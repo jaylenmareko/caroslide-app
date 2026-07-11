@@ -18,6 +18,7 @@ export async function createCarousel(input: {
   format: Format
   look: Look
   brief: string
+  referenceImageUrls: string[]
 }) {
   const supabase = await createClient()
   const {
@@ -38,6 +39,7 @@ export async function createCarousel(input: {
       look: input.look,
       brief: input.brief,
       slides: MOCK_SLIDES[input.angle].map((url) => ({ url })),
+      reference_images: input.referenceImageUrls.map((url) => ({ url })),
     })
     .select('id')
     .single()

@@ -13,6 +13,7 @@ const MOCK: Carousel = {
   look: 'Bold Stat',
   brief: null,
   slides: [1, 2, 3, 4, 5].map((i) => ({ url: `/mock/wagyuvalue-${i}.jpg` })),
+  reference_images: [],
   created_at: now,
   updated_at: now,
 }

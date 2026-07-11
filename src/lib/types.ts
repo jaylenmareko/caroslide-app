@@ -15,9 +15,13 @@ export type Carousel = {
   look: Look
   brief: string | null
   slides: Slide[]
+  reference_images: Slide[]
   created_at: string
   updated_at: string
 }
+
+export const MAX_ATTACHMENTS = 20
+export const MAX_ATTACHMENT_MB = 5
 
 export type BrandKit = {
   user_id: string

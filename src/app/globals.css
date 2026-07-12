@@ -320,7 +320,7 @@ a { color: inherit; }
    marquee content grid, scroll-rail steps, accordion FAQ),
    reskinned entirely in Caroslide's own colors/copy.
    ============================================================ */
-.lp { background: var(--bg); overflow-x: hidden; }
+.lp { background: var(--bg); overflow-x: hidden; font-family: var(--font-inter-tight), var(--font); }
 
 .lp-nav-wrap { position: sticky; top: 0; z-index: 40; padding: 18px 24px 0; }
 .lp-nav {
@@ -347,7 +347,7 @@ a { color: inherit; }
   position: relative; padding: 90px 24px 0; text-align: center; overflow: hidden;
   background: linear-gradient(160deg, #2C6B44 0%, #3E8B57 45%, #7DAE7F 100%);
 }
-.lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 60px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.08; color: #fff; }
+.lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 64px; font-weight: 650; letter-spacing: -1.3px; line-height: 1.12; color: #fff; }
 .lp-word { display: inline-block; opacity: 0; animation: lpFadeUp 0.6s ease forwards; }
 @keyframes lpFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .lp-hero-sub { max-width: 560px; margin: 0 auto 34px; font-size: 17px; color: rgba(255,255,255,0.88); line-height: 1.5; }
@@ -367,17 +367,14 @@ a { color: inherit; }
 .lp-hero-microcopy { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 12px; }
 .lp-hero-microcopy a { color: #fff; font-weight: 700; text-decoration: underline; }
 
-.lp-marquee-zone { position: relative; height: 420px; margin-top: 60px; display: flex; gap: 16px; padding: 0 24px; justify-content: center; mask-image: linear-gradient(180deg, transparent 0%, #000 12%, #000 88%, transparent 100%); }
-.lp-marquee-col { width: 200px; overflow: hidden; height: 100%; flex-shrink: 0; }
-.lp-marquee-col .lp-track { display: flex; flex-direction: column; gap: 16px; animation: lpMarqueeUp 34s linear infinite; }
-.lp-marquee-col.reverse .lp-track { animation-name: lpMarqueeDown; }
-.lp-marquee-col img { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 14px; box-shadow: var(--shadow-md); display: block; }
-@keyframes lpMarqueeUp { from { transform: translateY(0); } to { transform: translateY(-50%); } }
-@keyframes lpMarqueeDown { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+.lp-marquee-zone { position: relative; margin-top: 60px; overflow: hidden; mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%); }
+.lp-marquee-track { display: flex; gap: 20px; width: max-content; animation: lpMarqueeLeft 38s linear infinite; }
+.lp-marquee-track img { width: 190px; aspect-ratio: 4/5; object-fit: cover; border-radius: 14px; box-shadow: var(--shadow-md); display: block; flex-shrink: 0; }
+@keyframes lpMarqueeLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 .lp-steps { padding: 110px 24px 60px; }
 .lp-steps-head { text-align: center; max-width: 620px; margin: 0 auto 90px; }
-.lp-steps-head h2 { font-size: 42px; font-weight: 800; letter-spacing: -1px; margin: 0 0 14px; line-height: 1.15; }
+.lp-steps-head h2 { font-size: 44px; font-weight: 650; letter-spacing: -1px; margin: 0 0 14px; line-height: 1.15; }
 .lp-steps-head h2 .accent { color: var(--green); }
 .lp-steps-head p { font-size: 16px; color: var(--ink-soft); }
 .lp-step-row { max-width: 1100px; margin: 0 auto; display: flex; gap: 60px; align-items: center; margin-bottom: 90px; }
@@ -387,7 +384,7 @@ a { color: inherit; }
 .lp-step-line { width: 2px; flex: 1; background: var(--line-strong); margin: 6px 0; }
 .lp-step-text { flex: 1; }
 .lp-step-badge { display: inline-block; background: var(--green); color: #fff; font-size: 12.5px; font-weight: 800; padding: 6px 16px; border-radius: 100px; margin-bottom: 16px; }
-.lp-step-text h3 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 10px; }
+.lp-step-text h3 { font-size: 28px; font-weight: 650; letter-spacing: -0.5px; margin: 0 0 10px; }
 .lp-step-text p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.5; }
 .lp-step-visual { flex: 1; background: var(--surface); border-radius: 24px; padding: 30px; box-shadow: var(--shadow-md); border: 1px solid var(--line); }
 
@@ -399,13 +396,13 @@ a { color: inherit; }
 
 .lp-position { background: linear-gradient(160deg, #3E8B57 0%, #2C6B44 100%); padding: 100px 24px; text-align: center; color: #fff; }
 .lp-position .kicker { display: inline-block; background: rgba(255,255,255,0.16); padding: 7px 16px; border-radius: 100px; font-size: 12.5px; font-weight: 800; margin-bottom: 20px; }
-.lp-position h2 { font-size: 40px; font-weight: 800; letter-spacing: -1px; max-width: 700px; margin: 0 auto 20px; }
+.lp-position h2 { font-size: 42px; font-weight: 650; letter-spacing: -1px; max-width: 700px; margin: 0 auto 20px; }
 .lp-position p { max-width: 620px; margin: 0 auto; font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); }
 .lp-position blockquote { max-width: 560px; margin: 36px auto 0; font-size: 15px; font-style: italic; color: rgba(255,255,255,0.85); border-left: 3px solid rgba(255,255,255,0.4); padding-left: 18px; text-align: left; }
 .lp-position blockquote cite { display: block; margin-top: 8px; font-style: normal; font-weight: 700; font-size: 13px; }
 
 .lp-faq { padding: 100px 24px; max-width: 780px; margin: 0 auto; }
-.lp-faq h2 { text-align: center; font-size: 36px; font-weight: 800; letter-spacing: -0.8px; margin: 0 0 50px; }
+.lp-faq h2 { text-align: center; font-size: 38px; font-weight: 650; letter-spacing: -0.8px; margin: 0 0 50px; }
 .lp-faq-item { border-bottom: 1px solid var(--line); padding: 20px 0; }
 .lp-faq-q { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 16px; font-weight: 700; }
 .lp-faq-q .plus { font-size: 20px; color: var(--green); transition: transform 0.2s ease; }
@@ -426,7 +423,6 @@ a { color: inherit; }
   .lp-hero h1 { font-size: 38px; }
   .lp-step-row, .lp-step-row:nth-child(even) { flex-direction: column; }
   .lp-step-rail { display: none; }
-  .lp-marquee-zone { height: 300px; }
-  .lp-marquee-col { width: 140px; }
+  .lp-marquee-track img { width: 130px; }
   .lp-position h2, .lp-faq h2, .lp-steps-head h2 { font-size: 28px; }
 }

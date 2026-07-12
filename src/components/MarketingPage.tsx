@@ -31,16 +31,15 @@ function HeroWords({ text }: { text: string }) {
 }
 
 const MARQUEE_IMAGES = [
-  ['/mock/education-1.jpg', '/mock/education-2.jpg', '/mock/education-3.jpg', '/mock/education-4.jpg'],
-  ['/mock/growth-1.jpg', '/mock/growth-2.jpg', '/mock/wagyuvalue-3.jpg', '/mock/wagyuvalue-4.jpg'],
-  ['/mock/value-1.jpg', '/mock/wagyuvalue-1.jpg', '/mock/education-5.jpg', '/mock/growth-4.jpg'],
+  '/mock/education-1.jpg', '/mock/growth-1.jpg', '/mock/value-1.jpg', '/mock/wagyuvalue-1.jpg',
+  '/mock/education-3.jpg', '/mock/growth-2.jpg', '/mock/wagyuvalue-4.jpg', '/mock/education-5.jpg',
 ]
 
-function MarqueeColumn({ images, reverse }: { images: string[]; reverse?: boolean }) {
+function MarqueeRow({ images }: { images: string[] }) {
   const doubled = [...images, ...images]
   return (
-    <div className={`lp-marquee-col${reverse ? ' reverse' : ''}`}>
-      <div className="lp-track">
+    <div className="lp-marquee-zone">
+      <div className="lp-marquee-track">
         {doubled.map((src, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={i} src={src} alt="" />
@@ -133,11 +132,7 @@ export default function MarketingPage() {
           </p>
         </div>
 
-        <div className="lp-marquee-zone">
-          <MarqueeColumn images={MARQUEE_IMAGES[0]} />
-          <MarqueeColumn images={MARQUEE_IMAGES[1]} reverse />
-          <MarqueeColumn images={MARQUEE_IMAGES[2]} />
-        </div>
+        <MarqueeRow images={MARQUEE_IMAGES} />
       </section>
 
       <section className="lp-steps" id="how-it-works">

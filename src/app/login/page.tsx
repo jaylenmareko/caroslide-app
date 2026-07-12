@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -56,10 +57,10 @@ function LoginForm() {
   if (confirmSent) {
     return (
       <div className="auth-wrap">
+        <Link href="/" className="auth-top-brand">
+          <span>Caroslide</span>
+        </Link>
         <div className="auth-card">
-          <div className="brand">
-            <span>Caroslide</span>
-          </div>
           <h1>Check your email</h1>
           <p className="sub">
             We sent a confirmation link to <b>{email}</b>. Click it, then come back and sign in.
@@ -71,10 +72,10 @@ function LoginForm() {
 
   return (
     <div className="auth-wrap">
+      <Link href="/" className="auth-top-brand">
+        <span>Caroslide</span>
+      </Link>
       <div className="auth-card">
-        <div className="brand">
-          <span>Caroslide</span>
-        </div>
         <div key={mode} className="auth-mode-fade">
           <h1>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
           <p className="sub">

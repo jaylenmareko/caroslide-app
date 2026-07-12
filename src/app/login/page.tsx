@@ -13,7 +13,11 @@ function LoginForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    searchParams.get('error') === 'confirm_failed'
+      ? 'That confirmation link is invalid or expired. Please sign up again.'
+      : null
+  )
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
   const router = useRouter()
@@ -28,7 +32,10 @@ function LoginForm() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name } },
+        options: {
+          data: { name },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        },
       })
       if (error) {
         setError(error.message)

@@ -403,6 +403,18 @@ a { color: inherit; }
   padding: 26px; border-radius: 100px; text-decoration: none;
 }
 
+.lp-pricing { padding: 20px 24px 100px; text-align: center; }
+.lp-pricing h2 { font-size: 38px; font-weight: 650; letter-spacing: -0.9px; margin: 0 0 10px; }
+.lp-pricing-sub { font-size: 15.5px; color: var(--ink-soft); margin: 0 0 44px; }
+.lp-pricing-row { max-width: 640px; margin: 0 auto; display: flex; gap: 20px; }
+.lp-pricing-card {
+  flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px 26px;
+  text-align: left; box-shadow: var(--shadow-sm);
+}
+.lp-pricing-card.featured { border: 1.5px solid var(--green); box-shadow: var(--shadow-md); }
+.lp-pricing-amount { font-size: 30px; font-weight: 650; letter-spacing: -0.6px; margin: 14px 0 8px; }
+.lp-pricing-desc { font-size: 14px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 22px; }
+
 .lp-position { background: linear-gradient(160deg, #3E8B57 0%, #2C6B44 100%); padding: 100px 24px; text-align: center; color: #fff; }
 .lp-position .kicker { display: inline-block; background: rgba(255,255,255,0.16); padding: 7px 16px; border-radius: 100px; font-size: 12.5px; font-weight: 800; margin-bottom: 20px; }
 .lp-position h2 { font-size: 42px; font-weight: 650; letter-spacing: -1px; max-width: 700px; margin: 0 auto 20px; }
@@ -435,4 +447,5 @@ a { color: inherit; }
   .lp-step-rail { display: none; }
   .lp-marquee-track img { width: 130px; }
   .lp-position h2, .lp-faq h2, .lp-steps-head h2 { font-size: 28px; }
+  .lp-pricing-row { flex-direction: column; }
 }

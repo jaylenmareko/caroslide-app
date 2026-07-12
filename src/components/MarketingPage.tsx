@@ -3,18 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-const LOGO = (
-  <svg viewBox="0 0 200 115" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="100" y1="26" x2="100" y2="17" stroke="#F1E6D2" strokeWidth="3" />
-    <circle cx="100" cy="14" r="5" fill="#F1E6D2" />
-    <path d="M100,26 L30,92 Q41.5,104 53,84 L100,26 Z" fill="#F1E6D2" stroke="#16130f" strokeWidth="1.5" strokeOpacity="0.35" />
-    <path d="M100,26 L53,84 Q64.5,98 76,79 L100,26 Z" fill="#5B7A5E" />
-    <path d="M100,26 L76,79 Q88,95 100,76 L100,26 Z" fill="#F1E6D2" stroke="#16130f" strokeWidth="1.5" strokeOpacity="0.35" />
-    <path d="M100,26 L100,76 Q112,95 124,79 L100,26 Z" fill="#5B7A5E" />
-    <path d="M100,26 L124,79 Q135.5,98 147,84 L100,26 Z" fill="#F1E6D2" stroke="#16130f" strokeWidth="1.5" strokeOpacity="0.35" />
-    <path d="M100,26 L147,84 Q158.5,104 170,92 L100,26 Z" fill="#5B7A5E" />
-  </svg>
-)
 
 function HeroWords({ text }: { text: string }) {
   const words = text.split(' ')
@@ -31,8 +19,8 @@ function HeroWords({ text }: { text: string }) {
 }
 
 const MARQUEE_IMAGES = [
-  '/mock/education-1.jpg', '/mock/growth-1.jpg', '/mock/value-1.jpg', '/mock/wagyuvalue-1.jpg',
-  '/mock/education-3.jpg', '/mock/growth-2.jpg', '/mock/wagyuvalue-4.jpg', '/mock/education-5.jpg',
+  '/mock/wagyu-founder.jpg', '/mock/swipemaxx-tinder.jpg', '/mock/ranchpad-succession.jpg',
+  '/mock/wagyu-seedoil.jpg', '/mock/swipemaxx-dating.jpg', '/mock/ranchpad-lawsuit.jpg',
 ]
 
 function MarqueeRow({ images }: { images: string[] }) {
@@ -95,11 +83,10 @@ export default function MarketingPage() {
       <div className={`lp-nav-wrap${scrolled ? ' scrolled' : ''}`}>
         <nav className="lp-nav">
           <Link href="/" className="brand">
-            {LOGO}
             <span>Caroslide</span>
           </Link>
           <div className="lp-nav-links">
-            <Link href="/#how-it-works">How it works</Link>
+            <Link href="/#pricing">Pricing</Link>
             <Link href="/#faq">FAQ</Link>
           </div>
           <div className="lp-nav-actions">
@@ -161,7 +148,7 @@ export default function MarketingPage() {
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 1</span>
             <h3>Pick your angle</h3>
-            <p>Value, Growth, or Education — plus the format and look that fits what you're posting.</p>
+            <p>Value, Growth, or Education — plus the format and look that fits what you&apos;re posting.</p>
           </div>
           <div className="lp-step-visual">
             <div className="pick-row" style={{ marginBottom: 0 }}>
@@ -224,7 +211,7 @@ export default function MarketingPage() {
           </div>
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 4</span>
-            <h3>Iterate until it's right</h3>
+            <h3>Iterate until it&apos;s right</h3>
             <p>Chat to fix a hook, swap a CTA, or reorder a slide — no re-generating from scratch.</p>
           </div>
           <div className="lp-step-visual">
@@ -241,6 +228,25 @@ export default function MarketingPage() {
       <div className="lp-cta-bar-wrap">
         <Link href="/login" className="lp-cta-bar">Get Started For Free</Link>
       </div>
+
+      <section className="lp-pricing" id="pricing">
+        <h2>Simple pricing.</h2>
+        <p className="lp-pricing-sub">Start free. Upgrade when you&apos;re posting enough that it&apos;s worth it.</p>
+        <div className="lp-pricing-row">
+          <div className="lp-pricing-card">
+            <span className="plan-badge">Free</span>
+            <div className="lp-pricing-amount">$0</div>
+            <p className="lp-pricing-desc">3 carousels a month — every angle, format, and look.</p>
+            <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
+          </div>
+          <div className="lp-pricing-card featured">
+            <span className="plan-badge">Pro</span>
+            <div className="lp-pricing-amount">Coming soon</div>
+            <p className="lp-pricing-desc">Unlimited carousels, priority generation, and a saved Brand Kit.</p>
+            <Link href="/login" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Notified</Link>
+          </div>
+        </div>
+      </section>
 
       <section className="lp-position">
         <span className="kicker">Why Caroslide</span>
@@ -271,7 +277,6 @@ export default function MarketingPage() {
 
       <footer className="lp-footer">
         <Link href="/" className="brand">
-          {LOGO}
           <span>Caroslide</span>
         </Link>
         <div className="lp-footer-links">

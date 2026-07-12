@@ -18,6 +18,32 @@ const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Education', desc: 'A real fact, explained.' },
 ]
 
+function AngleIcon({ angle }: { angle: Angle }) {
+  if (angle === 'Value') {
+    return (
+      <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      </svg>
+    )
+  }
+  if (angle === 'Growth') {
+    return (
+      <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
+        <path d="M3 17l6-6 4 4 8-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M15 7h6v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
+      <path d="M4 5.5c0-.6.4-1 1-1h5.5a2 2 0 0 1 2 2v12a1.5 1.5 0 0 0-1.5-1.5H4V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M20 5.5c0-.6-.4-1-1-1h-5.5a2 2 0 0 0-2 2v12a1.5 1.5 0 0 1 1.5-1.5H20V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Circles + Photo', desc: 'Real photo proof, two circle insets.' },
   { title: 'Plain Text', desc: 'One strong cover, plain slides after.' },
@@ -214,6 +240,9 @@ export default function NewCarouselWizard() {
               className={`pick-card${angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
+              <div className="pick-card-icon">
+                <AngleIcon angle={a.title} />
+              </div>
               <div className="title">{a.title}</div>
               <div className="desc">{a.desc}</div>
             </div>

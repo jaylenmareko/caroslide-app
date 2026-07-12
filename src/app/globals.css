@@ -21,7 +21,7 @@ a { color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; color: inherit; }
 .brand svg { width: 64px; height: 64px; }
-.brand span { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; color: var(--ink); }
+.brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 24px; letter-spacing: -0.3px; color: var(--ink); }
 .nav-mid { display: flex; align-items: center; gap: 26px; }
 .nav-link { font-size: 14.5px; font-weight: 700; color: var(--ink-soft); text-decoration: none; padding: 6px 2px; border-bottom: 2px solid transparent; }
 .nav-link.active { color: var(--ink); border-bottom-color: var(--green); }
@@ -279,7 +279,7 @@ a { color: inherit; }
   .wrap { padding: 0 16px; }
   .app-nav { padding: 10px 16px; }
   .brand svg { width: 40px; height: 40px; }
-  .brand span { font-size: 15px; }
+  .brand span { font-size: 19px; }
 
   .dash-section { padding: 24px 0 40px; }
   .dash-head h1 { font-size: 21px; }
@@ -345,7 +345,7 @@ a { color: inherit; }
 }
 .lp-nav .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
 .lp-nav .brand svg { width: 34px; height: 34px; }
-.lp-nav .brand span { font-size: 16.5px; font-weight: 800; letter-spacing: -0.3px; color: #fff; transition: color 0.3s ease; }
+.lp-nav .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 24px; letter-spacing: -0.3px; color: #fff; transition: color 0.3s ease; }
 .lp-nav-wrap.scrolled .lp-nav .brand span { color: var(--ink); }
 .lp-nav-links { display: flex; align-items: center; gap: 28px; }
 .lp-nav-links a { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); text-decoration: none; transition: color 0.25s ease; }
@@ -421,17 +421,19 @@ a { color: inherit; }
 }
 .lp-cta-bar:hover { transform: translateY(-1px) scale(1.02); box-shadow: var(--shadow-md); }
 
-.lp-pricing { padding: 20px 24px 100px; text-align: center; }
+.lp-pricing { padding: 20px 24px 60px; text-align: center; }
 .lp-pricing h2 { font-size: 38px; font-weight: 600; letter-spacing: -0.9px; margin: 0 0 10px; }
 .lp-pricing-sub { font-size: 15.5px; color: var(--ink-soft); margin: 0 0 44px; }
-.lp-pricing-row { max-width: 640px; margin: 0 auto; display: flex; gap: 20px; }
+.lp-pricing-row { max-width: 920px; margin: 0 auto; display: flex; gap: 20px; }
 .lp-pricing-card {
   flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px 26px;
   text-align: left; box-shadow: var(--shadow-sm);
 }
-.lp-pricing-card.featured { border: 1.5px solid var(--green); box-shadow: var(--shadow-md); }
+.lp-pricing-card.featured { border: 1.5px solid var(--green); box-shadow: var(--shadow-md); position: relative; }
 .lp-pricing-amount { font-size: 30px; font-weight: 600; letter-spacing: -0.6px; margin: 14px 0 8px; }
+.lp-pricing-period { font-size: 15px; font-weight: 500; color: var(--ink-soft); }
 .lp-pricing-desc { font-size: 14px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 22px; }
+.lp-pricing-footnote { font-size: 13px; color: var(--ink-faint); margin: 32px 0 0; }
 
 .lp-position { background: linear-gradient(160deg, #3E8B57 0%, #2C6B44 100%); padding: 100px 24px; text-align: center; color: #fff; }
 .lp-position .kicker { display: inline-block; background: rgba(255,255,255,0.16); padding: 7px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-bottom: 20px; }
@@ -452,7 +454,7 @@ a { color: inherit; }
 .lp-footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 50px 24px 30px; text-align: center; }
 .lp-footer .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; margin-bottom: 14px; }
 .lp-footer .brand svg { width: 30px; height: 30px; }
-.lp-footer .brand span { font-weight: 800; font-size: 16px; color: #fff; }
+.lp-footer .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 22px; color: #fff; }
 .lp-footer-links { display: flex; gap: 22px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
 .lp-footer-links a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13.5px; }
 .lp-footer-links a:hover { color: #fff; }

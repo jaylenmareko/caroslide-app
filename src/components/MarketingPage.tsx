@@ -213,22 +213,29 @@ export default function MarketingPage() {
       <section className="lp-pricing" id="pricing">
         <Reveal>
           <h2>Simple pricing.</h2>
-          <p className="lp-pricing-sub">Start free. Upgrade when you&apos;re posting enough that it&apos;s worth it.</p>
+          <p className="lp-pricing-sub">1 carousel free when you sign up. Then pick the plan that fits how often you post.</p>
         </Reveal>
         <div className="lp-pricing-row">
           <Reveal className="lp-pricing-card">
-            <span className="plan-badge">Free</span>
-            <div className="lp-pricing-amount">$0</div>
-            <p className="lp-pricing-desc">3 carousels a month — every angle, format, and look.</p>
+            <span className="plan-badge">Starter</span>
+            <div className="lp-pricing-amount">$19<span className="lp-pricing-period">/mo</span></div>
+            <p className="lp-pricing-desc">10 carousels a month — every angle, format, and look.</p>
             <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
           <Reveal className="lp-pricing-card featured" delay={100}>
             <span className="plan-badge">Pro</span>
-            <div className="lp-pricing-amount">Coming soon</div>
-            <p className="lp-pricing-desc">Unlimited carousels, priority generation, and a saved Brand Kit.</p>
-            <Link href="/login" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Notified</Link>
+            <div className="lp-pricing-amount">$39<span className="lp-pricing-period">/mo</span></div>
+            <p className="lp-pricing-desc">30 carousels a month, priority generation, and a saved Brand Kit.</p>
+            <Link href="/login" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
+          </Reveal>
+          <Reveal className="lp-pricing-card" delay={200}>
+            <span className="plan-badge">Unlimited</span>
+            <div className="lp-pricing-amount">$79<span className="lp-pricing-period">/mo</span></div>
+            <p className="lp-pricing-desc">Unlimited carousels, top priority generation, and a saved Brand Kit.</p>
+            <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
         </div>
+        <p className="lp-pricing-footnote">Chat edits and iterations are always free — credits are only spent on new carousels.</p>
       </section>
 
       <section className="lp-position">

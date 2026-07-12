@@ -368,7 +368,7 @@ a { color: inherit; }
 
 .lp-hero {
   position: relative; margin: 20px 20px 0; border-radius: 30px; padding: 150px 24px 0; text-align: center; overflow: hidden;
-  background: radial-gradient(143% 115% at 50% 89.6%, #22C55E 26.1754%, #15803D 72%, #166534 87.0355%);
+  background: radial-gradient(150% 160% at 50% 92%, #22C55E 24%, #15803D 68%, #166534 92%);
 }
 .lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 64px; font-weight: 600; letter-spacing: -1.28px; line-height: 1.15; color: #fff; }
 .lp-word { display: inline-block; opacity: 0; animation: lpFadeUp 0.6s ease forwards; }

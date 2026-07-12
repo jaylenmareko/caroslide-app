@@ -320,7 +320,8 @@ a { color: inherit; }
    marquee content grid, scroll-rail steps, accordion FAQ),
    reskinned entirely in Caroslide's own colors/copy.
    ============================================================ */
-.lp { background: var(--bg); overflow-x: hidden; font-family: var(--font-inter-tight), var(--font); }
+.lp { background: var(--bg); overflow-x: hidden; font-family: var(--font-inter-tight), var(--font); cursor: default; user-select: none; }
+.lp input, .lp textarea { user-select: text; }
 
 .lp-reveal {
   opacity: 0; transform: translateY(60px) scale(0.94);

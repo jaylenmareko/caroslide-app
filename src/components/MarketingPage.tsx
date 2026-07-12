@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 const LOGO = (
@@ -79,10 +79,20 @@ const FAQS = [
 export default function MarketingPage() {
   const [topic, setTopic] = useState('')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 40)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <div className="lp">
-      <div className="lp-nav-wrap">
+      <div className={`lp-nav-wrap${scrolled ? ' scrolled' : ''}`}>
         <nav className="lp-nav">
           <Link href="/" className="brand">
             {LOGO}

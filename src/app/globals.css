@@ -329,10 +329,14 @@ a { color: inherit; }
 .lp-nav-wrap.scrolled { padding: 14px 24px 0; }
 .lp-nav {
   max-width: 1180px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between;
-  background: transparent; border-radius: 100px; padding: 10px 10px 10px 22px; box-shadow: none;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+  background: transparent; border-radius: 999px; padding: 14px 28px; box-shadow: none;
+  transition: background 0.3s ease, box-shadow 0.3s ease, backdrop-filter 0.3s ease, padding 0.3s ease;
 }
-.lp-nav-wrap.scrolled .lp-nav { background: var(--surface); box-shadow: var(--shadow-md); }
+.lp-nav-wrap.scrolled .lp-nav {
+  background: rgba(255,255,255,0.8);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: rgba(0,0,0,0.14) 0px 0.6px 0.6px -1.25px, rgba(0,0,0,0.13) 0px 2.3px 2.3px -2.5px, rgba(0,0,0,0.05) 0px 10px 10px -3.75px;
+}
 .lp-nav .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
 .lp-nav .brand svg { width: 34px; height: 34px; }
 .lp-nav .brand span { font-size: 16.5px; font-weight: 800; letter-spacing: -0.3px; color: #fff; transition: color 0.3s ease; }
@@ -353,8 +357,8 @@ a { color: inherit; }
 }
 
 .lp-hero {
-  position: relative; margin: 16px 16px 0; border-radius: 32px; padding: 150px 24px 0; text-align: center; overflow: hidden;
-  background: linear-gradient(160deg, #2C6B44 0%, #3E8B57 45%, #7DAE7F 100%);
+  position: relative; margin: 20px 20px 0; border-radius: 30px; padding: 150px 24px 0; text-align: center; overflow: hidden;
+  background: radial-gradient(143% 115% at 50% 89.6%, #6FCB8E 26.1754%, #3E8B57 72%, #1F4A32 87.0355%);
 }
 .lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 64px; font-weight: 650; letter-spacing: -1.3px; line-height: 1.12; color: #fff; }
 .lp-word { display: inline-block; opacity: 0; animation: lpFadeUp 0.6s ease forwards; }

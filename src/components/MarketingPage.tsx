@@ -189,7 +189,6 @@ export default function MarketingPage() {
         <Reveal className="lp-step-row">
           <div className="lp-step-rail">
             <div className="lp-step-dot" />
-            <div className="lp-step-line" />
           </div>
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 3</span>
@@ -202,25 +201,6 @@ export default function MarketingPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/mock/wagyuvalue-1.jpg" alt="Example carousel slide" />
               </div>
-            </div>
-          </div>
-        </Reveal>
-
-        <Reveal className="lp-step-row">
-          <div className="lp-step-rail">
-            <div className="lp-step-dot" />
-          </div>
-          <div className="lp-step-text">
-            <span className="lp-step-badge">Step 4</span>
-            <h3>Iterate until it&apos;s right</h3>
-            <p>Chat to fix a hook, swap a CTA, or reorder a slide — no re-generating from scratch.</p>
-          </div>
-          <div className="lp-step-visual">
-            <div className="chat-box" style={{ margin: 0, maxWidth: 'none' }}>
-              <input type="text" readOnly placeholder="e.g. slide 3: punchier hook, swap the CTA…" />
-              <button aria-label="Send" disabled>
-                <svg viewBox="0 0 24 24" width={16} height={16} fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
             </div>
           </div>
         </Reveal>

@@ -18,11 +18,61 @@ const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Education', desc: 'A real fact, explained.' },
 ]
 
-const LOOKS: { title: Look; desc: string; preview: string }[] = [
-  { title: 'Circles + Photo', desc: 'Real photo proof, two circle insets.', preview: '/mock/education-1.jpg' },
-  { title: 'Plain Text', desc: 'One strong cover, plain slides after.', preview: '/mock/growth-2.jpg' },
-  { title: 'Bold Stat', desc: 'A number takes over the frame.', preview: '/mock/value-1.jpg' },
+const LOOKS: { title: Look; desc: string }[] = [
+  { title: 'Circles + Photo', desc: 'Real photo proof, two circle insets.' },
+  { title: 'Plain Text', desc: 'One strong cover, plain slides after.' },
+  { title: 'Bold Stat', desc: 'A number takes over the frame.' },
 ]
+
+function ImagePlaceholderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} fill="none">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="8" cy="10" r="1.6" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M3 16.5 8.5 12 13 15.5 16.5 12.5 21 16" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function LookMockup({ look }: { look: Look }) {
+  if (look === 'Circles + Photo') {
+    return (
+      <div className="look-mock">
+        <div className="look-mock-photo">
+          <ImagePlaceholderIcon />
+        </div>
+        <div className="look-mock-circle-row">
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-lines">
+            <div className="look-mock-line" style={{ width: '70%' }} />
+            <div className="look-mock-line" style={{ width: '45%' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (look === 'Plain Text') {
+    return (
+      <div className="look-mock look-mock-plain">
+        <div className="look-mock-line" style={{ width: '80%', height: 10 }} />
+        <div className="look-mock-line" style={{ width: '92%', height: 10 }} />
+        <div className="look-mock-line" style={{ width: '60%', height: 10 }} />
+        <div className="look-mock-line accent" style={{ width: '38%' }} />
+      </div>
+    )
+  }
+  return (
+    <div className="look-mock look-mock-plain">
+      <div className="look-mock-stat">00%</div>
+      <div className="look-mock-line" style={{ width: '55%' }} />
+    </div>
+  )
+}
 
 type Attachment = { file: File; previewUrl: string }
 
@@ -181,8 +231,7 @@ export default function NewCarouselWizard() {
               onClick={() => pickLook(l.title)}
             >
               <div className="pick-card-preview">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={l.preview} alt={`${l.title} example`} />
+                <LookMockup look={l.title} />
               </div>
               <div className="title">
                 {l.title}

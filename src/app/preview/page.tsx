@@ -2,7 +2,7 @@
 // Supabase project is wired up and /dashboard can be checked directly.
 import Link from 'next/link'
 import DashboardGrid from '@/components/DashboardGrid'
-import TopNav from '@/components/TopNav'
+import Sidebar from '@/components/Sidebar'
 import type { Carousel } from '@/lib/types'
 
 const now = new Date().toISOString()
@@ -51,9 +51,9 @@ const MOCK: Carousel[] = [
 
 export default function PreviewPage() {
   return (
-    <>
-      <TopNav name="Jaylen Davis" email="jaylen@caroslide.com" />
-      <main>
+    <div className="app-shell">
+      <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />
+      <main className="app-main">
         <DashboardGrid carousels={MOCK} />
         <p style={{ textAlign: 'center', margin: '0 0 40px' }}>
           <Link href="/preview/new">→ preview wizard</Link> &nbsp;|&nbsp;{' '}
@@ -61,6 +61,6 @@ export default function PreviewPage() {
           <Link href="/preview/settings">→ preview settings</Link>
         </p>
       </main>
-    </>
+    </div>
   )
 }

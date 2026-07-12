@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import TopNav from '@/components/TopNav'
+import Sidebar from '@/components/Sidebar'
 
 export default async function AppLayout({
   children,
@@ -19,9 +19,9 @@ export default async function AppLayout({
   const name = (user.user_metadata?.name as string | undefined) || user.email!.split('@')[0]
 
   return (
-    <>
-      <TopNav name={name} email={user.email!} />
-      <main>{children}</main>
-    </>
+    <div className="app-shell">
+      <Sidebar name={name} email={user.email!} />
+      <main className="app-main">{children}</main>
+    </div>
   )
 }

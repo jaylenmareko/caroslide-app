@@ -28,9 +28,11 @@ export default function DashboardGrid({ carousels }: { carousels: Carousel[] }) 
             </div>
             <div className="meta">
               <div className="k">{c.title}</div>
-              <div className="t">
-                {c.angle} · {c.format} · {timeAgo(c.updated_at)}
+              <div className="dash-card-tags">
+                <span className="dash-tag">{c.angle}</span>
+                <span className="dash-tag neutral">{c.format}</span>
               </div>
+              <div className="t">{timeAgo(c.updated_at)}</div>
             </div>
           </Link>
         ))}

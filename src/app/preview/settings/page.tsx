@@ -1,11 +1,11 @@
-import TopNav from '@/components/TopNav'
+import Sidebar from '@/components/Sidebar'
 import SettingsForm from '@/components/SettingsForm'
 
 export default function PreviewSettingsPage() {
   return (
-    <>
-      <TopNav name="Jaylen Davis" email="jaylen@caroslide.com" />
-      <main>
+    <div className="app-shell">
+      <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />
+      <main className="app-main">
         <SettingsForm
           name="Jaylen Davis"
           email="jaylen@caroslide.com"
@@ -18,6 +18,6 @@ export default function PreviewSettingsPage() {
           }}
         />
       </main>
-    </>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-import TopNav from '@/components/TopNav'
+import Sidebar from '@/components/Sidebar'
 import Viewer from '@/components/Viewer'
 import type { Carousel } from '@/lib/types'
 
@@ -20,11 +20,11 @@ const MOCK: Carousel = {
 
 export default function PreviewCarouselPage() {
   return (
-    <>
-      <TopNav name="Jaylen Davis" email="jaylen@caroslide.com" />
-      <main>
+    <div className="app-shell">
+      <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />
+      <main className="app-main">
         <Viewer carousel={MOCK} />
       </main>
-    </>
+    </div>
   )
 }

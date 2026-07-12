@@ -91,8 +91,8 @@ export default function MarketingPage() {
             <a href="#faq">FAQ</a>
           </div>
           <div className="lp-nav-actions">
-            <Link href="/login" className="lp-btn-ghost">Sign In</Link>
-            <Link href="/login" className="lp-btn-solid">Get Started</Link>
+            <Link href="/login" className="lp-btn-ghost">Login</Link>
+            <Link href="/login" className="lp-btn-solid">Sign Up</Link>
           </div>
         </nav>
       </div>

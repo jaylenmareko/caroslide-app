@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Reveal from './Reveal'
 
 
 function HeroWords({ text }: { text: string }) {
@@ -133,14 +134,14 @@ export default function MarketingPage() {
       </section>
 
       <section className="lp-steps" id="how-it-works">
-        <div className="lp-steps-head">
+        <Reveal className="lp-steps-head">
           <h2>
             Real carousels, <span className="accent">not templates.</span>
           </h2>
           <p>Caroslide handles the writing, the design, and the format — you just pick the angle.</p>
-        </div>
+        </Reveal>
 
-        <div className="lp-step-row">
+        <Reveal className="lp-step-row">
           <div className="lp-step-rail">
             <div className="lp-step-dot" />
             <div className="lp-step-line" />
@@ -157,9 +158,9 @@ export default function MarketingPage() {
               <div className="pick-card"><div className="title">Education</div><div className="desc">A real fact, explained.</div></div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
-        <div className="lp-step-row">
+        <Reveal className="lp-step-row">
           <div className="lp-step-rail">
             <div className="lp-step-dot" />
             <div className="lp-step-line" />
@@ -183,9 +184,9 @@ export default function MarketingPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
-        <div className="lp-step-row">
+        <Reveal className="lp-step-row">
           <div className="lp-step-rail">
             <div className="lp-step-dot" />
             <div className="lp-step-line" />
@@ -203,9 +204,9 @@ export default function MarketingPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
-        <div className="lp-step-row">
+        <Reveal className="lp-step-row">
           <div className="lp-step-rail">
             <div className="lp-step-dot" />
           </div>
@@ -222,7 +223,7 @@ export default function MarketingPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <div className="lp-cta-bar-wrap">
@@ -230,48 +231,54 @@ export default function MarketingPage() {
       </div>
 
       <section className="lp-pricing" id="pricing">
-        <h2>Simple pricing.</h2>
-        <p className="lp-pricing-sub">Start free. Upgrade when you&apos;re posting enough that it&apos;s worth it.</p>
+        <Reveal>
+          <h2>Simple pricing.</h2>
+          <p className="lp-pricing-sub">Start free. Upgrade when you&apos;re posting enough that it&apos;s worth it.</p>
+        </Reveal>
         <div className="lp-pricing-row">
-          <div className="lp-pricing-card">
+          <Reveal className="lp-pricing-card">
             <span className="plan-badge">Free</span>
             <div className="lp-pricing-amount">$0</div>
             <p className="lp-pricing-desc">3 carousels a month — every angle, format, and look.</p>
             <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
-          </div>
-          <div className="lp-pricing-card featured">
+          </Reveal>
+          <Reveal className="lp-pricing-card featured" delay={100}>
             <span className="plan-badge">Pro</span>
             <div className="lp-pricing-amount">Coming soon</div>
             <p className="lp-pricing-desc">Unlimited carousels, priority generation, and a saved Brand Kit.</p>
             <Link href="/login" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Notified</Link>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       <section className="lp-position">
-        <span className="kicker">Why Caroslide</span>
-        <h2>Everyone else gives you a template. We give you a carousel.</h2>
-        <p>
-          We looked at the other carousel tools out there. Every one of them hands you a template and expects
-          you to write the copy, pick the photos, and design the layout yourself. Caroslide does all of that —
-          you just pick the angle.
-        </p>
-        <blockquote>
-          &ldquo;They all have the same concept. They give a template and you do the rest. None have incorporated AI yet.&rdquo;
-          <cite>— a real user, after trying three competitor carousel tools</cite>
-        </blockquote>
+        <Reveal>
+          <span className="kicker">Why Caroslide</span>
+          <h2>Everyone else gives you a template. We give you a carousel.</h2>
+          <p>
+            We looked at the other carousel tools out there. Every one of them hands you a template and expects
+            you to write the copy, pick the photos, and design the layout yourself. Caroslide does all of that —
+            you just pick the angle.
+          </p>
+          <blockquote>
+            &ldquo;They all have the same concept. They give a template and you do the rest. None have incorporated AI yet.&rdquo;
+            <cite>— a real user, after trying three competitor carousel tools</cite>
+          </blockquote>
+        </Reveal>
       </section>
 
       <section className="lp-faq" id="faq">
-        <h2>Frequently Asked Questions</h2>
+        <Reveal>
+          <h2>Frequently Asked Questions</h2>
+        </Reveal>
         {FAQS.map((f, i) => (
-          <div key={i} className={`lp-faq-item${openFaq === i ? ' open' : ''}`}>
+          <Reveal key={i} delay={i * 60} className={`lp-faq-item${openFaq === i ? ' open' : ''}`}>
             <div className="lp-faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
               {f.q}
               <span className="plus">+</span>
             </div>
             <div className="lp-faq-a">{f.a}</div>
-          </div>
+          </Reveal>
         ))}
       </section>
 

@@ -92,7 +92,7 @@ export default function MarketingPage() {
           </div>
           <div className="lp-nav-actions">
             <Link href="/login" className="lp-btn-ghost">Login</Link>
-            <Link href="/login" className="lp-btn-solid">Sign Up</Link>
+            <Link href="/login?mode=signup" className="lp-btn-solid">Sign Up</Link>
           </div>
         </nav>
       </div>
@@ -110,7 +110,7 @@ export default function MarketingPage() {
             className="lp-hero-form"
             onSubmit={(e) => {
               e.preventDefault()
-              window.location.href = `/login?topic=${encodeURIComponent(topic)}`
+              window.location.href = `/login?mode=signup&topic=${encodeURIComponent(topic)}`
             }}
           >
             <input
@@ -126,7 +126,7 @@ export default function MarketingPage() {
             </button>
           </form>
           <p className="lp-hero-microcopy">
-            No brand yet? <Link href="/login">Just tell us about it</Link>
+            No brand yet? <Link href="/login?mode=signup">Just tell us about it</Link>
           </p>
         </div>
 
@@ -207,7 +207,7 @@ export default function MarketingPage() {
       </section>
 
       <div className="lp-cta-bar-wrap">
-        <Link href="/login" className="lp-cta-bar">Get Started For Free</Link>
+        <Link href="/login?mode=signup" className="lp-cta-bar">Get Started For Free</Link>
       </div>
 
       <section className="lp-pricing" id="pricing">
@@ -220,19 +220,19 @@ export default function MarketingPage() {
             <span className="plan-badge">Starter</span>
             <div className="lp-pricing-amount">$19<span className="lp-pricing-period">/mo</span></div>
             <p className="lp-pricing-desc">10 carousels a month — every angle, format, and look.</p>
-            <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
+            <Link href="/login?mode=signup" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
           <Reveal className="lp-pricing-card featured" delay={100}>
             <span className="plan-badge">Pro</span>
             <div className="lp-pricing-amount">$39<span className="lp-pricing-period">/mo</span></div>
             <p className="lp-pricing-desc">30 carousels a month, priority generation, and a saved Brand Kit.</p>
-            <Link href="/login" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
+            <Link href="/login?mode=signup" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
           <Reveal className="lp-pricing-card" delay={200}>
             <span className="plan-badge">Unlimited</span>
             <div className="lp-pricing-amount">$79<span className="lp-pricing-period">/mo</span></div>
             <p className="lp-pricing-desc">Unlimited carousels, top priority generation, and a saved Brand Kit.</p>
-            <Link href="/login" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
+            <Link href="/login?mode=signup" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
         </div>
         <p className="lp-pricing-footnote">Chat edits and iterations are always free — credits are only spent on new carousels.</p>

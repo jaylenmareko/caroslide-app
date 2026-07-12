@@ -7,6 +7,7 @@
   --shadow-sm: 0 2px 6px -2px rgba(21,20,15,0.08);
   --shadow-md: 0 14px 34px -14px rgba(21,20,15,0.20), 0 4px 12px -4px rgba(21,20,15,0.08);
   --cta-glow: 0 10px 24px -8px rgba(22,101,52,0.4);
+  --hero-gradient: radial-gradient(150% 160% at 50% 92%, #22C55E 24%, #15803D 68%, #166534 92%);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -255,8 +256,20 @@ a { color: inherit; }
 .chat-hint { font-size: 12px; color: var(--ink-faint); margin-top: 10px; max-width: 420px; text-align: center; }
 
 /* ---------- auth ---------- */
-.auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.auth-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px 30px; box-shadow: var(--shadow-md); }
+.auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--hero-gradient); }
+.auth-card {
+  width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px 30px; box-shadow: var(--shadow-md);
+  animation: authCardIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes authCardIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.auth-mode-fade { animation: authModeFade 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes authModeFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .auth-card .brand { justify-content: center; margin-bottom: 22px; }
 .auth-card h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px; text-align: center; }
 .auth-card p.sub { font-size: 13px; color: var(--ink-soft); margin: 0 0 22px; text-align: center; }
@@ -265,13 +278,18 @@ a { color: inherit; }
 .auth-field input {
   width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px; font-size: 14px;
   font-family: var(--font); color: var(--ink); background: var(--bg-alt);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.auth-field input:focus { outline: none; border-color: var(--green-bright); box-shadow: 0 0 0 3px var(--green-pale); }
 .auth-submit {
   width: 100%; margin-top: 6px; background: linear-gradient(135deg, var(--green-bright), var(--green));
   color: #fff; padding: 11px 18px; border-radius: 100px; font-weight: 700; font-size: 14px; border: none; cursor: pointer; box-shadow: var(--cta-glow);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
+.auth-submit:hover { transform: translateY(-1px) scale(1.01); box-shadow: var(--shadow-md); }
 .auth-switch { text-align: center; font-size: 12.5px; color: var(--ink-soft); margin-top: 16px; }
-.auth-switch button { background: none; border: none; color: var(--green); font-weight: 700; cursor: pointer; font-family: var(--font); font-size: 12.5px; }
+.auth-switch button { background: none; border: none; color: var(--green); font-weight: 700; cursor: pointer; font-family: var(--font); font-size: 12.5px; transition: opacity 0.2s ease; }
+.auth-switch button:hover { opacity: 0.7; }
 .auth-error { font-size: 12.5px; color: #B3432B; background: #FBEAE6; border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; }
 
 /* ---------- mobile ---------- */
@@ -369,7 +387,7 @@ a { color: inherit; }
 
 .lp-hero {
   position: relative; margin: 20px 20px 0; border-radius: 30px; padding: 150px 24px 0; text-align: center; overflow: hidden;
-  background: radial-gradient(150% 160% at 50% 92%, #22C55E 24%, #15803D 68%, #166534 92%);
+  background: var(--hero-gradient);
 }
 .lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 64px; font-weight: 600; letter-spacing: -1.28px; line-height: 1.15; color: #fff; }
 .lp-word { display: inline-block; opacity: 0; animation: lpFadeUp 0.6s ease forwards; }

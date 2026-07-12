@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const [mode, setMode] = useState<'signin' | 'signup'>(
+    searchParams.get('mode') === 'signup' ? 'signup' : 'signin'
+  )
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -72,72 +75,82 @@ export default function LoginPage() {
         <div className="brand">
           <span>Caroslide</span>
         </div>
-        <h1>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
-        <p className="sub">
-          {mode === 'signin'
-            ? 'Sign in to keep making carousels.'
-            : 'Get five ready-to-post slides in minutes.'}
-        </p>
+        <div key={mode} className="auth-mode-fade">
+          <h1>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
+          <p className="sub">
+            {mode === 'signin'
+              ? 'Sign in to keep making carousels.'
+              : 'Get five ready-to-post slides in minutes.'}
+          </p>
 
-        {error && <div className="auth-error">{error}</div>}
+          {error && <div className="auth-error">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          {mode === 'signup' && (
+          <form onSubmit={handleSubmit}>
+            {mode === 'signup' && (
+              <div className="auth-field">
+                <label htmlFor="name">Name</label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="auth-field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="email">Email</label>
               <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
-          )}
-          <div className="auth-field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-          </div>
-          <button className="auth-submit" type="submit" disabled={loading}>
-            {loading ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
-          </button>
-        </form>
+            <div className="auth-field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                required
+              />
+            </div>
+            <button className="auth-submit" type="submit" disabled={loading}>
+              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
+            </button>
+          </form>
 
-        <div className="auth-switch">
-          {mode === 'signin' ? (
-            <>
-              New here?{' '}
-              <button type="button" onClick={() => setMode('signup')}>
-                Create an account
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <button type="button" onClick={() => setMode('signin')}>
-                Sign in
-              </button>
-            </>
-          )}
+          <div className="auth-switch">
+            {mode === 'signin' ? (
+              <>
+                New here?{' '}
+                <button type="button" onClick={() => setMode('signup')}>
+                  Create an account
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button type="button" onClick={() => setMode('signin')}>
+                  Sign in
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

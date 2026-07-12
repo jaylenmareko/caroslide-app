@@ -1,12 +1,12 @@
 :root {
   --bg: #FBFAF7; --bg-alt: #F2F5F1; --surface: #FFFFFF;
   --ink: #15140F; --ink-soft: #676054; --ink-faint: #9C9585;
-  --green: #2C6B44; --green-bright: #3E8B57; --green-pale: #E3F0E7;
+  --green: #15803D; --green-bright: #16A34A; --green-pale: #DCFCE7;
   --line: rgba(21,20,15,0.10); --line-strong: rgba(21,20,15,0.16);
   --font: -apple-system, 'Segoe UI Variable', 'Segoe UI', system-ui, Arial, sans-serif;
   --shadow-sm: 0 2px 6px -2px rgba(21,20,15,0.08);
   --shadow-md: 0 14px 34px -14px rgba(21,20,15,0.20), 0 4px 12px -4px rgba(21,20,15,0.08);
-  --cta-glow: 0 10px 24px -8px rgba(44,107,68,0.45);
+  --cta-glow: 0 10px 24px -8px rgba(21,128,61,0.5);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -368,7 +368,7 @@ a { color: inherit; }
 
 .lp-hero {
   position: relative; margin: 20px 20px 0; border-radius: 30px; padding: 150px 24px 0; text-align: center; overflow: hidden;
-  background: radial-gradient(143% 115% at 50% 89.6%, #6FCB8E 26.1754%, #3E8B57 72%, #1F4A32 87.0355%);
+  background: radial-gradient(143% 115% at 50% 89.6%, #4ADE80 26.1754%, #16A34A 72%, #14532D 87.0355%);
 }
 .lp-hero h1 { max-width: 900px; margin: 0 auto 22px; font-size: 64px; font-weight: 600; letter-spacing: -1.28px; line-height: 1.15; color: #fff; }
 .lp-word { display: inline-block; opacity: 0; animation: lpFadeUp 0.6s ease forwards; }
@@ -435,7 +435,7 @@ a { color: inherit; }
 .lp-pricing-desc { font-size: 14px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 22px; }
 .lp-pricing-footnote { font-size: 13px; color: var(--ink-faint); margin: 32px 0 0; }
 
-.lp-position { background: linear-gradient(160deg, #3E8B57 0%, #2C6B44 100%); padding: 100px 24px; text-align: center; color: #fff; }
+.lp-position { background: linear-gradient(160deg, #16A34A 0%, #15803D 100%); padding: 100px 24px; text-align: center; color: #fff; }
 .lp-position .kicker { display: inline-block; background: rgba(255,255,255,0.16); padding: 7px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-bottom: 20px; }
 .lp-position h2 { font-size: 42px; font-weight: 600; letter-spacing: -1px; max-width: 700px; margin: 0 auto 20px; }
 .lp-position p { max-width: 620px; margin: 0 auto; font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); }

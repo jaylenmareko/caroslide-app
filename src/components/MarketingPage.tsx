@@ -87,8 +87,8 @@ export default function MarketingPage() {
             <span>Caroslide</span>
           </Link>
           <div className="lp-nav-links">
-            <Link href="/#pricing">Pricing</Link>
-            <Link href="/#faq">FAQ</Link>
+            <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
           </div>
           <div className="lp-nav-actions">
             <Link href="/login" className="lp-btn-ghost">Sign In</Link>
@@ -275,8 +275,8 @@ export default function MarketingPage() {
         </Link>
         <div className="lp-footer-links">
           <Link href="/login">Sign In</Link>
-          <Link href="/#how-it-works">How it works</Link>
-          <Link href="/#faq">FAQ</Link>
+          <a href="#how-it-works">How it works</a>
+          <a href="#faq">FAQ</a>
         </div>
         <p className="copy">© {new Date().getFullYear()} Caroslide. All rights reserved.</p>
       </footer>

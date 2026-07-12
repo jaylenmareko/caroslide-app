@@ -99,7 +99,7 @@ export default function MarketingPage() {
 
       <section className="lp-hero">
         <h1>
-          <HeroWords text="The AI that makes your posts for you." />
+          <HeroWords text="The AI that makes your carousels for you." />
         </h1>
         <p className="lp-hero-sub">
           Caroslide turns a topic into a finished carousel — real slides, in your brand, not a template you fill in yourself.

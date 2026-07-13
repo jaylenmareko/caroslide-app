@@ -287,25 +287,25 @@ a { color: inherit; }
 
 .viewer-body { display: flex; align-items: flex-start; justify-content: center; gap: 30px; padding: 40px 40px 60px; }
 .thumb-rail { display: flex; flex-direction: column; gap: 10px; width: 66px; flex-shrink: 0; padding-top: 6px; }
-.thumb-item { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; aspect-ratio: 4/5; background: #111; box-shadow: var(--shadow-sm); }
+.thumb-item { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; aspect-ratio: 4/5; background: #111; }
 .thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb-item.active { border-color: var(--green); }
 .thumb-item .num {
-  position: absolute; bottom: 3px; left: 5px; font-size: 9.5px; font-weight: 800; color: #fff;
+  position: absolute; bottom: 3px; left: 5px; font-size: 9.5px; font-weight: 600; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,.7);
 }
 .canvas-col { display: flex; flex-direction: column; align-items: center; }
-.canvas-mat { background: var(--surface); border-radius: 26px; padding: 36px; box-shadow: var(--shadow-md); border: 1px solid var(--line); }
+.canvas-mat { background: var(--surface); border-radius: 16px; padding: 36px; border: 1px solid var(--line); }
 .stage { position: relative; width: 280px; }
-.stage-frame { border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-md); background: #111; cursor: zoom-in; border: none; padding: 0; }
+.stage-frame { border-radius: 16px; overflow: hidden; background: #111; cursor: zoom-in; border: none; padding: 0; }
 .stage-frame img { width: 100%; display: block; aspect-ratio: 4/5; object-fit: cover; }
 
 .lightbox {
-  display: none; position: fixed; inset: 0; background: rgba(10,10,8,0.86); z-index: 1000;
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(7.5px); z-index: 1000;
   align-items: center; justify-content: center; padding: 40px; cursor: zoom-out;
 }
 .lightbox.show { display: flex; }
-.lightbox img { max-width: min(560px, 90vw); max-height: 88vh; border-radius: 14px; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6); }
+.lightbox img { max-width: min(560px, 90vw); max-height: 88vh; border-radius: 14px; }
 .lightbox-close {
   position: absolute; top: 24px; right: 32px; width: 42px; height: 42px; border-radius: 50%;
   background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; font-size: 20px;
@@ -314,14 +314,14 @@ a { color: inherit; }
 .stage-arrow {
   position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; border-radius: 50%;
   background: var(--surface); border: 1px solid var(--line-strong); cursor: pointer; font-size: 18px; color: var(--ink);
-  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);
+  display: flex; align-items: center; justify-content: center;
 }
 .stage-prev { left: -21px; } .stage-next { right: -21px; }
 
 .chat-box {
   width: 100%; max-width: 460px; margin-top: 30px;
   background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 100px;
-  padding: 7px 7px 7px 20px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow-md);
+  padding: 7px 7px 7px 20px; display: flex; align-items: center; gap: 10px;
 }
 .chat-box input { flex: 1; border: none; outline: none; background: none; font-family: var(--font); font-size: 14.5px; color: var(--ink); padding: 11px 0; }
 .chat-box input::placeholder { color: var(--ink-faint); }

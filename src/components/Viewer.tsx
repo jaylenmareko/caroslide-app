@@ -10,7 +10,6 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(carousel.title)
-  const [hasEditedTitle, setHasEditedTitle] = useState(false)
 
   const slides = carousel.slides
 
@@ -40,30 +39,28 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
         </Link>
         <div className="viewer-title-wrap">
           {editingTitle ? (
-            <div className="viewer-title">
-              <input
-                autoFocus
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={commitTitle}
-                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-              />
-            </div>
-          ) : (
-            <div
+            <input
               className="viewer-title"
-              onClick={() => {
-                setEditingTitle(true)
-                setHasEditedTitle(true)
-              }}
-            >
-              {title}
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            />
+          ) : (
+            <div className="viewer-title-group" onClick={() => setEditingTitle(true)}>
+              <span className="viewer-title">{title}</span>
+              <svg className="viewer-title-edit-icon" viewBox="0 0 24 24" width={14} height={14} fill="none">
+                <path
+                  d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
           )}
-          {!hasEditedTitle && <div className="viewer-title-hint">Tap to change name</div>}
-          <div className="viewer-count">
-            Slide {current + 1} of {slides.length}
-          </div>
         </div>
         <button className="download-btn">⬇ Download</button>
       </div>
@@ -84,27 +81,26 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
         </div>
 
         <div className="canvas-col">
-          <div className="canvas-mat">
-            <div className="stage">
-              <button className="stage-frame" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slides[current]?.url} alt="Carousel slide" />
-              </button>
-              <button
-                className="stage-arrow stage-prev"
-                aria-label="Previous"
-                onClick={() => setCurrent((c) => (c - 1 + slides.length) % slides.length)}
-              >
-                ‹
-              </button>
-              <button
-                className="stage-arrow stage-next"
-                aria-label="Next"
-                onClick={() => setCurrent((c) => (c + 1) % slides.length)}
-              >
-                ›
-              </button>
-            </div>
+          <div className="stage">
+            <button className="stage-frame" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={slides[current]?.url} alt="Carousel slide" />
+            </button>
+          </div>
+
+          <div className="stage-nav">
+            <button
+              className="stage-nav-btn"
+              onClick={() => setCurrent((c) => (c - 1 + slides.length) % slides.length)}
+            >
+              ‹ Previous
+            </button>
+            <span className="stage-nav-count">
+              {current + 1} / {slides.length}
+            </span>
+            <button className="stage-nav-btn" onClick={() => setCurrent((c) => (c + 1) % slides.length)}>
+              Next ›
+            </button>
           </div>
 
           <div className="chat-box">

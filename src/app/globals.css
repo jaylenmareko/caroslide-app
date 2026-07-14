@@ -7,7 +7,7 @@
   --shadow-sm: 0 2px 6px -2px rgba(21,20,15,0.08);
   --shadow-md: 0 14px 34px -14px rgba(21,20,15,0.20), 0 4px 12px -4px rgba(21,20,15,0.08);
   --cta-glow: 0 10px 24px -8px rgba(22,101,52,0.4);
-  --hero-gradient: radial-gradient(150% 160% at 50% 92%, #22C55E 24%, #15803D 68%, #166534 92%);
+  --hero-gradient: radial-gradient(150% 160% at 50% 92%, #86EFAC 4%, #22C55E 26%, #15803D 55%, #14532D 80%, #052E16 100%);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -266,11 +266,14 @@ a { color: inherit; }
 .viewer-topbar { display: flex; align-items: center; justify-content: space-between; padding: 24px 40px; background: var(--surface); border-bottom: 1px solid var(--line); margin-bottom: 0; }
 .viewer-back { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 600; color: var(--ink-soft); text-decoration: none; background: none; border: none; cursor: pointer; font-family: var(--font); }
 .viewer-title-wrap { display: flex; flex-direction: column; align-items: center; }
-.viewer-title-group { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; padding: 2px 8px; border-radius: 8px; }
-.viewer-title-group:hover { background: var(--bg-alt); }
+.viewer-title-group {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 14px; border-radius: 8px;
+  border: 1px solid rgba(21,20,15,0.28); transition: border-color 0.15s ease, background 0.15s ease;
+}
+.viewer-title-group:hover { background: var(--bg-alt); border-color: var(--green); }
 .viewer-title-group:hover .viewer-title-edit-icon { opacity: 1; }
 .viewer-title { font-size: 28px; font-weight: 600; color: var(--ink); letter-spacing: -0.4px; }
-.viewer-title-edit-icon { opacity: 0; flex-shrink: 0; color: var(--ink-faint); transition: opacity 0.15s ease; }
+.viewer-title-edit-icon { opacity: 0.5; flex-shrink: 0; color: var(--ink-faint); transition: opacity 0.15s ease; }
 .viewer-title input {
   font-size: 28px; font-weight: 600; color: var(--ink); text-align: center; border: none; border-bottom: 2px solid var(--green);
   outline: none; background: none; font-family: var(--font); padding: 0; width: 280px;

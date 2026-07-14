@@ -44,8 +44,18 @@ export default function SettingsForm({
       <p className="lede">Your account, brand defaults, and plan.</p>
 
       <div className="settings-block">
-        <h2>Account</h2>
-        <p className="sub">Basic profile info.</p>
+        <div className="settings-block-head">
+          <div className="settings-block-icon">
+            <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
+              <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M5 20c1.2-3.5 4-5.5 7-5.5s5.8 2 7 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div>
+            <h2>Account</h2>
+            <p className="sub">Basic profile info.</p>
+          </div>
+        </div>
         <div className="settings-row">
           <div>
             <div className="label">Name</div>
@@ -85,17 +95,34 @@ export default function SettingsForm({
       </div>
 
       <div className="settings-block">
-        <h2>Brand Kit</h2>
-        <p className="sub">
-          Save your colors, logo, and voice once — every new carousel starts pre-filled with this instead of asking every time.
-        </p>
+        <div className="settings-block-head">
+          <div className="settings-block-icon">
+            <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
+              <circle cx="7" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="17" cy="6.5" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="17" cy="17.5" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          </div>
+          <div>
+            <h2>Brand Kit</h2>
+            <p className="sub">
+              Save your colors, logo, and voice once — every new carousel starts pre-filled with this instead of asking every time.
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-field-label">Colors</div>
         <div className="brand-swatches">
           {colors.map((c, i) => (
             <div key={i} className="brand-swatch" style={{ background: c }} />
           ))}
           <div className="brand-swatch add">+</div>
         </div>
+
+        <div className="settings-field-label">Logo</div>
         <div className="brand-logo-upload">Drop your logo here, or click to upload</div>
+
+        <div className="settings-field-label">Voice &amp; tone</div>
         <textarea
           className="brand-desc"
           value={voice}
@@ -109,18 +136,28 @@ export default function SettingsForm({
       </div>
 
       <div className="settings-block">
-        <h2>Plan</h2>
-        <p className="sub">
-          <span className="plan-badge">Free</span> — 3 carousels / month
-        </p>
-        <div className="settings-row">
+        <div className="settings-block-head">
+          <div className="settings-block-icon">
+            <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
+              <path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8L12 3.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          </div>
           <div>
-            <div className="label">Upgrade for unlimited carousels + priority generation</div>
+            <h2>Plan</h2>
+            <p className="sub">Your current subscription.</p>
+          </div>
+        </div>
+
+        <div className="plan-current">
+          <div>
+            <span className="plan-badge">Free</span>
+            <div className="plan-current-desc">3 carousels / month</div>
           </div>
           <button className="settings-save" style={{ marginTop: 0 }}>
             Upgrade
           </button>
         </div>
+        <p className="plan-upsell">Upgrade for unlimited carousels, priority generation, and more saved brand kits.</p>
       </div>
     </section>
   )

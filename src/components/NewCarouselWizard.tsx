@@ -18,29 +18,33 @@ const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Education', desc: 'A real fact, explained.' },
 ]
 
-function AngleIcon({ angle }: { angle: Angle }) {
-  if (angle === 'Value') {
-    return (
-      <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
-        <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6" />
-        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-      </svg>
-    )
-  }
-  if (angle === 'Growth') {
-    return (
-      <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
-        <path d="M3 17l6-6 4 4 8-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M15 7h6v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    )
-  }
+const ANGLE_MOCK_COPY: Record<Angle, { text: React.ReactNode; size: 'lg' | 'md' | 'sm' }> = {
+  Value: {
+    text: <>Your lotion has <span className="angle-mock-accent">more seed oil</span> than your salad dressing.</>,
+    size: 'lg',
+  },
+  Growth: {
+    text: <>I told my client his <span className="angle-mock-accent">dating apps</span> were the problem.</>,
+    size: 'md',
+  },
+  Education: {
+    text: (
+      <>
+        The class action covered every rancher who sold cattle between 2014 and 2019 — alleging the{' '}
+        <span className="angle-mock-accent">Big 4 packers</span> deliberately limited purchases to suppress the price
+        ranchers were paid.
+      </>
+    ),
+    size: 'sm',
+  },
+}
+
+function AngleMockup({ angle }: { angle: Angle }) {
+  const { text, size } = ANGLE_MOCK_COPY[angle]
   return (
-    <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
-      <path d="M4 5.5c0-.6.4-1 1-1h5.5a2 2 0 0 1 2 2v12a1.5 1.5 0 0 0-1.5-1.5H4V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M20 5.5c0-.6-.4-1-1-1h-5.5a2 2 0 0 0-2 2v12a1.5 1.5 0 0 1 1.5-1.5H20V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
+    <div className="angle-mock">
+      <div className={`angle-mock-text angle-mock-text-${size}`}>{text}</div>
+    </div>
   )
 }
 
@@ -254,8 +258,8 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
               className={`pick-card${angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
-              <div className="pick-card-icon">
-                <AngleIcon angle={a.title} />
+              <div className="pick-card-preview">
+                <AngleMockup angle={a.title} />
               </div>
               <div className="title">{a.title}</div>
               <div className="desc">{a.desc}</div>

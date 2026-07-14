@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { saveBrandKit } from '@/lib/actions'
 import type { BrandKit } from '@/lib/types'
+import { MAX_ATTACHMENT_MB } from '@/lib/types'
 
 export default function SettingsForm({
   name,
@@ -20,7 +21,11 @@ export default function SettingsForm({
 
   const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
   const [voice, setVoice] = useState(brandKit?.voice_description ?? '')
+  const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
   const [brandSaved, setBrandSaved] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   async function handlePasswordSave() {
     const supabase = createClient()
@@ -32,8 +37,49 @@ export default function SettingsForm({
     }
   }
 
+  function handleLogoClick() {
+    logoInputRef.current?.click()
+  }
+
+  async function handleLogoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setLogoError(null)
+
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Logo must be an image file.')
+      return
+    }
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      setLogoError(`Logo must be under ${MAX_ATTACHMENT_MB}MB.`)
+      return
+    }
+
+    setUploadingLogo(true)
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const path = `${user?.id}/logo-${crypto.randomUUID()}-${file.name}`
+    const { data, error } = await supabase.storage.from('carousel-uploads').upload(path, file)
+    setUploadingLogo(false)
+
+    if (error || !data) {
+      setLogoError('Upload failed — try again.')
+      return
+    }
+    const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(data.path)
+    setLogoUrl(pub.publicUrl)
+  }
+
+  function handleRemoveLogo() {
+    setLogoUrl(null)
+  }
+
   async function handleBrandSave() {
-    await saveBrandKit({ colors, voiceDescription: voice })
+    await saveBrandKit({ colors, voiceDescription: voice, logoUrl })
     setBrandSaved(true)
     setTimeout(() => setBrandSaved(false), 2000)
   }
@@ -120,7 +166,32 @@ export default function SettingsForm({
         </div>
 
         <div className="settings-field-label">Logo</div>
-        <div className="brand-logo-upload">Drop your logo here, or click to upload</div>
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleLogoSelected}
+        />
+        {logoUrl ? (
+          <div className="brand-logo-preview">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Brand logo" />
+            <div className="brand-logo-preview-actions">
+              <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
+                Replace
+              </button>
+              <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="brand-logo-upload" onClick={handleLogoClick}>
+            {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
+          </div>
+        )}
+        {logoError && <p className="attach-limit-error">{logoError}</p>}
 
         <div className="settings-field-label">Voice &amp; tone</div>
         <textarea

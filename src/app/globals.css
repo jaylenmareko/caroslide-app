@@ -26,7 +26,8 @@ a { color: inherit; }
 .brand svg { width: 64px; height: 64px; }
 .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 36px; letter-spacing: -0.3px; color: var(--ink); }
 
-.app-shell { display: flex; min-height: 100vh; }
+.app-shell { display: flex; min-height: 100vh; cursor: default; user-select: none; }
+.app-shell input, .app-shell textarea { user-select: text; cursor: auto; }
 .app-main { flex: 1; min-width: 0; }
 
 .app-sidebar {

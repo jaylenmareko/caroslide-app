@@ -8,6 +8,8 @@
   --shadow-md: 0 14px 34px -14px rgba(21,20,15,0.20), 0 4px 12px -4px rgba(21,20,15,0.08);
   --cta-glow: 0 10px 24px -8px rgba(22,101,52,0.4);
   --hero-gradient: linear-gradient(180deg, #1E1033 0%, #3B1F66 20%, #512888 40%, #4C6FB5 62%, #38BDF8 82%, #7DD3FC 100%);
+  --lp-accent: #512888; --lp-accent-2: #38BDF8;
+  --lp-cta-glow: 0 10px 24px -8px rgba(81,40,136,0.45);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -464,8 +466,8 @@ a { color: inherit; }
 }
 .lp-btn-ghost:hover { transform: translateY(-1px); background: var(--surface); box-shadow: var(--shadow-sm); }
 .lp-btn-solid {
-  font-size: 14px; font-weight: 500; color: #fff; background: linear-gradient(135deg, var(--green-bright), var(--green));
-  border: none; padding: 13px 20px; border-radius: 999px; text-decoration: none; cursor: pointer; box-shadow: var(--cta-glow);
+  font-size: 14px; font-weight: 500; color: #fff; background: linear-gradient(135deg, var(--lp-accent-2), var(--lp-accent));
+  border: none; padding: 13px 20px; border-radius: 999px; text-decoration: none; cursor: pointer; box-shadow: var(--lp-cta-glow);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 .lp-btn-solid:hover { transform: translateY(-1px) scale(1.02); box-shadow: var(--shadow-md); }
@@ -489,7 +491,7 @@ a { color: inherit; }
 .lp-hero-form input { flex: 1; border: none; outline: none; font-family: var(--font); font-size: 15px; color: var(--ink); background: none; padding: 12px 0; }
 .lp-hero-form button {
   width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--green-bright), var(--green)); color: #fff; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--lp-accent-2), var(--lp-accent)); color: #fff; display: flex; align-items: center; justify-content: center;
   transition: transform 0.25s ease;
 }
 .lp-hero-form button:hover { transform: scale(1.06); }
@@ -504,15 +506,15 @@ a { color: inherit; }
 .lp-steps { padding: 110px 24px 60px; }
 .lp-steps-head { text-align: center; max-width: 620px; margin: 0 auto 90px; }
 .lp-steps-head h2 { font-size: 44px; font-weight: 600; letter-spacing: -1px; margin: 0 0 14px; line-height: 1.15; }
-.lp-steps-head h2 .accent { color: var(--green); }
+.lp-steps-head h2 .accent { color: var(--lp-accent); }
 .lp-steps-head p { font-size: 16px; color: var(--ink-soft); }
 .lp-step-row { max-width: 1100px; margin: 0 auto; display: flex; gap: 60px; align-items: center; margin-bottom: 90px; }
 .lp-step-row:nth-child(even) { flex-direction: row-reverse; }
 .lp-step-rail { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; align-self: stretch; }
-.lp-step-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.lp-step-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--lp-accent); flex-shrink: 0; }
 .lp-step-line { width: 2px; flex: 1; background: var(--line-strong); margin: 6px 0; }
 .lp-step-text { flex: 1; }
-.lp-step-badge { display: inline-block; background: var(--green); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 16px; border-radius: 999px; margin-bottom: 16px; }
+.lp-step-badge { display: inline-block; background: var(--lp-accent); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 16px; border-radius: 999px; margin-bottom: 16px; }
 .lp-step-text h3 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin: 0 0 10px; }
 .lp-step-text p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.5; }
 .lp-step-visual { flex: 1; background: var(--surface); border-radius: 24px; padding: 30px; box-shadow: var(--shadow-md); border: 1px solid var(--line); }
@@ -533,13 +535,13 @@ a { color: inherit; }
   flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px 26px;
   text-align: left; box-shadow: var(--shadow-sm);
 }
-.lp-pricing-card.featured { border: 1.5px solid var(--green); box-shadow: var(--shadow-md); position: relative; }
+.lp-pricing-card.featured { border: 1.5px solid var(--lp-accent); box-shadow: var(--shadow-md); position: relative; }
 .lp-pricing-amount { font-size: 30px; font-weight: 600; letter-spacing: -0.6px; margin: 14px 0 8px; }
 .lp-pricing-period { font-size: 15px; font-weight: 500; color: var(--ink-soft); }
 .lp-pricing-desc { font-size: 14px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 22px; }
 .lp-pricing-footnote { font-size: 13px; color: var(--ink-faint); margin: 32px 0 0; }
 
-.lp-position { background: linear-gradient(160deg, #15803D 0%, #166534 100%); padding: 100px 24px; text-align: center; color: #fff; }
+.lp-position { background: linear-gradient(160deg, var(--lp-accent-2) 0%, var(--lp-accent) 100%); padding: 100px 24px; text-align: center; color: #fff; }
 .lp-position .kicker { display: inline-block; background: rgba(255,255,255,0.16); padding: 7px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-bottom: 20px; }
 .lp-position h2 { font-size: 42px; font-weight: 600; letter-spacing: -1px; max-width: 700px; margin: 0 auto 20px; }
 .lp-position p { max-width: 620px; margin: 0 auto; font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); }
@@ -550,7 +552,14 @@ a { color: inherit; }
 .lp-faq h2 { text-align: center; font-size: 38px; font-weight: 600; letter-spacing: -0.8px; margin: 0 0 50px; }
 .lp-faq-item { border-bottom: 1px solid var(--line); padding: 20px 0; }
 .lp-faq-q { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 16px; font-weight: 600; }
-.lp-faq-q .plus { font-size: 20px; color: var(--green); transition: transform 0.2s ease; }
+.lp-faq-q .plus { font-size: 20px; color: var(--lp-accent); transition: transform 0.2s ease; }
+
+/* landing-page demo mockups reuse app-interior classes -- repaint to the lp accent, scoped so the real in-app wizard stays green */
+.lp-step-visual .pick-card.selected { border-color: var(--lp-accent); background: #EDE4F7; }
+.lp-step-visual .pick-card.selected .title { color: var(--lp-accent); }
+.lp-step-visual .pick-card.selected .pick-card-icon { background: var(--lp-accent); color: #fff; }
+.lp-step-visual .composer-send-btn { background: linear-gradient(135deg, var(--lp-accent-2), var(--lp-accent)); box-shadow: var(--lp-cta-glow); }
+.lp-pricing-card .plan-badge { color: var(--lp-accent); background: #EDE4F7; }
 .lp-faq-item.open .lp-faq-q .plus { transform: rotate(45deg); }
 .lp-faq-a { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; font-size: 14.5px; color: var(--ink-soft); line-height: 1.55; }
 .lp-faq-item.open .lp-faq-a { max-height: 200px; margin-top: 12px; }

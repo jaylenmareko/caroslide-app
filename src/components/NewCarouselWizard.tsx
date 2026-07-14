@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import type { Angle, Format, Look } from '@/lib/types'
 import { ANGLE_TO_LOOK, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
-import { createCarousel } from '@/lib/actions'
+import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 
 const FORMATS: { title: Format; desc: string }[] = [
@@ -102,7 +102,7 @@ function LookMockup({ look }: { look: Look }) {
 
 type Attachment = { file: File; previewUrl: string }
 
-export default function NewCarouselWizard() {
+export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolean }) {
   const [step, setStep] = useState(0)
   const [format, setFormat] = useState<Format>('Post')
   const [angle, setAngle] = useState<Angle>('Value')
@@ -115,8 +115,12 @@ export default function NewCarouselWizard() {
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [brandColors, setBrandColors] = useState<string[]>(['#5B7A5E', '#F1E6D2', '#16130f'])
+  const [savingBrand, setSavingBrand] = useState(false)
+
   const recommendedLook = ANGLE_TO_LOOK[angle]
   const effectiveLook = lookTouched ? look : recommendedLook
+  const composerStep = hasBrandKit ? 3 : 4
 
   function pickFormat(f: Format) {
     setFormat(f)
@@ -131,6 +135,13 @@ export default function NewCarouselWizard() {
     setLook(l)
     setLookTouched(true)
     setStep(3)
+  }
+
+  async function handleContinueFromBrand() {
+    setSavingBrand(true)
+    await saveBrandKit({ colors: brandColors, voiceDescription: '' })
+    setSavingBrand(false)
+    setStep(composerStep)
   }
 
   function handleAttachClick() {
@@ -206,6 +217,9 @@ export default function NewCarouselWizard() {
         <span className={`wp-dot${step === 0 ? ' active' : ''}${step > 0 ? ' done' : ''}`} />
         <span className={`wp-dot${step === 1 ? ' active' : ''}${step > 1 ? ' done' : ''}`} />
         <span className={`wp-dot${step === 2 ? ' active' : ''}${step > 2 ? ' done' : ''}`} />
+        {!hasBrandKit && (
+          <span className={`wp-dot${step === 3 ? ' active' : ''}${step > 3 ? ' done' : ''}`} />
+        )}
       </div>
       <button
         className="wizard-back"
@@ -274,7 +288,40 @@ export default function NewCarouselWizard() {
         </div>
       </div>
 
-      <div className={`wizard-composer${step >= 3 ? ' show' : ''}`}>
+      {!hasBrandKit && (
+        <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
+          <p className="pick-label">Add your brand colors</p>
+          <p className="wiz-step-hint">
+            Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
+          </p>
+          <div className="brand-color-picker">
+            {brandColors.map((c, i) => (
+              <label key={i} className="color-swatch-input" style={{ background: c }}>
+                <input
+                  type="color"
+                  value={c}
+                  aria-label={`Brand color ${i + 1}`}
+                  onChange={(e) => {
+                    const next = [...brandColors]
+                    next[i] = e.target.value
+                    setBrandColors(next)
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="wiz-step-actions">
+            <button type="button" className="wizard-skip-btn" onClick={() => setStep(composerStep)}>
+              Skip for now
+            </button>
+            <button type="button" className="wizard-continue-btn" onClick={handleContinueFromBrand} disabled={savingBrand}>
+              {savingBrand ? 'Saving…' : 'Continue'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`wizard-composer${step >= composerStep ? ' show' : ''}`}>
         <p className="pick-label">Tell us everything</p>
         <div className="new-composer-box">
           <textarea

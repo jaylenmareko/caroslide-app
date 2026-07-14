@@ -1,15 +1,15 @@
 :root {
   --bg: #FBFAF7; --bg-alt: #F2F5F1; --surface: #FFFFFF;
   --ink: #15140F; --ink-soft: #676054; --ink-faint: #9C9585;
-  --green: #166534; --green-bright: #15803D; --green-pale: #DCFCE7;
+  --green: #512888; --green-bright: #38BDF8; --green-pale: #EDE4F7;
   --line: rgba(21,20,15,0.10); --line-strong: rgba(21,20,15,0.16);
   --font: -apple-system, 'Segoe UI Variable', 'Segoe UI', system-ui, Arial, sans-serif;
   --shadow-sm: 0 2px 6px -2px rgba(21,20,15,0.08);
   --shadow-md: 0 14px 34px -14px rgba(21,20,15,0.20), 0 4px 12px -4px rgba(21,20,15,0.08);
-  --cta-glow: 0 10px 24px -8px rgba(22,101,52,0.4);
+  --cta-glow: 0 10px 24px -8px rgba(81,40,136,0.4);
   --hero-gradient: linear-gradient(180deg, #1E1033 0%, #3B1F66 20%, #512888 40%, #4C6FB5 62%, #38BDF8 82%, #7DD3FC 100%);
-  --lp-accent: #512888; --lp-accent-2: #38BDF8;
-  --lp-cta-glow: 0 10px 24px -8px rgba(81,40,136,0.45);
+  --lp-accent: var(--green); --lp-accent-2: var(--green-bright);
+  --lp-cta-glow: var(--cta-glow);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -24,7 +24,7 @@ a { color: inherit; }
    in Caroslide's own green/cream palette. */
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; color: inherit; }
 .brand svg { width: 64px; height: 64px; }
-.brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 24px; letter-spacing: -0.3px; color: var(--ink); }
+.brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 36px; letter-spacing: -0.3px; color: var(--ink); }
 
 .app-shell { display: flex; min-height: 100vh; }
 .app-main { flex: 1; min-width: 0; }
@@ -88,7 +88,7 @@ a { color: inherit; }
     display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 40;
     background: var(--bg-alt); border-bottom: 1px solid var(--line); padding: 12px 16px;
   }
-  .app-mobile-bar .brand span { font-size: 19px; }
+  .app-mobile-bar .brand span { font-size: 27px; }
   .app-mobile-toggle { border: none; background: none; padding: 6px; cursor: pointer; color: var(--ink); }
   .app-sidebar {
     position: fixed; top: 0; left: 0; z-index: 60; height: 100dvh; box-shadow: var(--shadow-md);
@@ -346,7 +346,7 @@ a { color: inherit; }
   transition: opacity 0.2s ease;
 }
 .auth-top-brand:hover { opacity: 0.85; }
-.auth-top-brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 22px; color: #fff; }
+.auth-top-brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 30px; color: #fff; }
 .auth-card {
   width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px 30px; box-shadow: var(--shadow-md);
   animation: authCardIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
@@ -387,7 +387,7 @@ a { color: inherit; }
   .wrap { padding: 0 16px; }
   .app-nav { padding: 10px 16px; }
   .brand svg { width: 40px; height: 40px; }
-  .brand span { font-size: 19px; }
+  .brand span { font-size: 27px; }
 
   .dash-section { padding: 24px 0 40px; }
   .dash-head h1 { font-size: 21px; }
@@ -451,7 +451,7 @@ a { color: inherit; }
 }
 .lp-nav .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
 .lp-nav .brand svg { width: 34px; height: 34px; }
-.lp-nav .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 24px; letter-spacing: -0.3px; color: #fff; transition: color 0.3s ease; }
+.lp-nav .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 34px; letter-spacing: -0.3px; color: #fff; transition: color 0.3s ease; }
 .lp-nav-wrap.scrolled .lp-nav .brand span { color: var(--ink); }
 .lp-nav-links { display: flex; align-items: center; gap: 28px; }
 .lp-nav-links a { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); text-decoration: none; transition: color 0.25s ease; }
@@ -567,7 +567,7 @@ a { color: inherit; }
 .lp-footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 50px 24px 30px; text-align: center; }
 .lp-footer .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; margin-bottom: 14px; }
 .lp-footer .brand svg { width: 30px; height: 30px; }
-.lp-footer .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 22px; color: #fff; }
+.lp-footer .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 30px; color: #fff; }
 .lp-footer-links { display: flex; gap: 22px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
 .lp-footer-links a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13.5px; }
 .lp-footer-links a:hover { color: #fff; }
@@ -585,7 +585,7 @@ a { color: inherit; }
   .lp-pricing-row { flex-direction: column; }
   .lp-nav-links { display: none; }
   .lp-nav { padding: 12px 14px; gap: 8px; }
-  .lp-nav .brand span { font-size: 19px; }
+  .lp-nav .brand span { font-size: 26px; }
   .lp-nav-actions { gap: 6px; flex-shrink: 0; }
   .lp-btn-ghost, .lp-btn-solid { font-size: 12px; padding: 9px 12px; white-space: nowrap; }
 }

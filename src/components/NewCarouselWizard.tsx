@@ -244,7 +244,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   return (
     <section className="new-section wrap">
       <h1>New Carousel</h1>
-      <p className="lede">Pick a format, an angle, and a look — one step at a time — then drop in a topic.</p>
 
       <div className="wizard-progress">
         <span className={`wp-dot${step === 0 ? ' active' : ''}${step > 0 ? ' done' : ''}`} />

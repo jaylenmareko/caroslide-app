@@ -55,7 +55,12 @@ export async function updateCarouselTitle(id: string, title: string) {
   if (error) throw new Error(error.message)
 }
 
-export async function saveBrandKit(input: { colors: string[]; voiceDescription: string; logoUrl?: string | null }) {
+export async function saveBrandKit(input: {
+  colors: string[]
+  voiceDescription: string
+  logoUrl?: string | null
+  font?: string
+}) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -67,6 +72,7 @@ export async function saveBrandKit(input: { colors: string[]; voiceDescription: 
     colors: input.colors,
     voice_description: input.voiceDescription,
     ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
+    ...(input.font !== undefined ? { font: input.font } : {}),
   })
   if (error) throw new Error(error.message)
 }

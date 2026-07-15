@@ -28,8 +28,21 @@ export type BrandKit = {
   colors: string[]
   logo_url: string | null
   voice_description: string | null
+  font: string
   updated_at: string
 }
+
+export const DEFAULT_BRAND_FONT = 'Inter Tight'
+
+// Curated Google Fonts for carousel headlines -- next/font/google needs static,
+// build-time imports (see layout.tsx), so this list must match what's loaded there.
+export const BRAND_FONTS: { name: string; cssVar: string }[] = [
+  { name: 'Inter Tight', cssVar: 'var(--font-inter-tight)' },
+  { name: 'Poppins', cssVar: 'var(--font-poppins)' },
+  { name: 'Montserrat', cssVar: 'var(--font-montserrat)' },
+  { name: 'Archivo Black', cssVar: 'var(--font-archivo-black)' },
+  { name: 'DM Sans', cssVar: 'var(--font-dm-sans)' },
+]
 
 export const ANGLE_TO_LOOK: Record<Angle, Look> = {
   Value: 'Bold Stat',

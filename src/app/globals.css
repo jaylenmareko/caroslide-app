@@ -146,6 +146,13 @@ a { color: inherit; }
 }
 .brand-logo-preview img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: var(--surface); flex-shrink: 0; }
 .brand-logo-preview-actions { display: flex; flex-direction: column; gap: 6px; }
+.brand-font-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.brand-font-chip {
+  border: 1.5px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink);
+  padding: 10px 16px; font-size: 15px; cursor: pointer; transition: border-color .15s ease, background .15s ease;
+}
+.brand-font-chip:hover { background: var(--bg-alt); }
+.brand-font-chip.selected { border-color: var(--green); background: var(--green-pale); color: var(--green); }
 .brand-desc {
   width: 100%; min-height: 70px; border: 1px solid rgba(21,20,15,0.28); border-radius: 8px; padding: 10px 12px;
   font-family: var(--font); font-size: 13px; color: var(--ink); resize: vertical; background: var(--bg-alt);

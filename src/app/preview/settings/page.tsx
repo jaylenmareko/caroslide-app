@@ -14,6 +14,7 @@ export default function PreviewSettingsPage() {
             colors: ['#5B7A5E', '#F1E6D2', '#16130f'],
             logo_url: null,
             voice_description: 'Cream + forest-green earth tones. Minimal, confident, a little playful — never corporate-stiff.',
+            font: 'Inter Tight',
             updated_at: new Date().toISOString(),
           }}
         />

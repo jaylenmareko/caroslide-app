@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { saveBrandKit } from '@/lib/actions'
 import type { BrandKit } from '@/lib/types'
-import { MAX_ATTACHMENT_MB } from '@/lib/types'
+import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
 
 export default function SettingsForm({
   name,
@@ -22,6 +22,7 @@ export default function SettingsForm({
   const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
   const [voice, setVoice] = useState(brandKit?.voice_description ?? '')
   const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
+  const [font, setFont] = useState(brandKit?.font ?? DEFAULT_BRAND_FONT)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
   const [brandSaved, setBrandSaved] = useState(false)
@@ -79,7 +80,7 @@ export default function SettingsForm({
   }
 
   async function handleBrandSave() {
-    await saveBrandKit({ colors, voiceDescription: voice, logoUrl })
+    await saveBrandKit({ colors, voiceDescription: voice, logoUrl, font })
     setBrandSaved(true)
     setTimeout(() => setBrandSaved(false), 2000)
   }
@@ -192,6 +193,24 @@ export default function SettingsForm({
           </div>
         )}
         {logoError && <p className="attach-limit-error">{logoError}</p>}
+
+        <div className="settings-field-label">Font</div>
+        <div className="brand-font-row">
+          {BRAND_FONTS.map((f) => (
+            <button
+              type="button"
+              key={f.name}
+              className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
+              style={{ fontFamily: f.cssVar }}
+              onClick={() => setFont(f.name)}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+        <p className="wiz-step-hint" style={{ margin: '0 0 18px' }}>
+          Skip this and every carousel uses {DEFAULT_BRAND_FONT} by default.
+        </p>
 
         <div className="settings-field-label">Voice &amp; tone</div>
         <textarea

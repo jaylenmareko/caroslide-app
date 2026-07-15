@@ -238,7 +238,16 @@ a { color: inherit; }
 .look-mock-line.accent { background: var(--green); opacity: 0.55; height: 9px; }
 .look-mock-stat { font-size: 40px; font-weight: 800; letter-spacing: -1px; color: var(--line-strong); line-height: 1; }
 
-.angle-mock-caption { color: var(--ink); font-weight: 700; }
+.angle-mock { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 10px; }
+.angle-mock-photo {
+  border-radius: 8px; border: 1.5px dashed var(--line-strong); background: var(--surface);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-faint); margin-bottom: 10px;
+}
+.angle-mock-lg .angle-mock-photo { flex: 0 0 60%; }
+.angle-mock-md .angle-mock-photo { flex: 0 0 50%; }
+.angle-mock-sm .angle-mock-photo { flex: 0 0 32%; margin-bottom: 8px; }
+.angle-mock-divider { height: 1px; background: var(--line-strong); margin-bottom: 10px; }
+.angle-mock-caption { flex: 1; color: var(--ink); font-weight: 700; overflow: hidden; }
 .angle-mock-caption-lg { font-size: 20px; line-height: 1.3; }
 .angle-mock-caption-md { font-size: 17px; line-height: 1.32; }
 .angle-mock-caption-sm { font-size: 13.5px; line-height: 1.42; font-weight: 600; color: var(--ink-soft); }

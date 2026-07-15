@@ -12,6 +12,35 @@ const FORMATS: { title: Format; desc: string }[] = [
   { title: 'Story', desc: 'Warm audience — hook optional.' },
 ]
 
+// Real canvas dimensions from the /carousel skill's templates -- width is always
+// 1080, only height differs (1350 / 1080 / 1920). Using an SVG viewBox (not CSS
+// aspect-ratio + max-width) because that combo doesn't reliably shrink both
+// dimensions together -- SVG's native viewBox scaling does, like object-fit:contain.
+const FORMAT_CANVAS: Record<Format, [number, number]> = {
+  Post: [1080, 1350],
+  Square: [1080, 1080],
+  Story: [1080, 1920],
+}
+const FORMAT_LABEL: Record<Format, string> = {
+  Post: '4:5',
+  Square: '1:1',
+  Story: '9:16',
+}
+
+function FormatMockup({ format }: { format: Format }) {
+  const [w, h] = FORMAT_CANVAS[format]
+  return (
+    <div className="format-mock">
+      <svg className="format-mock-frame" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet">
+        <rect x="14" y="14" width={w - 28} height={h - 28} rx="24" fill="none" stroke="var(--line-strong)" strokeWidth="14" strokeDasharray="26 20" />
+        <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle" fontSize="72" fontWeight="700" fill="var(--ink-faint)">
+          {FORMAT_LABEL[format]}
+        </text>
+      </svg>
+    </div>
+  )
+}
+
 const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Value', desc: 'Direct tips, no story.' },
   { title: 'Growth', desc: 'A hook that builds into a story.' },
@@ -242,6 +271,9 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
               className={`pick-card${format === f.title ? ' selected' : ''}`}
               onClick={() => pickFormat(f.title)}
             >
+              <div className="pick-card-preview">
+                <FormatMockup format={f.title} />
+              </div>
               <div className="title">{f.title}</div>
               <div className="desc">{f.desc}</div>
             </div>

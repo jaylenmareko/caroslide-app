@@ -1,10 +1,11 @@
 export type Angle = 'Value' | 'Growth' | 'Education'
 export type Format = 'Post' | 'Square' | 'Story'
-export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat'
+export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus'
 
-// Only "Circles + Photo" currently maps to more than one real /carousel skill
-// template (see NewCarouselWizard.tsx VARIANTS) -- Plain Text and Bold Stat each
-// map to exactly one template, so they skip this sub-choice entirely.
+// Circles + Photo, Bold Stat, and Photo Focus each map to more than one real
+// /carousel skill template (see NewCarouselWizard.tsx's variantsFor()) -- Plain
+// Text maps to exactly one (the pure-text keynote layout), so it's the only
+// Look that skips this sub-choice.
 export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Photo Column' | 'Editorial'
 
 export type Slide = {

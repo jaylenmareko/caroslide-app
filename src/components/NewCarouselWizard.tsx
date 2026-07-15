@@ -81,6 +81,7 @@ function AngleMockup({ angle }: { angle: Angle }) {
 
 const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Circles + Photo', desc: 'Real photo proof, two circle insets.' },
+  { title: 'Photo Focus', desc: 'Clean photo layouts, no circles or stat.' },
   { title: 'Plain Text', desc: 'One strong cover, plain slides after.' },
   { title: 'Bold Stat', desc: 'A number takes over the frame.' },
 ]
@@ -90,6 +91,7 @@ const LOOKS: { title: Look; desc: string }[] = [
 // what a user picks here is what the template actually looks like.
 const LOOK_PREVIEW: Record<Look, string> = {
   'Circles + Photo': '/template-previews/1-circles-photo.png',
+  'Photo Focus': '/template-previews/2-side-by-side.png',
   'Plain Text': '/template-previews/7-plain-text.png',
   'Bold Stat': '/template-previews/5-bold-stat.png',
 }
@@ -99,18 +101,26 @@ function LookMockup({ look }: { look: Look }) {
   return <img className="tpl-preview-img" src={LOOK_PREVIEW[look]} alt="" />
 }
 
-// "Circles + Photo" and "Bold Stat" both map to more than one real /carousel
-// skill template -- this sub-step lets users pick exactly which one instead of
-// leaving it to chat iteration after the fact (Jaylen: a bad first generation
-// is a bigger turn-off than one more upfront choice). "Plain Text" maps to
-// exactly one template (the pure-text keynote layout), so it skips this step.
-// Circles + Photo gets all 5 layouts (2 of which feature the circle proofs);
-// Bold Stat only gets the 3 that don't hinge on circles, rendered with a big
-// stat number as the emphasis instead of a plain headline.
+// Circles + Photo, Photo Focus, and Bold Stat each map to more than one real
+// /carousel skill template -- this sub-step lets users pick exactly which one
+// instead of leaving it to chat iteration after the fact (Jaylen: a bad first
+// generation is a bigger turn-off than one more upfront choice). Plain Text
+// maps to exactly one template (the pure-text keynote layout), so it's the
+// only Look that skips this step.
+//
+// Side by Side / Photo Column / Editorial don't actually have circles, so they
+// live under their own "Photo Focus" Look rather than Circles + Photo, which
+// now means exactly what its name says (Classic + Flipped, the two that use
+// circle proofs). Bold Stat reuses those same three layouts with a big-stat
+// caption instead of a plain one -- that's a content-emphasis choice, not a
+// naming mismatch, so it keeps its own copies.
 const CIRCLES_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
   { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.', preview: '/template-previews/1-circles-photo.png' },
-  { title: 'Side by Side', desc: 'Two photos side by side, caption below.', preview: '/template-previews/2-side-by-side.png' },
   { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.', preview: '/template-previews/3-flipped.png' },
+]
+
+const PHOTO_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+  { title: 'Side by Side', desc: 'Two photos side by side, caption below.', preview: '/template-previews/2-side-by-side.png' },
   { title: 'Photo Column', desc: 'Photo column beside a text column.', preview: '/template-previews/4-photo-column.png' },
   { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.', preview: '/template-previews/6-editorial.png' },
 ]
@@ -122,7 +132,9 @@ const STAT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[]
 ]
 
 function variantsFor(look: Look) {
-  return look === 'Bold Stat' ? STAT_VARIANTS : CIRCLES_VARIANTS
+  if (look === 'Bold Stat') return STAT_VARIANTS
+  if (look === 'Photo Focus') return PHOTO_VARIANTS
+  return CIRCLES_VARIANTS
 }
 
 function VariantMockup({ look, variant }: { look: Look; variant: TemplateVariant }) {
@@ -158,7 +170,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
-  const hasVariantStep = effectiveLook === 'Circles + Photo' || effectiveLook === 'Bold Stat'
+  const hasVariantStep = effectiveLook !== 'Plain Text'
   const brandColorStep = hasVariantStep ? 4 : 3
   const composerStep = 3 + (hasVariantStep ? 1 : 0) + (hasBrandKit ? 0 : 1)
 

@@ -261,14 +261,17 @@ a { color: inherit; }
 }
 .rec-badge.show { display: inline-block; }
 
-.wizard-progress { display: flex; gap: 8px; margin-bottom: 22px; }
+.wizard-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.wizard-progress { display: flex; gap: 8px; }
 .wp-dot { width: 26px; height: 4px; border-radius: 3px; background: var(--line-strong); transition: background .15s ease; }
 .wp-dot.active { background: var(--green); }
 .wp-dot.done { background: var(--green-bright); }
 .wizard-back {
-  display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 600; color: var(--ink-soft); font-family: var(--font); padding: 0; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 5px; background: var(--bg-alt); border: 1px solid var(--line-strong);
+  border-radius: 100px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink); font-family: var(--font);
+  padding: 8px 16px 8px 12px; transition: background .15s ease, border-color .15s ease;
 }
+.wizard-back:hover { background: var(--line-strong); }
 .wiz-step { display: none; }
 .wiz-step.active { display: block; animation: wizStepIn 0.45s cubic-bezier(0.16,1,0.3,1) both; }
 @keyframes wizStepIn {

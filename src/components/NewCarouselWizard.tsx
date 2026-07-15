@@ -245,21 +245,23 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
     <section className="new-section wrap">
       <h1>New Carousel</h1>
 
-      <div className="wizard-progress">
-        <span className={`wp-dot${step === 0 ? ' active' : ''}${step > 0 ? ' done' : ''}`} />
-        <span className={`wp-dot${step === 1 ? ' active' : ''}${step > 1 ? ' done' : ''}`} />
-        <span className={`wp-dot${step === 2 ? ' active' : ''}${step > 2 ? ' done' : ''}`} />
-        {!hasBrandKit && (
-          <span className={`wp-dot${step === 3 ? ' active' : ''}${step > 3 ? ' done' : ''}`} />
-        )}
+      <div className="wizard-header-row">
+        <button
+          className="wizard-back"
+          style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+        >
+          ‹ Back
+        </button>
+        <div className="wizard-progress">
+          <span className={`wp-dot${step === 0 ? ' active' : ''}${step > 0 ? ' done' : ''}`} />
+          <span className={`wp-dot${step === 1 ? ' active' : ''}${step > 1 ? ' done' : ''}`} />
+          <span className={`wp-dot${step === 2 ? ' active' : ''}${step > 2 ? ' done' : ''}`} />
+          {!hasBrandKit && (
+            <span className={`wp-dot${step === 3 ? ' active' : ''}${step > 3 ? ' done' : ''}`} />
+          )}
+        </div>
       </div>
-      <button
-        className="wizard-back"
-        style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
-        onClick={() => setStep((s) => Math.max(0, s - 1))}
-      >
-        ‹ Back
-      </button>
 
       <div className={`wiz-step${step === 0 ? ' active' : ''}`}>
         <p className="pick-label">Choose a format</p>

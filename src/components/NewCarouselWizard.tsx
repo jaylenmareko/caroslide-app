@@ -479,6 +479,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
                   aria-label={`Brand color ${i + 1} hex code`}
                   maxLength={7}
                   placeholder="#000000"
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => {
                     const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
                     const next = [...brandColors]
@@ -553,9 +554,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           </div>
           {attachError && <p className="attach-limit-error">{attachError}</p>}
         </div>
-        <p className="new-hint">
-          <b>{format}</b> · <b>{angle}</b> · <b>{effectiveLook}</b> selected — the more detail here, the less back-and-forth later.
-        </p>
       </div>
     </section>
   )

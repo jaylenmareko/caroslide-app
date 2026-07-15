@@ -180,6 +180,7 @@ export default function SettingsForm({
                 aria-label={`Brand color ${i + 1} hex code`}
                 maxLength={7}
                 placeholder="#000000"
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
                   const next = [...colors]

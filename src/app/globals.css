@@ -258,15 +258,16 @@ a { color: inherit; }
 }
 .rec-badge.show { display: inline-block; }
 
-.wizard-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-.wizard-progress { display: flex; gap: 8px; }
+.wizard-header-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.wizard-header-row h1 { margin: 0; }
+.wizard-progress { display: flex; gap: 8px; flex-shrink: 0; }
 .wp-dot { width: 26px; height: 4px; border-radius: 3px; background: var(--line-strong); transition: background .15s ease; }
 .wp-dot.active { background: var(--green); }
 .wp-dot.done { background: var(--green-bright); }
 .wizard-back {
   display: flex; align-items: center; gap: 5px; background: var(--bg-alt); border: 1px solid var(--line-strong);
   border-radius: 100px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink); font-family: var(--font);
-  padding: 8px 16px 8px 12px; transition: background .15s ease, border-color .15s ease;
+  padding: 8px 16px 8px 12px; margin-bottom: 16px; transition: background .15s ease, border-color .15s ease;
 }
 .wizard-back:hover { background: var(--line-strong); }
 .wiz-step { display: none; }

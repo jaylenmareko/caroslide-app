@@ -324,16 +324,16 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   return (
     <section className="new-section wrap">
-      <h1>{stepTitle}</h1>
+      <button
+        className="wizard-back"
+        style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
+        onClick={() => setStep((s) => Math.max(0, s - 1))}
+      >
+        ‹ Back
+      </button>
 
       <div className="wizard-header-row">
-        <button
-          className="wizard-back"
-          style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-        >
-          ‹ Back
-        </button>
+        <h1>{stepTitle}</h1>
         <div className="wizard-progress">
           {Array.from({ length: composerStep }).map((_, i) => (
             <span key={i} className={`wp-dot${step === i ? ' active' : ''}${step > i ? ' done' : ''}`} />

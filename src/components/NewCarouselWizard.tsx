@@ -3,10 +3,10 @@
 import { useRef, useState, useTransition } from 'react'
 import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
-
-const RECOMMENDED_LOOK: Look = 'Circles + Photo'
 import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
+
+const RECOMMENDED_LOOK: Look = 'Circles + Photo'
 
 const FORMATS: { title: Format; desc: string }[] = [
   { title: 'Post', desc: 'Feed carousel — needs a real hook.' },
@@ -99,11 +99,15 @@ function LookMockup({ look }: { look: Look }) {
   return <img className="tpl-preview-img" src={LOOK_PREVIEW[look]} alt="" />
 }
 
-// Only "Circles + Photo" maps to more than one real /carousel skill template --
-// this sub-step lets users pick exactly which one instead of leaving it to
-// chat iteration after the fact (Jaylen: a bad first generation is a bigger
-// turn-off than one more upfront choice).
-const VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+// "Circles + Photo" and "Bold Stat" both map to more than one real /carousel
+// skill template -- this sub-step lets users pick exactly which one instead of
+// leaving it to chat iteration after the fact (Jaylen: a bad first generation
+// is a bigger turn-off than one more upfront choice). "Plain Text" maps to
+// exactly one template (the pure-text keynote layout), so it skips this step.
+// Circles + Photo gets all 5 layouts (2 of which feature the circle proofs);
+// Bold Stat only gets the 3 that don't hinge on circles, rendered with a big
+// stat number as the emphasis instead of a plain headline.
+const CIRCLES_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
   { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.', preview: '/template-previews/1-circles-photo.png' },
   { title: 'Side by Side', desc: 'Two photos side by side, caption below.', preview: '/template-previews/2-side-by-side.png' },
   { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.', preview: '/template-previews/3-flipped.png' },
@@ -111,8 +115,18 @@ const VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
   { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.', preview: '/template-previews/6-editorial.png' },
 ]
 
-function VariantMockup({ variant }: { variant: TemplateVariant }) {
-  const preview = VARIANTS.find((v) => v.title === variant)!.preview
+const STAT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+  { title: 'Side by Side', desc: 'Two photos side by side, your number as the headline.', preview: '/template-previews/2-side-by-side-stat.png' },
+  { title: 'Photo Column', desc: 'Full-height photo beside a giant stat number.', preview: '/template-previews/4-photo-column-stat.png' },
+  { title: 'Editorial', desc: 'Full-bleed photo, your number sits right on it.', preview: '/template-previews/6-editorial-stat.png' },
+]
+
+function variantsFor(look: Look) {
+  return look === 'Bold Stat' ? STAT_VARIANTS : CIRCLES_VARIANTS
+}
+
+function VariantMockup({ look, variant }: { look: Look; variant: TemplateVariant }) {
+  const preview = variantsFor(look).find((v) => v.title === variant)!.preview
   // eslint-disable-next-line @next/next/no-img-element
   return <img className="tpl-preview-img" src={preview} alt="" />
 }
@@ -136,11 +150,16 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [brandColors, setBrandColors] = useState<string[]>(['#5B7A5E', '#F1E6D2', '#16130f'])
+  const [brandName, setBrandName] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [savingBrand, setSavingBrand] = useState(false)
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
-  const hasVariantStep = effectiveLook === 'Circles + Photo'
+  const hasVariantStep = effectiveLook === 'Circles + Photo' || effectiveLook === 'Bold Stat'
   const brandColorStep = hasVariantStep ? 4 : 3
   const composerStep = 3 + (hasVariantStep ? 1 : 0) + (hasBrandKit ? 0 : 1)
 
@@ -150,7 +169,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
     : step === 2 ? 'Choose a Look'
     : hasVariantStep && step === 3 ? 'Choose a Style for Your Selected Look'
     : step === composerStep ? 'Tell Us Everything'
-    : 'Add Your Brand Colors'
+    : 'Add Your Brand Kit'
 
   function pickFormat(f: Format) {
     setFormat(f)
@@ -175,9 +194,50 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   async function handleContinueFromBrand() {
     setSavingBrand(true)
-    await saveBrandKit({ colors: brandColors, voiceDescription: '' })
+    await saveBrandKit({ colors: brandColors, voiceDescription: '', brandName, logoUrl })
     setSavingBrand(false)
     setStep(composerStep)
+  }
+
+  function handleLogoClick() {
+    logoInputRef.current?.click()
+  }
+
+  async function handleLogoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setLogoError(null)
+
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Logo must be an image file.')
+      return
+    }
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      setLogoError(`Logo must be under ${MAX_ATTACHMENT_MB}MB.`)
+      return
+    }
+
+    setUploadingLogo(true)
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const path = `${user?.id}/logo-${crypto.randomUUID()}-${file.name}`
+    const { data, error } = await supabase.storage.from('carousel-uploads').upload(path, file)
+    setUploadingLogo(false)
+
+    if (error || !data) {
+      setLogoError('Upload failed — try again.')
+      return
+    }
+    const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(data.path)
+    setLogoUrl(pub.publicUrl)
+  }
+
+  function handleRemoveLogo() {
+    setLogoUrl(null)
   }
 
   function handleAttachClick() {
@@ -332,14 +392,14 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       {hasVariantStep && (
         <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
           <div className="pick-row">
-            {VARIANTS.map((v) => (
+            {variantsFor(effectiveLook).map((v) => (
               <div
                 key={v.title}
                 className={`pick-card${variantTouched && templateVariant === v.title ? ' selected' : ''}`}
                 onClick={() => pickVariant(v.title)}
               >
                 <div className="pick-card-preview">
-                  <VariantMockup variant={v.title} />
+                  <VariantMockup look={effectiveLook} variant={v.title} />
                 </div>
                 <div className="title">{v.title}</div>
                 <div className="desc">{v.desc}</div>
@@ -354,6 +414,40 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           <p className="wiz-step-hint">
             Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
           </p>
+
+          <div className="brand-color-label" style={{ marginBottom: 8 }}>Brand name</div>
+          <input
+            className="settings-input"
+            type="text"
+            value={brandName}
+            onChange={(e) => setBrandName(e.target.value)}
+            placeholder="Shown top-left until you add a logo."
+            style={{ marginBottom: 24, maxWidth: 420 }}
+          />
+
+          <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
+          <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
+          {logoUrl ? (
+            <div className="brand-logo-preview">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="Brand logo" />
+              <div className="brand-logo-preview-actions">
+                <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
+                  Replace
+                </button>
+                <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="brand-logo-upload" onClick={handleLogoClick}>
+              {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
+            </div>
+          )}
+          {logoError && <p className="attach-limit-error">{logoError}</p>}
+
+          <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Colors</div>
           <div className="brand-color-picker">
             {brandColors.map((c, i) => (
               <div key={i} className="brand-color-card">

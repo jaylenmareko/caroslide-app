@@ -20,6 +20,7 @@ export default function SettingsForm({
   const [passwordSaved, setPasswordSaved] = useState(false)
 
   const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
+  const [brandName, setBrandName] = useState(brandKit?.brand_name ?? '')
   const [voice, setVoice] = useState(brandKit?.voice_description ?? '')
   const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
   const [font, setFont] = useState(brandKit?.font ?? DEFAULT_BRAND_FONT)
@@ -80,7 +81,7 @@ export default function SettingsForm({
   }
 
   async function handleBrandSave() {
-    await saveBrandKit({ colors, voiceDescription: voice, logoUrl, font })
+    await saveBrandKit({ colors, voiceDescription: voice, brandName, logoUrl, font })
     setBrandSaved(true)
     setTimeout(() => setBrandSaved(false), 2000)
   }
@@ -157,6 +158,16 @@ export default function SettingsForm({
             </p>
           </div>
         </div>
+
+        <div className="settings-field-label">Brand name</div>
+        <input
+          className="settings-input"
+          type="text"
+          value={brandName}
+          onChange={(e) => setBrandName(e.target.value)}
+          placeholder="Used as the text logo, top-left of every slide, until you upload a real logo."
+          style={{ marginBottom: 18 }}
+        />
 
         <div className="settings-field-label">Colors</div>
         <div className="brand-swatches">

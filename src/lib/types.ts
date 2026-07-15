@@ -32,6 +32,7 @@ export const MAX_ATTACHMENT_MB = 5
 export type BrandKit = {
   user_id: string
   colors: string[]
+  brand_name: string | null
   logo_url: string | null
   voice_description: string | null
   font: string

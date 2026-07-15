@@ -204,6 +204,12 @@ a { color: inherit; }
 .new-section > p.lede { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
 .pick-label { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; color: var(--ink-faint); margin: 0 0 12px; text-transform: uppercase; }
 .pick-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+/* Flex's wrap stretches a lone last-row item to fill the whole row -- fine
+   when the item count divides evenly into the row (3 Formats, 3 Angles), but
+   with 4 Looks the 4th card wrapped alone and blew up to full width. A fixed
+   2-column grid keeps all 4 the same size and noticeably bigger than the old
+   3-per-row layout, without singling one out. */
+.pick-row-2col { display: grid; grid-template-columns: repeat(2, 1fr); }
 .pick-card {
   flex: 1 1 220px; background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 14px;
   padding: 14px 15px 13px; text-align: left; cursor: pointer; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
@@ -479,6 +485,7 @@ a { color: inherit; }
   .new-section { padding: 28px 0 40px; max-width: 100%; min-height: auto; justify-content: flex-start; }
   .new-section h1 { font-size: 21px; }
   .pick-card { flex: 1 1 100%; }
+  .pick-row-2col { grid-template-columns: 1fr; }
 
   .viewer-section { border-radius: 14px; margin-top: 4px; }
   .viewer-topbar { padding: 14px 16px; }

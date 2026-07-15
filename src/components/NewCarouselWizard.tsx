@@ -378,7 +378,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       </div>
 
       <div className={`wiz-step${step === 2 ? ' active' : ''}`}>
-        <div className="pick-row">
+        <div className="pick-row pick-row-2col">
           {LOOKS.map((l) => (
             <div
               key={l.title}

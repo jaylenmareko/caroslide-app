@@ -83,154 +83,36 @@ const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Bold Stat', desc: 'A number takes over the frame.' },
 ]
 
-function ImagePlaceholderIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={18} height={18} fill="none">
-      <rect x="2.5" y="4.5" width="19" height="15" rx="2" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="8" cy="10" r="1.6" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M3 16.5 8.5 12 13 15.5 16.5 12.5 21 16" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  )
+// Real rendered screenshots of the actual /carousel skill templates (real fonts,
+// real proportions, generic placeholder photo) -- not hand-drawn CSS mockups, so
+// what a user picks here is what the template actually looks like.
+const LOOK_PREVIEW: Record<Look, string> = {
+  'Circles + Photo': '/template-previews/1-circles-photo.png',
+  'Plain Text': '/template-previews/7-plain-text.png',
+  'Bold Stat': '/template-previews/5-bold-stat.png',
 }
 
 function LookMockup({ look }: { look: Look }) {
-  if (look === 'Circles + Photo') {
-    return (
-      <div className="look-mock">
-        <div className="look-mock-photo">
-          <ImagePlaceholderIcon />
-        </div>
-        <div className="look-mock-circle-row">
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-lines">
-            <div className="look-mock-line" style={{ width: '70%' }} />
-            <div className="look-mock-line" style={{ width: '45%' }} />
-          </div>
-        </div>
-      </div>
-    )
-  }
-  if (look === 'Plain Text') {
-    return (
-      <div className="look-mock look-mock-plain">
-        <div className="look-mock-line" style={{ width: '80%', height: 10 }} />
-        <div className="look-mock-line" style={{ width: '92%', height: 10 }} />
-        <div className="look-mock-line" style={{ width: '60%', height: 10 }} />
-        <div className="look-mock-line accent" style={{ width: '38%' }} />
-      </div>
-    )
-  }
-  return (
-    <div className="look-mock look-mock-plain">
-      <div className="look-mock-stat">00%</div>
-      <div className="look-mock-line" style={{ width: '55%' }} />
-    </div>
-  )
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="tpl-preview-img" src={LOOK_PREVIEW[look]} alt="" />
 }
 
 // Only "Circles + Photo" maps to more than one real /carousel skill template --
 // this sub-step lets users pick exactly which one instead of leaving it to
 // chat iteration after the fact (Jaylen: a bad first generation is a bigger
 // turn-off than one more upfront choice).
-const VARIANTS: { title: TemplateVariant; desc: string }[] = [
-  { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.' },
-  { title: 'Side by Side', desc: 'Two photos side by side, caption below.' },
-  { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.' },
-  { title: 'Photo Column', desc: 'Photo column beside a text column.' },
-  { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.' },
+const VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+  { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.', preview: '/template-previews/1-circles-photo.png' },
+  { title: 'Side by Side', desc: 'Two photos side by side, caption below.', preview: '/template-previews/2-side-by-side.png' },
+  { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.', preview: '/template-previews/3-flipped.png' },
+  { title: 'Photo Column', desc: 'Photo column beside a text column.', preview: '/template-previews/4-photo-column.png' },
+  { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.', preview: '/template-previews/6-editorial.png' },
 ]
 
 function VariantMockup({ variant }: { variant: TemplateVariant }) {
-  if (variant === 'Classic') {
-    return (
-      <div className="look-mock">
-        <div className="look-mock-photo">
-          <ImagePlaceholderIcon />
-        </div>
-        <div className="look-mock-circle-row">
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-lines">
-            <div className="look-mock-line" style={{ width: '70%' }} />
-            <div className="look-mock-line" style={{ width: '45%' }} />
-          </div>
-        </div>
-      </div>
-    )
-  }
-  if (variant === 'Side by Side') {
-    return (
-      <div className="look-mock">
-        <div className="variant-mock-row">
-          <div className="look-mock-photo">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-photo">
-            <ImagePlaceholderIcon />
-          </div>
-        </div>
-        <div className="look-mock-lines" style={{ flex: '0 0 auto', marginTop: 8 }}>
-          <div className="look-mock-line" style={{ width: '80%' }} />
-          <div className="look-mock-line accent" style={{ width: '50%' }} />
-        </div>
-      </div>
-    )
-  }
-  if (variant === 'Flipped') {
-    return (
-      <div className="look-mock">
-        <div className="look-mock-lines" style={{ flex: '0 0 auto', marginBottom: 10 }}>
-          <div className="look-mock-line" style={{ width: '75%' }} />
-          <div className="look-mock-line accent" style={{ width: '45%' }} />
-        </div>
-        <div className="look-mock-photo" style={{ marginBottom: -18 }}>
-          <ImagePlaceholderIcon />
-        </div>
-        <div className="look-mock-circle-row" style={{ justifyContent: 'center' }}>
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-          <div className="look-mock-circle">
-            <ImagePlaceholderIcon />
-          </div>
-        </div>
-      </div>
-    )
-  }
-  if (variant === 'Photo Column') {
-    return (
-      <div className="variant-mock-split">
-        <div className="look-mock-photo variant-mock-split-photo">
-          <ImagePlaceholderIcon />
-        </div>
-        <div className="variant-mock-split-text">
-          <div className="look-mock-line" style={{ width: '90%' }} />
-          <div className="look-mock-line" style={{ width: '70%' }} />
-          <div className="look-mock-line accent" style={{ width: '55%' }} />
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className="variant-mock-editorial">
-      <div className="look-mock-photo variant-mock-editorial-photo">
-        <ImagePlaceholderIcon />
-      </div>
-      <div className="variant-mock-editorial-caption">
-        <div className="look-mock-line" style={{ width: '65%' }} />
-        <div className="look-mock-line accent" style={{ width: '40%' }} />
-      </div>
-    </div>
-  )
+  const preview = VARIANTS.find((v) => v.title === variant)!.preview
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="tpl-preview-img" src={preview} alt="" />
 }
 
 type Attachment = { file: File; previewUrl: string }
@@ -238,9 +120,12 @@ type Attachment = { file: File; previewUrl: string }
 export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolean }) {
   const [step, setStep] = useState(0)
   const [format, setFormat] = useState<Format>('Post')
+  const [formatTouched, setFormatTouched] = useState(false)
   const [angle, setAngle] = useState<Angle>('Value')
+  const [angleTouched, setAngleTouched] = useState(false)
   const [look, setLook] = useState<Look>(ANGLE_TO_LOOK['Value'])
   const [lookTouched, setLookTouched] = useState(false)
+  const [variantTouched, setVariantTouched] = useState(false)
   const [brief, setBrief] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
@@ -268,10 +153,12 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   function pickFormat(f: Format) {
     setFormat(f)
+    setFormatTouched(true)
     setStep(1)
   }
   function pickAngle(a: Angle) {
     setAngle(a)
+    setAngleTouched(true)
     setLookTouched(false)
     setStep(2)
   }
@@ -282,6 +169,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   }
   function pickVariant(v: TemplateVariant) {
     setTemplateVariant(v)
+    setVariantTouched(true)
     setStep(hasBrandKit ? composerStep : brandColorStep)
   }
 
@@ -387,7 +275,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           {FORMATS.map((f) => (
             <div
               key={f.title}
-              className={`pick-card${format === f.title ? ' selected' : ''}`}
+              className={`pick-card${formatTouched && format === f.title ? ' selected' : ''}`}
               onClick={() => pickFormat(f.title)}
             >
               <div className="pick-card-preview">
@@ -405,7 +293,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           {ANGLES.map((a) => (
             <div
               key={a.title}
-              className={`pick-card${angle === a.title ? ' selected' : ''}`}
+              className={`pick-card${angleTouched && angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
               <div className="pick-card-preview">
@@ -423,7 +311,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           {LOOKS.map((l) => (
             <div
               key={l.title}
-              className={`pick-card${effectiveLook === l.title ? ' selected' : ''}`}
+              className={`pick-card${lookTouched && look === l.title ? ' selected' : ''}`}
               onClick={() => pickLook(l.title)}
             >
               <div className="pick-card-preview">
@@ -447,7 +335,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
             {VARIANTS.map((v) => (
               <div
                 key={v.title}
-                className={`pick-card${templateVariant === v.title ? ' selected' : ''}`}
+                className={`pick-card${variantTouched && templateVariant === v.title ? ' selected' : ''}`}
                 onClick={() => pickVariant(v.title)}
               >
                 <div className="pick-card-preview">

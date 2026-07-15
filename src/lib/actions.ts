@@ -59,8 +59,6 @@ export async function updateCarouselTitle(id: string, title: string) {
 
 export async function saveBrandKit(input: {
   colors: string[]
-  voiceDescription: string
-  brandName?: string | null
   logoUrl?: string | null
   font?: string
 }) {
@@ -73,8 +71,6 @@ export async function saveBrandKit(input: {
   const { error } = await supabase.from('brand_kits').upsert({
     user_id: user!.id,
     colors: input.colors,
-    voice_description: input.voiceDescription,
-    ...(input.brandName !== undefined ? { brand_name: input.brandName } : {}),
     ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
     ...(input.font !== undefined ? { font: input.font } : {}),
   })

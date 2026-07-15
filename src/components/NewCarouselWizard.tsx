@@ -150,7 +150,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [brandColors, setBrandColors] = useState<string[]>(['#5B7A5E', '#F1E6D2', '#16130f'])
-  const [brandName, setBrandName] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
@@ -194,7 +193,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   async function handleContinueFromBrand() {
     setSavingBrand(true)
-    await saveBrandKit({ colors: brandColors, voiceDescription: '', brandName, logoUrl })
+    await saveBrandKit({ colors: brandColors, logoUrl })
     setSavingBrand(false)
     setStep(composerStep)
   }
@@ -391,6 +390,14 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
       {hasVariantStep && (
         <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
+          <div className="variant-look-context">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="variant-look-context-thumb" src={LOOK_PREVIEW[effectiveLook]} alt="" />
+            <div>
+              <div className="variant-look-context-label">Your Look</div>
+              <div className="variant-look-context-name">{effectiveLook}</div>
+            </div>
+          </div>
           <div className="pick-row">
             {variantsFor(effectiveLook).map((v) => (
               <div
@@ -414,16 +421,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           <p className="wiz-step-hint">
             Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
           </p>
-
-          <div className="brand-color-label" style={{ marginBottom: 8 }}>Brand name</div>
-          <input
-            className="settings-input"
-            type="text"
-            value={brandName}
-            onChange={(e) => setBrandName(e.target.value)}
-            placeholder="Shown top-left until you add a logo."
-            style={{ marginBottom: 24, maxWidth: 420 }}
-          />
 
           <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
           <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />

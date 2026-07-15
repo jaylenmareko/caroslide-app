@@ -20,8 +20,6 @@ export default function SettingsForm({
   const [passwordSaved, setPasswordSaved] = useState(false)
 
   const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
-  const [brandName, setBrandName] = useState(brandKit?.brand_name ?? '')
-  const [voice, setVoice] = useState(brandKit?.voice_description ?? '')
   const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
   const [font, setFont] = useState(brandKit?.font ?? DEFAULT_BRAND_FONT)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -81,7 +79,7 @@ export default function SettingsForm({
   }
 
   async function handleBrandSave() {
-    await saveBrandKit({ colors, voiceDescription: voice, brandName, logoUrl, font })
+    await saveBrandKit({ colors, logoUrl, font })
     setBrandSaved(true)
     setTimeout(() => setBrandSaved(false), 2000)
   }
@@ -154,27 +152,44 @@ export default function SettingsForm({
           <div>
             <h2>Brand Kit</h2>
             <p className="sub">
-              Save your colors, logo, and voice once — every new carousel starts pre-filled with this instead of asking every time.
+              Save your colors and logo once — every new carousel starts pre-filled with this instead of asking every time.
             </p>
           </div>
         </div>
 
-        <div className="settings-field-label">Brand name</div>
-        <input
-          className="settings-input"
-          type="text"
-          value={brandName}
-          onChange={(e) => setBrandName(e.target.value)}
-          placeholder="Used as the text logo, top-left of every slide, until you upload a real logo."
-          style={{ marginBottom: 18 }}
-        />
-
         <div className="settings-field-label">Colors</div>
-        <div className="brand-swatches">
+        <div className="brand-color-picker">
           {colors.map((c, i) => (
-            <div key={i} className="brand-swatch" style={{ background: c }} />
+            <div key={i} className="brand-color-card">
+              <label className="color-swatch-input" style={{ background: c }}>
+                <input
+                  type="color"
+                  value={c}
+                  aria-label={`Brand color ${i + 1}`}
+                  onChange={(e) => {
+                    const next = [...colors]
+                    next[i] = e.target.value
+                    setColors(next)
+                  }}
+                />
+              </label>
+              <input
+                type="text"
+                className="hex-input"
+                value={c}
+                aria-label={`Brand color ${i + 1} hex code`}
+                maxLength={7}
+                placeholder="#000000"
+                onChange={(e) => {
+                  const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
+                  const next = [...colors]
+                  next[i] = v
+                  setColors(next)
+                }}
+              />
+              <div className="brand-color-label">Color {i + 1}</div>
+            </div>
           ))}
-          <div className="brand-swatch add">+</div>
         </div>
 
         <div className="settings-field-label">Logo</div>
@@ -223,14 +238,6 @@ export default function SettingsForm({
           Skip this and every carousel uses {DEFAULT_BRAND_FONT} by default.
         </p>
 
-        <div className="settings-field-label">Voice &amp; tone</div>
-        <textarea
-          className="brand-desc"
-          value={voice}
-          onChange={(e) => setVoice(e.target.value)}
-          placeholder="Cream + forest-green earth tones. Minimal, confident, a little playful — never corporate-stiff."
-        />
-        <br />
         <button className="settings-save" onClick={handleBrandSave}>
           {brandSaved ? 'Saved ✓' : 'Save brand kit'}
         </button>

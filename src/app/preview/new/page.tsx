@@ -6,7 +6,7 @@ export default function PreviewNewPage() {
     <div className="app-shell">
       <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />
       <main className="app-main">
-        <NewCarouselWizard hasBrandKit={false} />
+        <NewCarouselWizard existingBrandKit={null} />
       </main>
     </div>
   )

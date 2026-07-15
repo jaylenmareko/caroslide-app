@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import NewCarouselWizard from '@/components/NewCarouselWizard'
+import type { BrandKit } from '@/lib/types'
 
 export default async function NewCarouselPage() {
   const supabase = await createClient()
@@ -9,9 +10,9 @@ export default async function NewCarouselPage() {
 
   const { data: brandKit } = await supabase
     .from('brand_kits')
-    .select('id')
+    .select('*')
     .eq('user_id', user!.id)
     .maybeSingle()
 
-  return <NewCarouselWizard hasBrandKit={!!brandKit} />
+  return <NewCarouselWizard existingBrandKit={brandKit as BrandKit | null} />
 }

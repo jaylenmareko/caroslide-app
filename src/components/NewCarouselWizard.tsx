@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
-import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
+import type { Angle, BrandKit, Format, Look, TemplateVariant } from '@/lib/types'
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
 import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 
@@ -145,7 +145,7 @@ function VariantMockup({ look, variant }: { look: Look; variant: TemplateVariant
 
 type Attachment = { file: File; previewUrl: string }
 
-export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolean }) {
+export default function NewCarouselWizard({ existingBrandKit }: { existingBrandKit: BrandKit | null }) {
   const [step, setStep] = useState(0)
   const [format, setFormat] = useState<Format>('Post')
   const [formatTouched, setFormatTouched] = useState(false)
@@ -161,8 +161,14 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [brandColors, setBrandColors] = useState<string[]>(['#5B7A5E', '#F1E6D2', '#16130f'])
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  // Pre-filled from the account's saved default (if any) so returning users see
+  // their real brand immediately -- this step shows on every carousel, not just
+  // the first, so a multi-brand user can still change any of it just for this
+  // one project without a detour to Settings. See Carousel.brand_colors's comment
+  // in types.ts for why this gets snapshotted onto the carousel itself too.
+  const [brandColors, setBrandColors] = useState<string[]>(existingBrandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
+  const [logoUrl, setLogoUrl] = useState<string | null>(existingBrandKit?.logo_url ?? null)
+  const [font, setFont] = useState(existingBrandKit?.font ?? DEFAULT_BRAND_FONT)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -172,7 +178,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
   const hasVariantStep = effectiveLook !== 'Plain Text'
   const brandColorStep = hasVariantStep ? 4 : 3
-  const composerStep = 3 + (hasVariantStep ? 1 : 0) + (hasBrandKit ? 0 : 1)
+  const composerStep = 3 + (hasVariantStep ? 1 : 0) + 1
 
   const stepTitle =
     step === 0 ? 'Choose a Format'
@@ -200,12 +206,12 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   function pickVariant(v: TemplateVariant) {
     setTemplateVariant(v)
     setVariantTouched(true)
-    setStep(hasBrandKit ? composerStep : brandColorStep)
+    setStep(brandColorStep)
   }
 
   async function handleContinueFromBrand() {
     setSavingBrand(true)
-    await saveBrandKit({ colors: brandColors, logoUrl })
+    await saveBrandKit({ colors: brandColors, logoUrl, font })
     setSavingBrand(false)
     setStep(composerStep)
   }
@@ -318,6 +324,12 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
         templateVariant: hasVariantStep ? templateVariant : null,
         brief,
         referenceImageUrls: urls,
+        // Whatever's currently set here -- prefilled default, edited for just
+        // this one, or brand new -- is what this carousel uses, independent of
+        // whether it also got saved as the account's new default below.
+        brandColors,
+        logoUrl,
+        font,
       })
     })
   }
@@ -428,79 +440,95 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
         </div>
       )}
 
-      {!hasBrandKit && (
-        <div className={`wiz-step${step === brandColorStep ? ' active' : ''}`}>
-          <p className="wiz-step-hint">
-            Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
-          </p>
+      <div className={`wiz-step${step === brandColorStep ? ' active' : ''}`}>
+        <p className="wiz-step-hint">
+          {existingBrandKit
+            ? 'Pre-filled from your saved brand — change anything just for this one, or continue to also update your default.'
+            : 'This carries into every carousel after this one — you can always change it later in Settings → Brand Kit.'}
+        </p>
 
-          <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
-          <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
-          {logoUrl ? (
-            <div className="brand-logo-preview">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="Brand logo" />
-              <div className="brand-logo-preview-actions">
-                <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
-                  Replace
-                </button>
-                <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
-                  Remove
-                </button>
-              </div>
+        <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
+        <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
+        {logoUrl ? (
+          <div className="brand-logo-preview">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Brand logo" />
+            <div className="brand-logo-preview-actions">
+              <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
+                Replace
+              </button>
+              <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
+                Remove
+              </button>
             </div>
-          ) : (
-            <div className="brand-logo-upload" onClick={handleLogoClick}>
-              {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
-            </div>
-          )}
-          {logoError && <p className="attach-limit-error">{logoError}</p>}
+          </div>
+        ) : (
+          <div className="brand-logo-upload" onClick={handleLogoClick}>
+            {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
+          </div>
+        )}
+        {logoError && <p className="attach-limit-error">{logoError}</p>}
 
-          <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Colors</div>
-          <div className="brand-color-picker">
-            {brandColors.map((c, i) => (
-              <div key={i} className="brand-color-card">
-                <label className="color-swatch-input" style={{ background: c }}>
-                  <input
-                    type="color"
-                    value={c}
-                    aria-label={`Brand color ${i + 1}`}
-                    onChange={(e) => {
-                      const next = [...brandColors]
-                      next[i] = e.target.value
-                      setBrandColors(next)
-                    }}
-                  />
-                </label>
+        <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Colors</div>
+        <div className="brand-color-picker">
+          {brandColors.map((c, i) => (
+            <div key={i} className="brand-color-card">
+              <label className="color-swatch-input" style={{ background: c }}>
                 <input
-                  type="text"
-                  className="hex-input"
+                  type="color"
                   value={c}
-                  aria-label={`Brand color ${i + 1} hex code`}
-                  maxLength={7}
-                  placeholder="#000000"
-                  onFocus={(e) => e.target.select()}
+                  aria-label={`Brand color ${i + 1}`}
                   onChange={(e) => {
-                    const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
                     const next = [...brandColors]
-                    next[i] = v
+                    next[i] = e.target.value
                     setBrandColors(next)
                   }}
                 />
-                <div className="brand-color-label">Color {i + 1}</div>
-              </div>
-            ))}
-          </div>
-          <div className="wiz-step-actions">
-            <button type="button" className="wizard-skip-btn" onClick={() => setStep(composerStep)}>
-              Skip for now
-            </button>
-            <button type="button" className="wizard-continue-btn" onClick={handleContinueFromBrand} disabled={savingBrand}>
-              {savingBrand ? 'Saving…' : 'Continue'}
-            </button>
-          </div>
+              </label>
+              <input
+                type="text"
+                className="hex-input"
+                value={c}
+                aria-label={`Brand color ${i + 1} hex code`}
+                maxLength={7}
+                placeholder="#000000"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
+                  const next = [...brandColors]
+                  next[i] = v
+                  setBrandColors(next)
+                }}
+              />
+              <div className="brand-color-label">Color {i + 1}</div>
+            </div>
+          ))}
         </div>
-      )}
+
+        <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Font</div>
+        <div className="brand-font-row">
+          {BRAND_FONTS.map((f) => (
+            <button
+              type="button"
+              key={f.name}
+              className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
+              style={{ fontFamily: f.cssVar }}
+              onClick={() => setFont(f.name)}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="wiz-step-actions" style={{ marginTop: 24 }}>
+          <button type="button" className="wizard-skip-btn" onClick={() => setStep(composerStep)}>
+            Skip for now
+          </button>
+          <button type="button" className="wizard-continue-btn" onClick={handleContinueFromBrand} disabled={savingBrand}>
+            {savingBrand ? 'Saving…' : 'Continue'}
+          </button>
+        </div>
+      </div>
 
       <div className={`wizard-composer${step >= composerStep ? ' show' : ''}`}>
         <div className="new-composer-box">

@@ -20,6 +20,9 @@ export async function createCarousel(input: {
   templateVariant: TemplateVariant | null
   brief: string
   referenceImageUrls: string[]
+  brandColors: string[]
+  logoUrl: string | null
+  font: string
 }) {
   const supabase = await createClient()
   const {
@@ -42,6 +45,11 @@ export async function createCarousel(input: {
       brief: input.brief,
       slides: MOCK_SLIDES[input.angle].map((url) => ({ url })),
       reference_images: input.referenceImageUrls.map((url) => ({ url })),
+      // Snapshotted here, not read live from brand_kits at generation time --
+      // see the Carousel type's brand_colors/logo_url/font comment.
+      brand_colors: input.brandColors,
+      logo_url: input.logoUrl,
+      font: input.font,
     })
     .select('id')
     .single()

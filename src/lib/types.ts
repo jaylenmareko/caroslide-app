@@ -23,6 +23,12 @@ export type Carousel = {
   brief: string | null
   slides: Slide[]
   reference_images: Slide[]
+  // Snapshotted from the wizard at creation time, not read live off brand_kits --
+  // a user managing multiple brands needs THIS carousel's look to stick even if
+  // their account default changes later, or if they overrode it just this once.
+  brand_colors: string[] | null
+  logo_url: string | null
+  font: string | null
   created_at: string
   updated_at: string
 }

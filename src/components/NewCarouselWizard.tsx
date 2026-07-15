@@ -155,6 +155,13 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const effectiveLook = lookTouched ? look : recommendedLook
   const composerStep = hasBrandKit ? 3 : 4
 
+  const stepTitle =
+    step === 0 ? 'Choose a Format'
+    : step === 1 ? 'Choose an Angle'
+    : step === 2 ? 'Choose a Look'
+    : step === composerStep ? 'Tell Us Everything'
+    : 'Add Your Brand Colors'
+
   function pickFormat(f: Format) {
     setFormat(f)
     setStep(1)
@@ -243,7 +250,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   return (
     <section className="new-section wrap">
-      <h1>New Carousel</h1>
+      <h1>{stepTitle}</h1>
 
       <div className="wizard-header-row">
         <button
@@ -264,7 +271,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       </div>
 
       <div className={`wiz-step${step === 0 ? ' active' : ''}`}>
-        <p className="pick-label">Choose a format</p>
         <div className="pick-row">
           {FORMATS.map((f) => (
             <div
@@ -283,7 +289,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       </div>
 
       <div className={`wiz-step${step === 1 ? ' active' : ''}`}>
-        <p className="pick-label">Choose an angle</p>
         <div className="pick-row">
           {ANGLES.map((a) => (
             <div
@@ -302,7 +307,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       </div>
 
       <div className={`wiz-step${step === 2 ? ' active' : ''}`}>
-        <p className="pick-label">Choose a look</p>
         <div className="pick-row">
           {LOOKS.map((l) => (
             <div
@@ -327,7 +331,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
       {!hasBrandKit && (
         <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
-          <p className="pick-label">Add your brand colors</p>
           <p className="wiz-step-hint">
             Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
           </p>
@@ -362,7 +365,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       )}
 
       <div className={`wizard-composer${step >= composerStep ? ' show' : ''}`}>
-        <p className="pick-label">Tell us everything</p>
         <div className="new-composer-box">
           <textarea
             rows={3}

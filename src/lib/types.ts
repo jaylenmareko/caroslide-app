@@ -2,6 +2,11 @@ export type Angle = 'Value' | 'Growth' | 'Education'
 export type Format = 'Post' | 'Square' | 'Story'
 export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat'
 
+// Only "Circles + Photo" currently maps to more than one real /carousel skill
+// template (see NewCarouselWizard.tsx VARIANTS) -- Plain Text and Bold Stat each
+// map to exactly one template, so they skip this sub-choice entirely.
+export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Photo Column' | 'Editorial'
+
 export type Slide = {
   url: string
 }
@@ -13,6 +18,7 @@ export type Carousel = {
   angle: Angle
   format: Format
   look: Look
+  template_variant: TemplateVariant | null
   brief: string | null
   slides: Slide[]
   reference_images: Slide[]

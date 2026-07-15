@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Angle, Format, Look } from '@/lib/types'
+import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
 
 const MOCK_SLIDES: Record<string, string[]> = {
   Value: ['/mock/wagyuvalue-1.jpg', '/mock/wagyuvalue-2.jpg', '/mock/wagyuvalue-3.jpg', '/mock/wagyuvalue-4.jpg', '/mock/wagyuvalue-5.jpg'],
@@ -17,6 +17,7 @@ export async function createCarousel(input: {
   angle: Angle
   format: Format
   look: Look
+  templateVariant: TemplateVariant | null
   brief: string
   referenceImageUrls: string[]
 }) {
@@ -37,6 +38,7 @@ export async function createCarousel(input: {
       angle: input.angle,
       format: input.format,
       look: input.look,
+      template_variant: input.templateVariant,
       brief: input.brief,
       slides: MOCK_SLIDES[input.angle].map((url) => ({ url })),
       reference_images: input.referenceImageUrls.map((url) => ({ url })),

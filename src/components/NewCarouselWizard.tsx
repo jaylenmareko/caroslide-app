@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import type { Angle, Format, Look } from '@/lib/types'
+import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
 import { ANGLE_TO_LOOK, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
 import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -133,6 +133,106 @@ function LookMockup({ look }: { look: Look }) {
   )
 }
 
+// Only "Circles + Photo" maps to more than one real /carousel skill template --
+// this sub-step lets users pick exactly which one instead of leaving it to
+// chat iteration after the fact (Jaylen: a bad first generation is a bigger
+// turn-off than one more upfront choice).
+const VARIANTS: { title: TemplateVariant; desc: string }[] = [
+  { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.' },
+  { title: 'Side by Side', desc: 'Two photos side by side, caption below.' },
+  { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.' },
+  { title: 'Photo Column', desc: 'Photo column beside a text column.' },
+  { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.' },
+]
+
+function VariantMockup({ variant }: { variant: TemplateVariant }) {
+  if (variant === 'Classic') {
+    return (
+      <div className="look-mock">
+        <div className="look-mock-photo">
+          <ImagePlaceholderIcon />
+        </div>
+        <div className="look-mock-circle-row">
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-lines">
+            <div className="look-mock-line" style={{ width: '70%' }} />
+            <div className="look-mock-line" style={{ width: '45%' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (variant === 'Side by Side') {
+    return (
+      <div className="look-mock">
+        <div className="variant-mock-row">
+          <div className="look-mock-photo">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-photo">
+            <ImagePlaceholderIcon />
+          </div>
+        </div>
+        <div className="look-mock-lines" style={{ flex: '0 0 auto', marginTop: 8 }}>
+          <div className="look-mock-line" style={{ width: '80%' }} />
+          <div className="look-mock-line accent" style={{ width: '50%' }} />
+        </div>
+      </div>
+    )
+  }
+  if (variant === 'Flipped') {
+    return (
+      <div className="look-mock">
+        <div className="look-mock-lines" style={{ flex: '0 0 auto', marginBottom: 10 }}>
+          <div className="look-mock-line" style={{ width: '75%' }} />
+          <div className="look-mock-line accent" style={{ width: '45%' }} />
+        </div>
+        <div className="look-mock-photo" style={{ marginBottom: -18 }}>
+          <ImagePlaceholderIcon />
+        </div>
+        <div className="look-mock-circle-row" style={{ justifyContent: 'center' }}>
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+          <div className="look-mock-circle">
+            <ImagePlaceholderIcon />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (variant === 'Photo Column') {
+    return (
+      <div className="variant-mock-split">
+        <div className="look-mock-photo variant-mock-split-photo">
+          <ImagePlaceholderIcon />
+        </div>
+        <div className="variant-mock-split-text">
+          <div className="look-mock-line" style={{ width: '90%' }} />
+          <div className="look-mock-line" style={{ width: '70%' }} />
+          <div className="look-mock-line accent" style={{ width: '55%' }} />
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="variant-mock-editorial">
+      <div className="look-mock-photo variant-mock-editorial-photo">
+        <ImagePlaceholderIcon />
+      </div>
+      <div className="variant-mock-editorial-caption">
+        <div className="look-mock-line" style={{ width: '65%' }} />
+        <div className="look-mock-line accent" style={{ width: '40%' }} />
+      </div>
+    </div>
+  )
+}
+
 type Attachment = { file: File; previewUrl: string }
 
 export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolean }) {
@@ -150,15 +250,19 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
 
   const [brandColors, setBrandColors] = useState<string[]>(['#5B7A5E', '#F1E6D2', '#16130f'])
   const [savingBrand, setSavingBrand] = useState(false)
+  const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
 
   const recommendedLook = ANGLE_TO_LOOK[angle]
   const effectiveLook = lookTouched ? look : recommendedLook
-  const composerStep = hasBrandKit ? 3 : 4
+  const hasVariantStep = effectiveLook === 'Circles + Photo'
+  const brandColorStep = hasVariantStep ? 4 : 3
+  const composerStep = 3 + (hasVariantStep ? 1 : 0) + (hasBrandKit ? 0 : 1)
 
   const stepTitle =
     step === 0 ? 'Choose a Format'
     : step === 1 ? 'Choose an Angle'
     : step === 2 ? 'Choose a Look'
+    : hasVariantStep && step === 3 ? 'Choose a Style'
     : step === composerStep ? 'Tell Us Everything'
     : 'Add Your Brand Colors'
 
@@ -175,6 +279,10 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
     setLook(l)
     setLookTouched(true)
     setStep(3)
+  }
+  function pickVariant(v: TemplateVariant) {
+    setTemplateVariant(v)
+    setStep(hasBrandKit ? composerStep : brandColorStep)
   }
 
   async function handleContinueFromBrand() {
@@ -244,7 +352,14 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
       }
 
       setUploading(false)
-      await createCarousel({ angle, format, look: effectiveLook, brief, referenceImageUrls: urls })
+      await createCarousel({
+        angle,
+        format,
+        look: effectiveLook,
+        templateVariant: hasVariantStep ? templateVariant : null,
+        brief,
+        referenceImageUrls: urls,
+      })
     })
   }
 
@@ -261,12 +376,9 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           ‹ Back
         </button>
         <div className="wizard-progress">
-          <span className={`wp-dot${step === 0 ? ' active' : ''}${step > 0 ? ' done' : ''}`} />
-          <span className={`wp-dot${step === 1 ? ' active' : ''}${step > 1 ? ' done' : ''}`} />
-          <span className={`wp-dot${step === 2 ? ' active' : ''}${step > 2 ? ' done' : ''}`} />
-          {!hasBrandKit && (
-            <span className={`wp-dot${step === 3 ? ' active' : ''}${step > 3 ? ' done' : ''}`} />
-          )}
+          {Array.from({ length: composerStep }).map((_, i) => (
+            <span key={i} className={`wp-dot${step === i ? ' active' : ''}${step > i ? ' done' : ''}`} />
+          ))}
         </div>
       </div>
 
@@ -329,8 +441,28 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
         </div>
       </div>
 
-      {!hasBrandKit && (
+      {hasVariantStep && (
         <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
+          <div className="pick-row">
+            {VARIANTS.map((v) => (
+              <div
+                key={v.title}
+                className={`pick-card${templateVariant === v.title ? ' selected' : ''}`}
+                onClick={() => pickVariant(v.title)}
+              >
+                <div className="pick-card-preview">
+                  <VariantMockup variant={v.title} />
+                </div>
+                <div className="title">{v.title}</div>
+                <div className="desc">{v.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasBrandKit && (
+        <div className={`wiz-step${step === brandColorStep ? ' active' : ''}`}>
           <p className="wiz-step-hint">
             Every carousel after this one will use these automatically — you can always change them later in Settings → Brand Kit.
           </p>

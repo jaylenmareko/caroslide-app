@@ -11,6 +11,7 @@ const MOCK: Carousel = {
   angle: 'Value',
   format: 'Post',
   look: 'Bold Stat',
+  template_variant: null,
   brief: null,
   slides: [1, 2, 3, 4, 5].map((i) => ({ url: `/mock/wagyuvalue-${i}.jpg` })),
   reference_images: [],

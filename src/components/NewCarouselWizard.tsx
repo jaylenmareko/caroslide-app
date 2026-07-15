@@ -333,18 +333,21 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
           </p>
           <div className="brand-color-picker">
             {brandColors.map((c, i) => (
-              <label key={i} className="color-swatch-input" style={{ background: c }}>
-                <input
-                  type="color"
-                  value={c}
-                  aria-label={`Brand color ${i + 1}`}
-                  onChange={(e) => {
-                    const next = [...brandColors]
-                    next[i] = e.target.value
-                    setBrandColors(next)
-                  }}
-                />
-              </label>
+              <div key={i} className="brand-color-card">
+                <label className="color-swatch-input" style={{ background: c }}>
+                  <input
+                    type="color"
+                    value={c}
+                    aria-label={`Brand color ${i + 1}`}
+                    onChange={(e) => {
+                      const next = [...brandColors]
+                      next[i] = e.target.value
+                      setBrandColors(next)
+                    }}
+                  />
+                </label>
+                <div className="brand-color-label">Color {i + 1}</div>
+              </div>
             ))}
           </div>
           <div className="wiz-step-actions">

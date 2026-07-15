@@ -50,12 +50,6 @@ export const BRAND_FONTS: { name: string; cssVar: string }[] = [
   { name: 'DM Sans', cssVar: 'var(--font-dm-sans)' },
 ]
 
-export const ANGLE_TO_LOOK: Record<Angle, Look> = {
-  Value: 'Bold Stat',
-  Growth: 'Plain Text',
-  Education: 'Circles + Photo',
-}
-
 export function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60000)

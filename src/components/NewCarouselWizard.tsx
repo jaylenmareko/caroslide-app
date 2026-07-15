@@ -2,7 +2,9 @@
 
 import { useRef, useState, useTransition } from 'react'
 import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
-import { ANGLE_TO_LOOK, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB } from '@/lib/types'
+
+const RECOMMENDED_LOOK: Look = 'Circles + Photo'
 import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 
@@ -123,7 +125,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const [formatTouched, setFormatTouched] = useState(false)
   const [angle, setAngle] = useState<Angle>('Value')
   const [angleTouched, setAngleTouched] = useState(false)
-  const [look, setLook] = useState<Look>(ANGLE_TO_LOOK['Value'])
+  const [look, setLook] = useState<Look>(RECOMMENDED_LOOK)
   const [lookTouched, setLookTouched] = useState(false)
   const [variantTouched, setVariantTouched] = useState(false)
   const [brief, setBrief] = useState('')
@@ -137,8 +139,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   const [savingBrand, setSavingBrand] = useState(false)
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
 
-  const recommendedLook = ANGLE_TO_LOOK[angle]
-  const effectiveLook = lookTouched ? look : recommendedLook
+  const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
   const hasVariantStep = effectiveLook === 'Circles + Photo'
   const brandColorStep = hasVariantStep ? 4 : 3
   const composerStep = 3 + (hasVariantStep ? 1 : 0) + (hasBrandKit ? 0 : 1)
@@ -147,7 +148,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
     step === 0 ? 'Choose a Format'
     : step === 1 ? 'Choose an Angle'
     : step === 2 ? 'Choose a Look'
-    : hasVariantStep && step === 3 ? 'Choose a Style'
+    : hasVariantStep && step === 3 ? 'Choose a Style for Your Selected Look'
     : step === composerStep ? 'Tell Us Everything'
     : 'Add Your Brand Colors'
 
@@ -159,7 +160,6 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
   function pickAngle(a: Angle) {
     setAngle(a)
     setAngleTouched(true)
-    setLookTouched(false)
     setStep(2)
   }
   function pickLook(l: Look) {
@@ -319,7 +319,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
               </div>
               <div className="title">
                 {l.title}
-                {l.title === recommendedLook && (
+                {l.title === RECOMMENDED_LOOK && (
                   <span className="rec-badge show">Recommended</span>
                 )}
               </div>
@@ -369,6 +369,20 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
                     }}
                   />
                 </label>
+                <input
+                  type="text"
+                  className="hex-input"
+                  value={c}
+                  aria-label={`Brand color ${i + 1} hex code`}
+                  maxLength={7}
+                  placeholder="#000000"
+                  onChange={(e) => {
+                    const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
+                    const next = [...brandColors]
+                    next[i] = v
+                    setBrandColors(next)
+                  }}
+                />
                 <div className="brand-color-label">Color {i + 1}</div>
               </div>
             ))}

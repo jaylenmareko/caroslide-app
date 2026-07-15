@@ -410,7 +410,7 @@ export default function NewCarouselWizard({ hasBrandKit }: { hasBrandKit: boolea
               <div className="variant-look-context-name">{effectiveLook}</div>
             </div>
           </div>
-          <div className="pick-row">
+          <div className="pick-row pick-row-2col">
             {variantsFor(effectiveLook).map((v) => (
               <div
                 key={v.title}

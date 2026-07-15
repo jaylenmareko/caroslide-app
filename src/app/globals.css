@@ -206,9 +206,11 @@ a { color: inherit; }
 .pick-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
 /* Flex's wrap stretches a lone last-row item to fill the whole row -- fine
    when the item count divides evenly into the row (3 Formats, 3 Angles), but
-   with 4 Looks the 4th card wrapped alone and blew up to full width. A fixed
-   2-column grid keeps all 4 the same size and noticeably bigger than the old
-   3-per-row layout, without singling one out. */
+   4 Looks left the 4th card alone on its row and it blew up to full width. A
+   fixed 2-column grid keeps every card the same, larger size regardless of
+   count (an odd item out just sits alone in its row, same size as the rest,
+   never stretched) -- used on both the Look step and every Style step so
+   card sizing stays visually consistent across the whole wizard. */
 .pick-row-2col { display: grid; grid-template-columns: repeat(2, 1fr); }
 .pick-card {
   flex: 1 1 220px; background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 14px;

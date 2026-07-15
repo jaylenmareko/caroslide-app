@@ -42,11 +42,7 @@ const ANGLE_MOCK_COPY: Record<Angle, { text: React.ReactNode; size: 'lg' | 'md' 
 function AngleMockup({ angle }: { angle: Angle }) {
   const { text, size } = ANGLE_MOCK_COPY[angle]
   return (
-    <div className={`angle-mock angle-mock-${size}`}>
-      <div className="angle-mock-photo">
-        <ImagePlaceholderIcon />
-      </div>
-      <div className="angle-mock-divider" />
+    <div className="angle-mock">
       <div className={`angle-mock-caption angle-mock-caption-${size}`}>{text}</div>
     </div>
   )

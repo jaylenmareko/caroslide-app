@@ -117,6 +117,7 @@ function LookMockup({ look }: { look: Look }) {
 const CIRCLES_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
   { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.', preview: '/template-previews/1-circles-photo.png' },
   { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.', preview: '/template-previews/3-flipped.png' },
+  { title: 'Spotlight', desc: 'Full-bleed photo, one circle inset in the corner, caption right on it.', preview: '/template-previews/11-single-circle.png' },
 ]
 
 const PHOTO_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [

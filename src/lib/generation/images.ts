@@ -6,6 +6,20 @@ const anthropic = new Anthropic()
 
 const MIN_DIMENSION = 400 // reject tiny icons/thumbnails masquerading as og:image
 
+// Both fetches in this file are server-side and their target isn't literally user-typed (page
+// URLs come from Claude's web_search results), but nothing upstream guarantees that stays true
+// forever -- reject anything that isn't a plain http(s) URL before ever calling fetch() on it,
+// so a malformed/unexpected value (file://, an internal-looking scheme, etc.) fails closed
+// instead of being handed to the server's fetch implementation.
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // How many real photo slots the mapped template needs -- one per {{...IMG}} placeholder in the
 // real .claude/skills/carousel/templates/*.html file. Measured directly off the templates
 // (grepped every {{BG_IMG}}/{{CIRCLE_IMG}}/etc.), not guessed -- see
@@ -37,6 +51,8 @@ export function photosNeeded(variant: TemplateVariant | null, look: string): num
 export async function fetchOgImage(
   pageUrl: string
 ): Promise<{ url: string; buffer: Buffer; width: number; height: number } | null> {
+  if (!isSafeHttpUrl(pageUrl)) return null
+
   let html: string
   try {
     const pageRes = await fetch(pageUrl, {
@@ -54,6 +70,7 @@ export async function fetchOgImage(
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
   if (!match) return null
   const imgUrl = match[1]
+  if (!isSafeHttpUrl(imgUrl)) return null
 
   let buffer: Buffer
   try {

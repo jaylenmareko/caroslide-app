@@ -11,6 +11,10 @@ const anthropic = new Anthropic()
 
 const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 // Fields with a documented {{FIELD_SIZE}} override in at least one template -- shrinking this is
 // a legitimate fix for an over-budget field (a real, established pattern this session used
 // manually multiple times, e.g. STAT_SIZE:125px to fit "500M" instead of clipping at the 165px
@@ -144,9 +148,15 @@ export async function generateCarousel(input: {
   const brand = {
     PRIMARY: input.brandColors[0] ?? '#D97757',
     SECONDARY: input.brandColors[1] ?? '#F4C95D',
+    // accountName is user-controlled (Supabase auth display name or email prefix) and lands
+    // directly in HTML with no mediation -- escape it. Everything else that flows into a
+    // template field (captions, headlines, etc.) comes from Claude's own structured output
+    // following the c1/c2/c3 span convention, which is real markup by design, not raw user text,
+    // so it's correctly left unescaped -- this is the one field where that distinction doesn't
+    // hold.
     LOGO_HTML: input.logoUrl
       ? `<img src="${input.logoUrl}" alt="">`
-      : `<span class="a">${input.accountName}</span><span class="b"></span>`,
+      : `<span class="a">${escapeHtml(input.accountName)}</span><span class="b"></span>`,
     ...fontValues(input.font),
   }
 
@@ -172,13 +182,19 @@ export async function generateCarousel(input: {
     const slide = generated.slides[i]
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
-    const photoValues = isCta ? {} : await resolvePhotos(slide.photoBriefs, referenceImagePool)
+    const needsPhotos = !isCta && expectedPhotoCount > 0
+    const photoValues = needsPhotos ? await resolvePhotos(slide.photoBriefs, referenceImagePool) : {}
 
+    // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
+    // returned in `slide.values` can override them. The model sees the raw template HTML
+    // (including PRIMARY/SECONDARY/LOGO_HTML/CANVAS_H placeholders) as context, so it's fully
+    // capable of echoing one of those keys back in `values` even though it was told not to --
+    // the ordering here is what actually prevents that from mattering, not just the instruction.
     const values: Record<string, string> = {
-      CANVAS_H: String(canvasH),
-      ...brand,
       ...slide.values,
       ...photoValues,
+      ...brand,
+      CANVAS_H: String(canvasH),
     }
     if (input.templateVariant === 'Spotlight Left') values.CIRCLE_SIDE = 'left'
 

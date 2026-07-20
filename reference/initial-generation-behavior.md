@@ -128,9 +128,43 @@ failure modes are catchable with plain code, not judgment calls.
 - Per-template character/length budgets on every text placeholder (`CAPTION_HTML`, `HEADLINE_HTML`,
   `STAT_LABEL`, etc.) — reject or force a smaller `*_SIZE` override before render if the
   caption-writing call's output exceeds the budget for that template's box at that font size.
-  **Budgets themselves still need to be measured empirically per template** (render a few real
-  test strings at the boundary, see what actually clips) before this can be enforced — not yet
-  done, flag as a prerequisite before building this step, don't guess safe character counts.
+  **Measured empirically 2026-07-20** (real boundary-case renders at 15/20/25/30-word captions
+  against the generic gray-mockup placeholder, screenshot-verified, not guessed) — see the table
+  below. Two real bugs surfaced by this testing, not previously known:
+  - **Photo Grid** (`8-photo-grid.html`): a caption past ~25 words (6 lines) grows the head zone
+    tall enough that the logo (fixed `top:44px`) visually collides with the caption's first line.
+    Not a risk on Split Flip/Flipped at the same word count — their head/text zones have more
+    vertical room by default.
+  - **Editorial / Spotlight** (`6-minimal-magazine.html`, `11-single-circle.html`) kicker+headline
+    mode: past ~20 words (5 lines) the headline (grows upward from `bottom:110px`) collides with
+    the kicker (fixed at `bottom:400px`) — the 290px gap between them only holds ~4 lines at the
+    default 56px `HEADLINE_SIZE`. Story mode (`STORY_HTML`) doesn't have this ceiling — tested
+    clean at 47 words with room to spare, since nothing else occupies that vertical zone.
+  - (Already known, reconfirmed) **Overlay** (`10-split-overlay.html`) collides with its own
+    brand-badge past ~15-18 words at the default `BRAND_LINE_BOTTOM:200px` — matches the real
+    per-carousel overrides `templates-guide.md` already documents (carousels #03/#13 both needed
+    `BRAND_LINE_BOTTOM` bumped for longer captions). Overlay's real safe default is closer to one
+    short line (~10 words) unless `BRAND_LINE_BOTTOM` is pushed down proportionally.
+
+  | TemplateVariant | Field | Safe default budget | Real ceiling found |
+  |---|---|---|---|
+  | Classic | `CAPTION_HTML` | ≤25 words / ~165 chars | 33 words (7 lines) still fit, no margin to spare — don't push past 30 |
+  | Flipped | `CAPTION_HTML` | ≤25 words / ~165 chars | 33 words (6 lines) right at the divider line — don't push past 30 |
+  | Spotlight, Spotlight Left | `HEADLINE_HTML` (cover mode) | **≤20 words / ~115 chars** | 26 words (5 lines) collides with the kicker — real bug |
+  | Spotlight, Spotlight Left | `STORY_HTML` (narrative mode) | ≤45 words / ~250 chars | tested clean at 47 words, no nearby element to collide with |
+  | Side by Side | `CAPTION_HTML` | ≤25 words / ~165 chars | tested clean through 26 words |
+  | Photo Column | `TAGLINE`+`CAPTION_HTML` | ≤25 words / ~165 chars | full-height column, generous — no collision risk found even at the tested ceiling |
+  | Editorial | `HEADLINE_HTML` (cover mode) | **≤20 words / ~115 chars** | 26 words (5 lines) collides with the kicker — real bug |
+  | Editorial | `STORY_HTML` (narrative mode) | ≤45 words / ~250 chars | tested clean at 47 words |
+  | Photo Grid | `TAGLINE`+`CAPTION_HTML` | **≤25 words / ~165 chars** | 33 words (6 lines) collides with the logo — real bug |
+  | Split Flip | `TAGLINE`+`CAPTION_HTML` | ≤30 words / ~195 chars | tested clean through 33 words, roomier than Photo Grid |
+  | Overlay | `CAPTION_HTML` (headline) | **≤10 words / ~60 chars at default `BRAND_LINE_BOTTOM`** | 18 words (3 lines) already collides with the brand badge — bump `BRAND_LINE_BOTTOM` for anything longer, per `templates-guide.md`'s existing per-carousel pattern |
+  | Plain Text | `STATEMENT_HTML` | ≤12 words / ~70 chars | template's own intent is a single short punchy line, not tested past this — don't write more even if it would technically fit |
+  | Every template's CTA slide | `HEADLINE_HTML`/`SUBHEAD`/`CTA_TEXT` | headline ≤9 words, subhead ≤12 words, button ≤4 words | tested clean well within these, plenty of margin |
+
+  These are the actual measured numbers — enforce them as hard caps in the guardrail step, don't
+  loosen them without re-rendering a real boundary test first (font sizes/box dimensions change
+  between templates, a budget that's safe on one is not automatically safe on another).
 - Image URL existence/load check before render.
 - The no-duplicate-photo rule above (background vs. circle image), checked by comparing the actual
   URLs/hashes, not by asking a model to notice.

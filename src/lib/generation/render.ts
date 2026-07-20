@@ -28,10 +28,21 @@ export async function loadTemplate(templateFile: string): Promise<string> {
 
 export class RenderError extends Error {}
 
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
  * Fills a template and renders it to a PNG via Cloudflare's Browser Rendering REST API
  * (raw HTML in, PNG bytes out -- no Worker deployment needed). Requires CLOUDFLARE_ACCOUNT_ID
  * and CLOUDFLARE_API_TOKEN (Browser Rendering - Edit scope) in the environment.
+ *
+ * Retries up to 3 times with exponential backoff on 429/5xx (rate-limited or transiently down) --
+ * unlike Anthropic API calls elsewhere in this pipeline (the SDK retries those automatically),
+ * this is a plain fetch() with no built-in retry, so a real 429 would otherwise fail the whole
+ * slide outright.
  */
 export async function renderSlide(
   templateFile: string,
@@ -50,30 +61,39 @@ export async function renderSlide(
     throw new RenderError('CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN not set')
   }
 
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/screenshot`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        html: filledHtml,
-        viewport: { width: 1080, height: Number(canvasH) },
-        gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
-        screenshotOptions: { type: 'png' },
-      }),
-    }
-  )
+  const maxAttempts = 3
+  let lastError: RenderError | null = null
 
-  if (!res.ok) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/screenshot`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: filledHtml,
+          viewport: { width: 1080, height: Number(canvasH) },
+          gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
+          screenshotOptions: { type: 'png' },
+        }),
+      }
+    )
+
+    if (res.ok) {
+      const png = Buffer.from(await res.arrayBuffer())
+      return { png, filledHtml, unresolved }
+    }
+
     const body = await res.text().catch(() => '')
-    throw new RenderError(
+    lastError = new RenderError(
       `Cloudflare screenshot API returned ${res.status} for ${templateFile}: ${body.slice(0, 500)}`
     )
+    if (!RETRYABLE_STATUS.has(res.status) || attempt === maxAttempts) throw lastError
+    await sleep(500 * 2 ** (attempt - 1)) // 500ms, 1s, ...
   }
 
-  const png = Buffer.from(await res.arrayBuffer())
-  return { png, filledHtml, unresolved }
+  throw lastError ?? new RenderError(`Cloudflare screenshot API failed for ${templateFile}`)
 }

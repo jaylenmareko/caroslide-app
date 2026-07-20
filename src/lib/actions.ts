@@ -23,6 +23,24 @@ export async function createCarousel(input: {
 
   if (!user) redirect('/login')
 
+  // STOPGAP, not real billing: there is no credits/plan-tier system built yet (Settings' "Free --
+  // 1 carousel to start" and the marketing page's "credits are only spent on new carousels" copy
+  // are both promises with zero enforcement in code right now). Real generation costs real money
+  // per call (Anthropic + Cloudflare), so an account with no cap at all could be called
+  // repeatedly, unbounded, by a bug or a bad actor. This is a blunt safety net -- generous enough
+  // not to block real usage/testing, not the actual quota system. Replace with real Stripe-tied
+  // credit tracking when billing gets built; don't mistake this for that.
+  const MAX_CAROUSELS_PER_ACCOUNT = Number(process.env.MAX_CAROUSELS_PER_ACCOUNT) || 20
+  const { count: existingCount } = await supabase
+    .from('carousels')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user!.id)
+  if ((existingCount ?? 0) >= MAX_CAROUSELS_PER_ACCOUNT) {
+    throw new Error(
+      `You've reached the ${MAX_CAROUSELS_PER_ACCOUNT}-carousel limit for this account. Delete an old one or contact support.`
+    )
+  }
+
   // voice_description is read live from the account's brand_kits row, not snapshotted onto the
   // carousel the way colors/logo/font are -- unlike those, it only shapes NEW writing choices,
   // it isn't baked pixel-for-pixel into a past rendered image, so there's no consistency reason

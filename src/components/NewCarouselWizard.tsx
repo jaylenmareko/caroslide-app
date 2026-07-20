@@ -118,6 +118,7 @@ const CIRCLES_VARIANTS: { title: TemplateVariant; desc: string; preview: string 
   { title: 'Classic', desc: 'Full photo, two circle proofs, caption below.', preview: '/template-previews/1-circles-photo.png' },
   { title: 'Flipped', desc: 'Caption on top, photo below with proof circles.', preview: '/template-previews/3-flipped.png' },
   { title: 'Spotlight', desc: 'Full-bleed photo, one circle inset in the corner, caption right on it.', preview: '/template-previews/11-single-circle.png' },
+  { title: 'Spotlight Left', desc: 'Same as Spotlight, mirrored — circle inset on the left instead.', preview: '/template-previews/11-single-circle-left.png' },
 ]
 
 const PHOTO_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [

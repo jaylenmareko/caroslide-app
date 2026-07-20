@@ -1,0 +1,70 @@
+<!-- VARIANT 3: Flip. Text/black zone on TOP, photo visible at the BOTTOM (mirrored from a normal
+     cover), with two circle insets sitting at the bottom edge overlapping the photo. Apply to
+     every content slide (1-4) for a consistent look; slide 5 stays the standard CTA (unflipped).
+
+     FORMAT SCALING: this template uses flexbox column (textzone height + divider + photozone
+     flex:1), so only TEXTZONE_H needs to vary by format/slide-type — the photo zone
+     auto-fills the remainder via flex:1. Circle/logo offsets are already edge-anchored px
+     (bottom:Npx from the photozone's own bottom), so they need no conversion. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
+
+  .logo { position:absolute; top:50px; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:6; }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .textzone { height:{{TEXTZONE_H|38.52vh}}; background:#0a0a0a; display:flex; align-items:center; justify-content:center; padding:110px 90px 0; }
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|48px}}; font-weight:800; line-height:1.32; }
+  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c2 { color:#ffffff; }
+  .caption .c3 { color:{{PRIMARY}}; }
+
+  .divider { position:relative; height:3px; background:#ffffff; margin:0 108px; z-index:6; }
+
+  .photozone { flex:1; position:relative; overflow:hidden; }
+  .photozone img { width:100%; height:100%; object-fit:cover; object-position:{{BG_POSITION|50% 20%}}; display:block; }
+  .top-fade { position:absolute; top:0; left:0; right:0; height:200px; background:linear-gradient(180deg, #0a0a0a 0%, rgba(10,10,10,0) 100%); z-index:2; }
+
+  /* Bumped 270px -> 320px 2026-07-20 per Jaylen -- read small next to Spotlight's single 410px
+     circle. left/right recomputed to keep the same proportional margins/gap (150/220/170 ->
+     120/180/140) rather than just growing outward into the edges or into each other. */
+  .circle-wrap { position:absolute; bottom:160px; width:320px; height:320px; z-index:5; }
+  .circle-wrap.left { left:120px; }
+  .circle-wrap.right { left:620px; }
+  .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
+  .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 25%}}; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+
+    <div class="textzone">
+      <div class="caption">
+        {{CAPTION_HTML}}
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="photozone">
+      <img src="{{BG_IMG}}" alt="">
+      <div class="top-fade"></div>
+      <!-- 0, 1, or 2 circles — omit the divs entirely if this slide doesn't need them (e.g. the brand-pivot slide) -->
+      <div class="circle-wrap left">
+        <div class="circle"><img src="{{CIRCLE_L_IMG}}" alt=""></div>
+      </div>
+      <div class="circle-wrap right">
+        <div class="circle"><img src="{{CIRCLE_R_IMG}}" alt=""></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

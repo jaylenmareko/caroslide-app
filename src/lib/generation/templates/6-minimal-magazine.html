@@ -1,0 +1,72 @@
+<!-- VARIANT 6: Minimal magazine. Full-bleed photo, NO black box anywhere — text sits directly on
+     the photo over a soft gradient scrim. Most editorial/premium-feeling template; best for
+     narrative/story-driven carousels (trend hook -> story -> resolution -> CTA) rather than
+     stat-drops.
+
+     FORMAT SCALING: every text element is anchored from the BOTTOM edge via a fixed px offset
+     (bottom:Npx), which is inherently format-agnostic — "110px above the bottom edge" means the
+     same thing whether the canvas is 1350 or 1920 tall. Needs zero conversion, just {{CANVAS_H}}. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; overflow:hidden; }
+  .photo { position:absolute; inset:0; background:#3a3a3a; }
+  .photo img { width:100%; height:100%; object-fit:cover; object-position:{{BG_POSITION|50% 15%}}; display:block; }
+  .top-scrim { position:absolute; top:0; left:0; right:0; height:220px; background:linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%); }
+  .bottom-scrim { position:absolute; bottom:0; left:0; right:0; height:{{SCRIM_H|760px}}; background:linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%); }
+
+  .logo { position:absolute; top:50px; left:60px; font-size:32px; font-weight:900; letter-spacing:1px; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:46px; width:auto; display:block; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9)) drop-shadow(0 0 16px rgba(0,0,0,0.6)); } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML — layered shadow keeps a real logo image legible against any photo, not just dark ones */
+
+  /* kicker+headline used to be two independently bottom-anchored elements with a hardcoded 290px
+     gap between their anchor points (.kicker at bottom:400px, .headline at bottom:110px) -- a
+     headline long enough to wrap past ~4 lines grew upward past the kicker's fixed position and
+     visually collided with it (real bug, caught 2026-07-20 via a boundary-length render test).
+     Fixed by wrapping both in one bottom-anchored flex column (.cover-block) so the kicker always
+     sits directly above the headline with a fixed small gap and the whole block grows upward
+     together as a unit, regardless of headline length -- structurally can't collide anymore. */
+  .cover-block { position:absolute; left:70px; right:70px; bottom:110px; display:flex; flex-direction:column; }
+  .kicker { font-size:28px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:{{SECONDARY_LIGHT|#f87171}}; margin-bottom:14px; }
+  .kicker:empty { margin-bottom:0; line-height:0; } /* collapses to zero height if a future slide ever uses headline without a kicker */
+  .headline { font-size:{{HEADLINE_SIZE|56px}}; font-weight:900; line-height:1.18; color:#ffffff; letter-spacing:-1px; text-wrap:balance; }
+  .headline .accent { color:{{SECONDARY}}; }
+  /* narrative/story slides use a running paragraph instead of kicker+headline */
+  .story { position:absolute; left:70px; right:90px; bottom:130px; font-size:{{STORY_SIZE|42px}}; font-weight:700; line-height:1.4; color:#ffffff; }
+  .story .accent { color:{{PRIMARY}}; }
+  .story .muted { color:#9a9a9a; }
+
+  /* stat takeover, added 2026-07-18: previously this template had no dedicated stat treatment —
+     "stat mode" meant writing the number as the first word of the regular 56px .headline, which
+     read as barely-bigger than the surrounding sentence instead of a real stat callout (compare
+     to 4-vertical-split.html's 165px/8-photo-grid.html's 120px .stat). Anchored bottom like
+     .headline so it needs zero format conversion, same as everything else in this template. */
+  .stat { position:absolute; left:70px; right:70px; bottom:180px; font-size:{{STAT_SIZE|140px}}; font-weight:900; color:#ffffff; letter-spacing:-3px; line-height:1; text-align:center; text-shadow:0 2px 14px rgba(0,0,0,0.6); }
+  .statlbl { position:absolute; left:70px; right:70px; bottom:110px; font-size:28px; font-weight:700; color:#e5e5e5; letter-spacing:1px; text-transform:uppercase; text-align:center; text-shadow:0 2px 8px rgba(0,0,0,0.6); }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="photo"><img src="{{BG_IMG}}" alt=""></div>
+    <div class="top-scrim"></div>
+    <div class="bottom-scrim"></div>
+    <div class="logo">{{LOGO_HTML}}</div>
+    <!-- cover/resolution slides: use kicker+headline, leave STORY_HTML/STAT_NUMBER empty.
+         narrative/story slides: use STORY_HTML, leave the other two pairs empty.
+         stat takeover: use STAT_NUMBER + STAT_LABEL, leave KICKER/HEADLINE_HTML/STORY_HTML empty.
+         an empty div renders invisibly, so leaving unused pairs blank is safe. -->
+    <div class="cover-block">
+      <div class="kicker">{{KICKER|}}</div>
+      <div class="headline">{{HEADLINE_HTML|}}</div>
+    </div>
+    <div class="story">{{STORY_HTML|}}</div>
+    <div class="stat">{{STAT_NUMBER|}}</div>
+    <div class="statlbl">{{STAT_LABEL|}}</div>
+  </div>
+</body>
+</html>

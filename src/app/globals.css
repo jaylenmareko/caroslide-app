@@ -366,6 +366,12 @@ a { color: inherit; }
   display: flex; align-items: center; justify-content: center; box-shadow: var(--cta-glow);
 }
 .composer-send-btn svg { width: 16px; height: 16px; }
+.composer-send-btn.pending { cursor: default; opacity: 0.85; }
+.composer-spinner {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff; animation: composerSpin 0.8s linear infinite;
+}
+@keyframes composerSpin { to { transform: rotate(360deg); } }
 .attach-limit-error { font-size: 12px; color: #B3432B; margin: 6px 0 0; }
 
 .new-hint { font-size: 12.5px; color: var(--ink-faint); margin: 0; }

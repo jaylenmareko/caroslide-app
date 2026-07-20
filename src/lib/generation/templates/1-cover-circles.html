@@ -1,0 +1,64 @@
+<!-- VARIANT 1: Cover-circles. Full-bleed photo, bottom-fade to black, 2 circle insets near top,
+     caption in the black zone at the bottom. Best as slide 1 (the hook) with the circles showing
+     two different "before" teasers, or as an inner slide with circles as a before/after pair.
+
+     FORMAT SCALING: canvas width is 1080 for every supported format (post/square/story) — only
+     height differs (1350 / 1080 / 1920). So horizontal values, fixed-element sizes (circle
+     diameter, logo, borders, font-size) stay in px unchanged; only the vertical offsets that
+     define the photo/text split are expressed in vh (percent of whatever height this render
+     actually uses), computed here as original_px / 1350 * 100 against the reference design. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; }
+  .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:cover; background-position:{{BG_POSITION|50% 20%}}; }
+  .scrim-bottom { position:absolute; bottom:0; left:0; right:0; height:56.3vh; background:linear-gradient(0deg, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 100%); }
+  .scrim-top { position:absolute; top:0; left:0; right:0; height:16.3vh; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%); }
+  .logo { position:absolute; top:3.7vh; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:5; }
+  .logo .a { color:{{PRIMARY}}; }
+  .logo .b { color:#ffffff; }
+  .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  /* Bumped 280px -> 320px 2026-07-20 per Jaylen -- read small next to Spotlight's single 410px
+     circle. left/right recomputed to keep the same proportional margins/gap (150/200/170 ->
+     125/170/145) rather than just growing outward into the edges or into each other. */
+  .circle-wrap { position:absolute; top:9.63vh; width:320px; height:320px; }
+  .circle-wrap.left { left:125px; }
+  .circle-wrap.right { left:615px; }
+  .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
+  .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 25%}}; }
+
+  .divider { position:absolute; top:54.67vh; left:108px; right:108px; height:3px; background:#ffffff; }
+  .caption { position:absolute; top:58.52vh; left:100px; right:100px; text-align:center; font-size:50px; font-weight:800; line-height:1.32; }
+  /* caption spans use classes .c1 (secondary accent), .c2 (white/body), .c3 (primary accent) */
+  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c2 { color:#ffffff; }
+  .caption .c3 { color:{{PRIMARY}}; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="photo"></div>
+    <div class="scrim-bottom"></div>
+    <div class="scrim-top"></div>
+    <div class="logo">{{LOGO_HTML}}</div>
+
+    <div class="circle-wrap left">
+      <div class="circle"><img src="{{CIRCLE_L_IMG}}" alt=""></div>
+    </div>
+    <div class="circle-wrap right">
+      <div class="circle"><img src="{{CIRCLE_R_IMG}}" alt=""></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="caption">
+      {{CAPTION_HTML}}
+    </div>
+  </div>
+</body>
+</html>

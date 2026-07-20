@@ -1,0 +1,78 @@
+<!-- VARIANT 8: Photo grid. Headline zone (solid black, fixed height) on top, an asymmetric photo
+     grid below it — one large photo (left, ~60% width) plus two smaller photos stacked on top of
+     each other (right, ~40% width). No circles, no divider line. Good for "here's the proof" posts
+     that want more than one supporting photo without the weight of a full before/after claim.
+
+     Dual-mode like 4-vertical-split.html: both .stat/.statlbl and .tagline/.caption markup live in
+     the headline zone at once. Fill whichever pair fits (plain caption vs. a stat takeover) and
+     leave the other pair's placeholders unset — an empty div renders invisibly.
+
+     FORMAT SCALING: width is fixed 1080 across formats. HEAD_H is the one measurement that should
+     vary by format/slide-type (taller headline zone reads fine on a 1920 Story canvas, cramped on
+     a 1080 Square) — everything below it is flex:1 and fills the remainder automatically. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
+
+  /* .head used to vertically CENTER its tagline+caption -- fine for short text, but a long caption
+     grows in both directions from center and its top edge pushed up into the logo (real bug,
+     caught 2026-07-20 via a boundary-length render test; moving .logo to a different DOM parent
+     didn't fix it, since both .head and .slide share the same top-left origin -- the actual fix is
+     changing which direction the text is allowed to grow). Switched to top-anchored
+     (justify-content:flex-start) with enough padding-top to clear the logo, so tagline+caption can
+     only grow DOWNWARD, same technique 3-flip.html already uses safely -- it can never reach back
+     up into the logo's row regardless of length. Growth risk shifts to the BOTTOM of .head instead
+     (extending toward .grid on a very long caption), which is a far less jarring failure than text
+     overlapping the logo, and is what the measured word-count budget in
+     initial-generation-behavior.md is there to prevent in the first place. */
+  .head { height:{{HEAD_H|36vh}}; background:#0a0a0a; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:95px 70px 30px; }
+  .logo { position:absolute; top:44px; left:60px; font-size:30px; font-weight:900; letter-spacing:1px; z-index:5; }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:30px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px; text-align:center; }
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|46px}}; font-weight:800; line-height:1.28; }
+  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c2 { color:#ffffff; }
+  .caption .c3 { color:{{PRIMARY}}; }
+
+  /* Same 165px-stat rationale as 4-vertical-split.html: the number should dominate the zone at a
+     glance, not read as a normal headline. Render an actual test slide for any stat string before
+     shipping -- a size that fits "80%" isn't guaranteed to fit every stat. */
+  .stat { font-size:120px; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; }
+  .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; }
+
+  .grid { flex:1; display:flex; gap:6px; position:relative; }
+  .grid-main { width:60%; overflow:hidden; position:relative; background:#3a3a3a; }
+  .grid-side { width:40%; display:flex; flex-direction:column; gap:6px; }
+  .grid-side .cell { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
+  .grid img { width:100%; height:100%; object-fit:cover; display:block; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+    <div class="head">
+      <!-- plain caption: use .tagline + .caption, leave STAT_NUMBER/STAT_LABEL unset.
+           stat takeover: use .stat + .statlbl, leave TAGLINE/CAPTION_HTML unset. -->
+      <div class="tagline">{{TAGLINE|}}</div>
+      <div class="caption">{{CAPTION_HTML|}}</div>
+      <div class="stat">{{STAT_NUMBER|}}</div>
+      <div class="statlbl">{{STAT_LABEL|}}</div>
+    </div>
+    <div class="grid">
+      <div class="grid-main"><img src="{{IMG_MAIN}}" alt=""></div>
+      <div class="grid-side">
+        <div class="cell"><img src="{{IMG_TOP}}" alt=""></div>
+        <div class="cell"><img src="{{IMG_BOTTOM}}" alt=""></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

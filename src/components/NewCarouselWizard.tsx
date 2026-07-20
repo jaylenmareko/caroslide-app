@@ -600,18 +600,28 @@ export default function NewCarouselWizard({
               Attach photos {attachments.length > 0 && `(${attachments.length}/${MAX_ATTACHMENTS})`}
             </button>
             <button
-              className="composer-send-btn"
+              className={`composer-send-btn${isPending || uploading ? ' pending' : ''}`}
               aria-label="Generate"
               onClick={handleGenerate}
               disabled={isPending || uploading}
             >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              {isPending || uploading ? (
+                <span className="composer-spinner" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
             </button>
           </div>
           {attachError && <p className="attach-limit-error">{attachError}</p>}
           {generateError && <p className="attach-limit-error">{generateError}</p>}
+          {isPending && !uploading && (
+            <p className="wiz-step-hint" style={{ margin: '10px 0 0' }}>
+              Writing and rendering your carousel — this takes a bit longer than a normal message,
+              hang tight…
+            </p>
+          )}
         </div>
       </div>
     </section>

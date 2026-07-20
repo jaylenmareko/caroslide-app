@@ -1,0 +1,67 @@
+<!-- VARIANT 5: Stat-takeover. Text/stat dominates the frame; the photo is a supporting strip at
+     the very bottom instead of being the hero. Opposite feel from the other templates (text-first,
+     not photo-first).
+
+     STRIP HEIGHT: 36vh (~486px at the 1350 reference) — bumped up from an original 25.19vh
+     (~340px) after three real complaints (SwipeMaxx x2, WagyuWellnessCo) about photos reading as
+     barely-there or getting cropped to something unrecognizable at the old height. Still clearly
+     text-dominant (64/36 split), but gives a real photo enough room to actually be seen. This is a
+     floor, not a guarantee — see templates-guide.md: still render an actual test slide and look at
+     it before finalizing STRIP_POSITION, don't just pick coordinates and ship.
+
+     FORMAT SCALING: stagezone is flex:1 (auto-fills remainder), photostrip is a fixed 36vh — both
+     scale correctly with {{CANVAS_H}} automatically via flexbox. The one thing that needs a calc()
+     mix of vh+px is the bleed circle, since it must straddle the seam between stagezone and
+     photostrip by a fixed 85px regardless of format: top: calc(64vh - 85px) — 64vh is exactly
+     (100% - the strip's 36vh), i.e. the strip's top edge. If the strip height ever changes again,
+     this calc's percentage must change with it — they're derived from each other, not independent. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
+
+  .logo { position:absolute; top:50px; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:6; }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .stagezone { flex:1; background:radial-gradient(circle at 50% 35%, #1a0a0a 0%, #0a0a0a 65%); display:flex; align-items:center; justify-content:center; padding:170px 90px 60px; }
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|52px}}; font-weight:800; line-height:1.3; }
+  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c2 { color:#ffffff; }
+  .caption .c3 { color:{{PRIMARY}}; }
+
+  .photostrip { height:36vh; position:relative; overflow:hidden; }
+  .photostrip img { width:100%; height:100%; object-fit:cover; object-position:{{STRIP_POSITION|50% 25%}}; display:block; }
+  .strip-fade { position:absolute; top:0; left:0; right:0; height:110px; background:linear-gradient(180deg, #0a0a0a 0%, rgba(10,10,10,0) 100%); z-index:2; }
+
+  /* bleeds across the stagezone/photostrip seam — see scaling note above.
+     Circle markup is NOT static template HTML — it's the whole CIRCLE_BLOCK placeholder value (see below),
+     omittable with an empty default instead of requiring post-fill HTML surgery. Never hand-edit
+     generated HTML to strip a circle — a broken regex once left an orphaned tag span that silently
+     rendered "Before" on a carousel making no before/after claim. If no circle is needed, just
+     don't set CIRCLE_BLOCK. */
+  .circle-wrap { position:absolute; top:calc(64vh - 85px); {{CIRCLE_SIDE|left}}:90px; width:170px; height:170px; z-index:5; }
+  .circle { width:100%; height:100%; border-radius:50%; border:8px solid #ffffff; box-shadow:0 10px 26px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
+  .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 22%}}; }
+  .tag { position:absolute; bottom:-2px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); border:1px solid #555; color:#fff; font-size:13px; font-weight:800; letter-spacing:1px; text-transform:uppercase; padding:3px 12px; border-radius:100px; white-space:nowrap; z-index:6; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+    <div class="stagezone">
+      <div class="caption">{{CAPTION_HTML}}</div>
+    </div>
+    <div class="photostrip">
+      <img src="{{BG_IMG}}" alt="">
+      <div class="strip-fade"></div>
+    </div>
+    {{CIRCLE_BLOCK|}}
+  </div>
+</body>
+</html>

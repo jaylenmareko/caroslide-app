@@ -3,16 +3,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
+import { generateCarousel } from '@/lib/generation/pipeline'
 
-const MOCK_SLIDES: Record<string, string[]> = {
-  Value: ['/mock/wagyuvalue-1.jpg', '/mock/wagyuvalue-2.jpg', '/mock/wagyuvalue-3.jpg', '/mock/wagyuvalue-4.jpg', '/mock/wagyuvalue-5.jpg'],
-  Growth: ['/mock/growth-1.jpg', '/mock/growth-2.jpg', '/mock/growth-3.jpg', '/mock/growth-4.jpg', '/mock/growth-5.jpg'],
-  Education: ['/mock/education-1.jpg', '/mock/education-2.jpg', '/mock/education-3.jpg', '/mock/education-4.jpg', '/mock/education-5.jpg'],
-}
-
-// TODO: this stubs slide generation with placeholder images so the wizard -> viewer
-// flow works end to end. Real generation needs to call an image-rendering pipeline
-// (the same template approach the `/carousel` skill uses) from a server route.
 export async function createCarousel(input: {
   angle: Angle
   format: Format
@@ -31,19 +23,57 @@ export async function createCarousel(input: {
 
   if (!user) redirect('/login')
 
-  const title = input.brief.trim().slice(0, 60) || `${input.angle} carousel`
+  // voice_description is read live from the account's brand_kits row, not snapshotted onto the
+  // carousel the way colors/logo/font are -- unlike those, it only shapes NEW writing choices,
+  // it isn't baked pixel-for-pixel into a past rendered image, so there's no consistency reason
+  // to freeze it at creation time.
+  const { data: brandKit } = await supabase
+    .from('brand_kits')
+    .select('voice_description')
+    .eq('user_id', user!.id)
+    .maybeSingle()
+
+  const accountName =
+    (user!.user_metadata?.name as string | undefined) || user!.email!.split('@')[0]
+
+  const generated = await generateCarousel({
+    angle: input.angle,
+    format: input.format,
+    look: input.look,
+    templateVariant: input.templateVariant,
+    brief: input.brief,
+    voiceDescription: brandKit?.voice_description ?? null,
+    referenceImageUrls: input.referenceImageUrls,
+    brandColors: input.brandColors,
+    logoUrl: input.logoUrl,
+    font: input.font,
+    accountName,
+  })
+
+  const slides = []
+  for (let i = 0; i < generated.slides.length; i++) {
+    const slide = generated.slides[i]
+    const path = `${user!.id}/${crypto.randomUUID()}/slide-${i + 1}.png`
+    const { error: uploadError } = await supabase.storage
+      .from('carousel-slides')
+      .upload(path, slide.png, { contentType: 'image/png' })
+    if (uploadError) throw new Error(`Slide ${i + 1} upload failed: ${uploadError.message}`)
+
+    const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(path)
+    slides.push({ url: pub.publicUrl, template: slide.template, values: slide.values })
+  }
 
   const { data, error } = await supabase
     .from('carousels')
     .insert({
       user_id: user!.id,
-      title,
+      title: generated.title || input.brief.trim().slice(0, 60) || `${input.angle} carousel`,
       angle: input.angle,
       format: input.format,
       look: input.look,
       template_variant: input.templateVariant,
       brief: input.brief,
-      slides: MOCK_SLIDES[input.angle].map((url) => ({ url })),
+      slides,
       reference_images: input.referenceImageUrls.map((url) => ({ url })),
       // Snapshotted here, not read live from brand_kits at generation time --
       // see the Carousel type's brand_colors/logo_url/font comment.

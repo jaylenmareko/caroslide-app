@@ -8,8 +8,16 @@ export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus
 // Look that skips this sub-choice.
 export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Spotlight' | 'Spotlight Left' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay'
 
+// template/values are only set on AI-generated slides (what actually filled the template to
+// produce `url`) -- absent on user-uploaded reference photos, which reuse this same type in
+// Carousel.reference_images but were never rendered from a template at all. Optional, not
+// required, so a raw upload doesn't need to fake them and old rows pre-dating this field don't
+// need a migration/backfill -- see chat-editing-execution.md for why generated slides need this
+// to make editing possible at all.
 export type Slide = {
   url: string
+  template?: string                // e.g. "1-cover-circles.html" -- which skill template rendered this
+  values?: Record<string, string>  // the exact fill values used, so an edit has something to rewrite
 }
 
 export type Carousel = {

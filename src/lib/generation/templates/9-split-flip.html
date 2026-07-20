@@ -1,0 +1,61 @@
+<!-- VARIANT 9: Split-flip. Same 2-photo split as 2-split-cover.html, but inverted the same way
+     3-flip.html inverts 1-cover-circles.html: headline zone on TOP (fixed height), the photo split
+     BELOW it instead of above. No circles here (this is the Photo Focus pairing, not Circles +
+     Photo) -- no divider line, the text zone and photo split sit flush against each other.
+
+     Dual-mode like 4-vertical-split.html / 8-photo-grid.html: both .stat/.statlbl and
+     .tagline/.caption markup live in the headline zone at once. Fill whichever pair fits and leave
+     the other pair's placeholders unset -- an empty div renders invisibly.
+
+     FORMAT SCALING: this template uses flexbox column (textzone height + splitzone flex:1), so
+     only TEXTZONE_H needs to vary by format/slide-type -- the photo split auto-fills
+     the remainder via flex:1, exactly like 3-flip.html's photozone. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
+
+  .logo { position:absolute; top:44px; left:60px; font-size:30px; font-weight:900; letter-spacing:1px; z-index:6; }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:30px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .textzone { height:{{TEXTZONE_H|36vh}}; background:#0a0a0a; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:100px 80px 0; }
+  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px; text-align:center; }
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|46px}}; font-weight:800; line-height:1.28; }
+  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c2 { color:#ffffff; }
+  .caption .c3 { color:{{PRIMARY}}; }
+
+  .stat { font-size:110px; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; }
+  .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; }
+
+  .split { flex:1; display:flex; position:relative; }
+  .half { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
+  .half img { width:100%; height:100%; object-fit:cover; display:block; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+
+    <div class="textzone">
+      <!-- plain caption: use .tagline + .caption, leave STAT_NUMBER/STAT_LABEL unset.
+           stat takeover: use .stat + .statlbl, leave TAGLINE/CAPTION_HTML unset. -->
+      <div class="tagline">{{TAGLINE|}}</div>
+      <div class="caption">{{CAPTION_HTML|}}</div>
+      <div class="stat">{{STAT_NUMBER|}}</div>
+      <div class="statlbl">{{STAT_LABEL|}}</div>
+    </div>
+
+    <div class="split">
+      <div class="half l"><img src="{{IMG_LEFT}}" alt=""></div>
+      <div class="half r"><img src="{{IMG_RIGHT}}" alt=""></div>
+    </div>
+  </div>
+</body>
+</html>

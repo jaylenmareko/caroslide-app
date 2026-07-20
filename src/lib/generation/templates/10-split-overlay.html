@@ -1,0 +1,62 @@
+<!-- VARIANT 10: Split-overlay. Same 2-photo split as 2-split-cover.html, but with NO solid-color
+     caption zone at all -- the headline sits directly on the photos via a bottom gradient scrim,
+     same overlay treatment as 6-minimal-magazine.html. A thin horizontal line with a small centered
+     pill/badge logo mark sits just above the headline (distinct from every other template's
+     top-left corner logo -- this one's logo lives bottom-center, on the line).
+
+     Deliberately NO stat mirror for this one (unlike 8-photo-grid.html and 9-split-flip.html).
+     A giant stat number overlaid on a busy photo split via just a gradient scrim risks poor
+     legibility depending on what's under it -- the whole point of a stat callout is that it reads
+     instantly, and "instant" isn't guaranteed against arbitrary photo content the way it is against
+     a flat black zone. If a stat is needed with this photo arrangement, use 9-split-flip.html's
+     stat mode instead -- it puts the number on a solid black zone where legibility is guaranteed.
+
+     FORMAT SCALING: split runs edge-to-edge and full height, and every text/badge element is
+     anchored from the BOTTOM edge via a fixed px offset (bottom:Npx) -- format-agnostic the same
+     way 6-minimal-magazine.html's kicker/headline are. Needs zero conversion, just {{CANVAS_H}}. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; overflow:hidden; }
+
+  .split { position:absolute; inset:0; display:flex; }
+  .half { flex:1; overflow:hidden; position:relative; }
+  .half img { width:100%; height:100%; object-fit:cover; display:block; }
+  .seam { position:absolute; top:0; bottom:0; left:50%; width:2px; margin-left:-1px; background:rgba(255,255,255,0.35); z-index:3; }
+
+  .bottom-scrim { position:absolute; bottom:0; left:0; right:0; height:{{SCRIM_H|620px}}; background:linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%); z-index:2; }
+
+  .brand-line { position:absolute; left:80px; right:80px; bottom:{{BRAND_LINE_BOTTOM|200px}}; height:1px; background:rgba(255,255,255,0.4); z-index:4; }
+  .brand-badge {
+    position:absolute; left:50%; bottom:{{BRAND_LINE_BOTTOM|200px}}; transform:translate(-50%, -50%);
+    background:rgba(0,0,0,0.85); border:1px solid rgba(255,255,255,0.5); border-radius:100px;
+    padding:8px 22px; font-size:18px; font-weight:900; letter-spacing:1px; z-index:5; white-space:nowrap;
+  }
+  .brand-badge .a { color:{{PRIMARY}}; } .brand-badge .b { color:#ffffff; }
+  .brand-badge img { height:20px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; }
+  .headline .c1 { color:{{SECONDARY}}; }
+  .headline .c2 { color:#ffffff; }
+  .headline .c3 { color:{{PRIMARY}}; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="split">
+      <div class="half l"><img src="{{IMG_LEFT}}" alt=""></div>
+      <div class="half r"><img src="{{IMG_RIGHT}}" alt=""></div>
+      <div class="seam"></div>
+    </div>
+    <div class="bottom-scrim"></div>
+    <div class="brand-line"></div>
+    <div class="brand-badge">{{LOGO_HTML}}</div>
+    <div class="headline">{{CAPTION_HTML}}</div>
+  </div>
+</body>
+</html>

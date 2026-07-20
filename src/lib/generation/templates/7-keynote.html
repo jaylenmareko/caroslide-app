@@ -1,0 +1,37 @@
+<!-- VARIANT 7: Keynote. Pure black canvas, one giant centered statement per slide — no photo, no
+     supporting elements. Inspired by Steve Jobs keynote slides: maximum whitespace, one concept
+     only. Best for brand-statement/manifesto carousels or a single hard-hitting line, not tip
+     lists — there's no room here for four short lines, this is one idea, full stop.
+
+     FORMAT SCALING: flexbox centering on .slide means vertical position needs zero conversion —
+     same technique as cta.html. Only {{CANVAS_H}} changes; horizontal padding and font sizes stay
+     fixed px across formats since width is always 1080. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#000000; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:120px; position:relative; }
+
+  .logo { position:absolute; top:50px; left:60px; font-size:30px; font-weight:900; letter-spacing:1px; }
+  .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:32px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  .kicker { font-size:28px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:{{SECONDARY}}; margin-bottom:40px; }
+  .statement { font-size:{{STATEMENT_SIZE|84px}}; font-weight:900; line-height:1.15; letter-spacing:-2px; color:#ffffff; }
+  .statement .c1 { color:{{SECONDARY}}; }
+  .statement .c2 { color:#ffffff; }
+  .statement .c3 { color:{{PRIMARY}}; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+    <div class="kicker">{{KICKER|}}</div>
+    <div class="statement">{{STATEMENT_HTML}}</div>
+  </div>
+</body>
+</html>

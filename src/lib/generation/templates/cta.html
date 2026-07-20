@@ -1,0 +1,31 @@
+<!-- Standard CTA slide — always the last slide, regardless of which of the 6 templates the rest
+     of the carousel uses. No photo, centered, radial-gradient dark background. Uses flexbox
+     centering so it needs zero format-scaling work — just {{CANVAS_H}}. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:90px; background:radial-gradient(circle at 50% 30%, {{DARK_TINT|#1a0a0a}} 0%, #0a0a0a 65%); }
+  .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; text-transform:uppercase; margin-bottom:70px; }
+  .logo span { color:#ffffff; }
+  .logo img { height:40px; width:auto; display:block; margin:0 auto; } /* used instead of the text+span when the brand has a real logo image, see LOGO_HTML */
+  h1 { font-size:80px; font-weight:900; color:#ffffff; line-height:1.1; letter-spacing:-2px; margin-bottom:36px; }
+  .sub { font-size:34px; color:#9a9a9a; font-weight:500; margin-bottom:70px; }
+  .btn { background:{{PRIMARY}}; color:#fff; font-size:36px; font-weight:800; padding:30px 60px; border-radius:100px; letter-spacing:-0.5px; }
+  .micro { margin-top:34px; font-size:26px; color:#666; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="logo">{{LOGO_HTML}}</div>
+    <h1>{{HEADLINE_HTML}}</h1>
+    <div class="sub">{{SUBHEAD}}</div>
+    <div class="btn">{{CTA_TEXT}}</div>
+    <div class="micro">{{MICRO_TEXT|Follow for more · Save this}}</div>
+  </div>
+</body>
+</html>

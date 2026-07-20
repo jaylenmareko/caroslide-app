@@ -564,6 +564,13 @@ a { color: inherit; }
   .new-section h1 { font-size: 21px; }
   .pick-card { flex: 1 1 100%; }
   .pick-row-2col { grid-template-columns: 1fr; }
+  /* Format and Angle steps' cards were forced full 4:5 height (correct for the
+     Look/Style steps' real template screenshots, wrong here) -- their mockups are
+     just simple text/SVG, not a photo that needs that much room, so stacking 3
+     of them at full 4:5 read as "extremely big" on a phone. Scope this to the
+     plain .pick-row (Format/Angle) and explicitly leave .pick-row-2col
+     (Look/Style, real screenshots) at the correct ratio above. */
+  .pick-row:not(.pick-row-2col) .pick-card-preview { aspect-ratio: 3/2; }
 
   .viewer-section { border-radius: 14px; margin-top: 4px; }
   /* Back button removed on mobile per Jaylen -- the mobile app-bar's logo (Sidebar.tsx)

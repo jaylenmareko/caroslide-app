@@ -637,7 +637,12 @@ a { color: inherit; }
   .chat-box { max-width: 100%; }
   .chat-hint { max-width: 100%; }
   .new-composer-box { padding: 14px; }
-  .pick-card-preview { aspect-ratio: 4/3; }
+  /* NOTE: aspect-ratio:4/3 previously forced here squished every real template
+     preview screenshot (Look/Style pickers) into the wrong shape -- the actual
+     images are 4/5 (1080x1350), so object-fit:cover cropped the bottom clean
+     off (exactly where each template's caption text sits). The format picker's
+     own abstract Post/Square/Story mockups don't need a different ratio here;
+     removing this override restores the correct 4:5 base for both. */
 }
 
 /* ============================================================

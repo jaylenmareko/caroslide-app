@@ -98,6 +98,7 @@ export async function saveBrandKit(input: {
   colors: string[]
   logoUrl?: string | null
   font?: string
+  voiceDescription?: string | null
 }) {
   const supabase = await createClient()
   const {
@@ -110,6 +111,7 @@ export async function saveBrandKit(input: {
     colors: input.colors,
     ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
     ...(input.font !== undefined ? { font: input.font } : {}),
+    ...(input.voiceDescription !== undefined ? { voice_description: input.voiceDescription } : {}),
   })
   if (error) throw new Error(error.message)
 }

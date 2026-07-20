@@ -22,6 +22,7 @@ export default function SettingsForm({
   const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
   const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
   const [font, setFont] = useState(brandKit?.font ?? DEFAULT_BRAND_FONT)
+  const [voiceDescription, setVoiceDescription] = useState(brandKit?.voice_description ?? '')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
   const [brandSaved, setBrandSaved] = useState(false)
@@ -79,7 +80,7 @@ export default function SettingsForm({
   }
 
   async function handleBrandSave() {
-    await saveBrandKit({ colors, logoUrl, font })
+    await saveBrandKit({ colors, logoUrl, font, voiceDescription: voiceDescription.trim() || null })
     setBrandSaved(true)
     setTimeout(() => setBrandSaved(false), 2000)
   }
@@ -237,6 +238,17 @@ export default function SettingsForm({
         </div>
         <p className="wiz-step-hint" style={{ margin: '0 0 18px' }}>
           Skip this and every carousel uses {DEFAULT_BRAND_FONT} by default.
+        </p>
+
+        <div className="settings-field-label">Voice &amp; Tone</div>
+        <textarea
+          className="settings-textarea"
+          placeholder="Who you are, who you're talking to, and how you sound — a founder detail, your real audience, a phrase you always use. This shapes the topic and tone of every carousel."
+          value={voiceDescription}
+          onChange={(e) => setVoiceDescription(e.target.value)}
+        />
+        <p className="wiz-step-hint" style={{ margin: '0 0 18px' }}>
+          Optional, but the more specific the better — a real detail beats a generic description.
         </p>
 
         <button className="settings-save" onClick={handleBrandSave}>

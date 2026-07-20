@@ -100,9 +100,19 @@ ${briefInstruction}
 
 Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.`
 
-  const message = await anthropic.messages.parse({
+  const format = zodOutputFormat(GenerationOutput)
+
+  // Deliberately using .create() instead of .parse(): with web_search attached, the model emits
+  // short natural-language text blocks ("Let me check current stats...") ahead of its final JSON
+  // answer, and the SDK's .parse() helper (lib/parser.js) always grabs the FIRST text block in
+  // message.content to run through the output format's parser -- that's the preamble, not the
+  // answer, so .parse() reliably fails here. Selecting the LAST text block ourselves instead.
+  const message = await anthropic.messages.create({
     model: 'claude-opus-4-8',
-    max_tokens: 8192,
+    // 8192 was measured to truncate mid-JSON on a real run: 3 web_search round-trips plus the
+    // full 5-slide structured output (photoBriefs + values per slide) share this one turn's
+    // budget, and research-heavy briefs can burn through it before the JSON closes.
+    max_tokens: 16384,
     tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
     system: systemPrompt,
     messages: [
@@ -111,11 +121,22 @@ Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause conve
         content: 'Write the real content for this carousel now.',
       },
     ],
-    output_config: { format: zodOutputFormat(GenerationOutput) },
+    output_config: { format },
   })
 
-  if (!message.parsed_output) {
-    throw new Error('Caption generation returned no parsed output')
+  const textBlocks = message.content.filter((block) => block.type === 'text')
+  console.log(
+    `[generation] captions call: stop_reason=${message.stop_reason}, content blocks=[${message.content.map((b) => b.type).join(', ')}], text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}]`
+  )
+  const finalBlock = textBlocks[textBlocks.length - 1]
+  if (!finalBlock) {
+    throw new Error(`Caption generation returned no text content (stop_reason: ${message.stop_reason})`)
   }
-  return message.parsed_output
+
+  try {
+    return format.parse(finalBlock.text)
+  } catch (error) {
+    console.log(`[generation] failed text block (last 300 chars): ...${finalBlock.text.slice(-300)}`)
+    throw error
+  }
 }

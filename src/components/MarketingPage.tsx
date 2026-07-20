@@ -23,7 +23,7 @@ const MARQUEE_IMAGES = [
   '/mock/caroslide-the-odyssey.jpg', '/mock/caroslide-world-cup-final-preview.jpg', '/mock/caroslide-five-star-weekend.jpg', '/mock/caroslide-tiktok-emotions-trend.jpg',
   '/mock/caroslide-glitter-freckles.jpg', '/mock/caroslide-grok-4-5-launch.jpg', '/mock/caroslide-anthropic-valuation.jpg', '/mock/caroslide-bangladesh-song.jpg',
   '/mock/caroslide-grande-man.jpg', '/mock/caroslide-hotdog-summer.jpg', '/mock/caroslide-xiaomi-powerbank.jpg', '/mock/caroslide-dai-dai.jpg',
-  '/mock/caroslide-spiderman-bnd.jpg', '/mock/caroslide-2016-trend.jpg',
+  '/mock/caroslide-spiderman-bnd.jpg', '/mock/caroslide-2016-trend.jpg', '/mock/caroslide-apple-openai-lawsuit.jpg',
 ]
 
 function MarqueeRow({ images }: { images: string[] }) {

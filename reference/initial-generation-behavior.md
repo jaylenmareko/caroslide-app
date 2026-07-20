@@ -130,33 +130,40 @@ failure modes are catchable with plain code, not judgment calls.
   caption-writing call's output exceeds the budget for that template's box at that font size.
   **Measured empirically 2026-07-20** (real boundary-case renders at 15/20/25/30-word captions
   against the generic gray-mockup placeholder, screenshot-verified, not guessed) — see the table
-  below. Two real bugs surfaced by this testing, not previously known:
-  - **Photo Grid** (`8-photo-grid.html`): a caption past ~25 words (6 lines) grows the head zone
-    tall enough that the logo (fixed `top:44px`) visually collides with the caption's first line.
-    Not a risk on Split Flip/Flipped at the same word count — their head/text zones have more
-    vertical room by default.
+  below. Two real bugs surfaced by this testing, **both fixed the same day, not just documented:**
+  - **Photo Grid** (`8-photo-grid.html`) — FIXED: a caption past ~25 words used to grow the
+    (vertically-centered) head zone tall enough that the logo (fixed `top:44px`) visually collided
+    with the caption's first line. Fixed by switching `.head` from centered to top-anchored
+    (`justify-content:flex-start`, more top padding to clear the logo, `HEAD_H` default bumped
+    32vh→36vh to compensate for the added padding) — caption can now only grow downward, away from
+    the logo. Growth risk shifted to the *bottom* of the zone (bleeding toward the photo grid)
+    instead, confirmed via re-render to be a much later, softer failure than the logo collision —
+    still budget ≤25 words to stay clear of it entirely.
   - **Editorial / Spotlight** (`6-minimal-magazine.html`, `11-single-circle.html`) kicker+headline
-    mode: past ~20 words (5 lines) the headline (grows upward from `bottom:110px`) collides with
-    the kicker (fixed at `bottom:400px`) — the 290px gap between them only holds ~4 lines at the
-    default 56px `HEADLINE_SIZE`. Story mode (`STORY_HTML`) doesn't have this ceiling — tested
-    clean at 47 words with room to spare, since nothing else occupies that vertical zone.
-  - (Already known, reconfirmed) **Overlay** (`10-split-overlay.html`) collides with its own
-    brand-badge past ~15-18 words at the default `BRAND_LINE_BOTTOM:200px` — matches the real
-    per-carousel overrides `templates-guide.md` already documents (carousels #03/#13 both needed
-    `BRAND_LINE_BOTTOM` bumped for longer captions). Overlay's real safe default is closer to one
-    short line (~10 words) unless `BRAND_LINE_BOTTOM` is pushed down proportionally.
+    mode — FIXED: past ~20 words the headline (which grew upward from a fixed `bottom:110px`) used
+    to collide with the kicker (independently fixed at `bottom:400px`). Fixed by wrapping both in
+    one bottom-anchored flex block (`.cover-block`) so the kicker always sits directly above the
+    headline and the whole block grows upward together — **re-tested clean even at 33 words**, no
+    collision possible anymore regardless of length. The ≤25-word budget below is a writing-quality
+    ceiling now (per `content-strategies.md`), not a layout-safety one.
+  - (Already known, reconfirmed, not yet fixed) **Overlay** (`10-split-overlay.html`) still collides
+    with its own brand-badge past ~15-18 words at the default `BRAND_LINE_BOTTOM:200px` — matches
+    the real per-carousel overrides `templates-guide.md` already documents (carousels #03/#13 both
+    needed `BRAND_LINE_BOTTOM` bumped for longer captions). Real safe default is closer to one short
+    line (~10 words) unless `BRAND_LINE_BOTTOM` is pushed down proportionally — the guardrail must
+    enforce this one for real, since the template itself hasn't been restructured to prevent it.
 
-  | TemplateVariant | Field | Safe default budget | Real ceiling found |
+  | TemplateVariant | Field | Safe default budget | Notes |
   |---|---|---|---|
   | Classic | `CAPTION_HTML` | ≤25 words / ~165 chars | 33 words (7 lines) still fit, no margin to spare — don't push past 30 |
   | Flipped | `CAPTION_HTML` | ≤25 words / ~165 chars | 33 words (6 lines) right at the divider line — don't push past 30 |
-  | Spotlight, Spotlight Left | `HEADLINE_HTML` (cover mode) | **≤20 words / ~115 chars** | 26 words (5 lines) collides with the kicker — real bug |
+  | Spotlight, Spotlight Left | `HEADLINE_HTML` (cover mode) | ≤25 words / ~165 chars | structurally can't collide anymore (fixed) — budget is a writing-quality ceiling, not a safety one |
   | Spotlight, Spotlight Left | `STORY_HTML` (narrative mode) | ≤45 words / ~250 chars | tested clean at 47 words, no nearby element to collide with |
   | Side by Side | `CAPTION_HTML` | ≤25 words / ~165 chars | tested clean through 26 words |
   | Photo Column | `TAGLINE`+`CAPTION_HTML` | ≤25 words / ~165 chars | full-height column, generous — no collision risk found even at the tested ceiling |
-  | Editorial | `HEADLINE_HTML` (cover mode) | **≤20 words / ~115 chars** | 26 words (5 lines) collides with the kicker — real bug |
+  | Editorial | `HEADLINE_HTML` (cover mode) | ≤25 words / ~165 chars | structurally can't collide anymore (fixed) — budget is a writing-quality ceiling, not a safety one |
   | Editorial | `STORY_HTML` (narrative mode) | ≤45 words / ~250 chars | tested clean at 47 words |
-  | Photo Grid | `TAGLINE`+`CAPTION_HTML` | **≤25 words / ~165 chars** | 33 words (6 lines) collides with the logo — real bug |
+  | Photo Grid | `TAGLINE`+`CAPTION_HTML` | ≤25 words / ~165 chars | logo collision fixed (top-anchored now) — this budget avoids the *new*, softer bottom-of-zone bleed risk, not the logo |
   | Split Flip | `TAGLINE`+`CAPTION_HTML` | ≤30 words / ~195 chars | tested clean through 33 words, roomier than Photo Grid |
   | Overlay | `CAPTION_HTML` (headline) | **≤10 words / ~60 chars at default `BRAND_LINE_BOTTOM`** | 18 words (3 lines) already collides with the brand badge — bump `BRAND_LINE_BOTTOM` for anything longer, per `templates-guide.md`'s existing per-carousel pattern |
   | Plain Text | `STATEMENT_HTML` | ≤12 words / ~70 chars | template's own intent is a single short punchy line, not tested past this — don't write more even if it would technically fit |

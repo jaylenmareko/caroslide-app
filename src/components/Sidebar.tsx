@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_ITEMS = [
@@ -36,19 +36,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('click', onDocClick)
-    return () => document.removeEventListener('click', onDocClick)
-  }, [])
 
   useEffect(() => {
     setMobileOpen(false)
@@ -115,27 +103,20 @@ export default function Sidebar({
           })}
         </nav>
 
-        <div className="sidebar-bottom" ref={menuRef}>
-          <button
-            className="sidebar-profile"
-            aria-label="Account menu"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
+        <div className="sidebar-bottom">
+          <div className="sidebar-profile">
             <div className="avatar">{initials || 'U'}</div>
             <div className="sidebar-profile-text">
               <div className="name">{name}</div>
               <div className="email">{email}</div>
             </div>
-          </button>
-          <div className={`avatar-menu sidebar-menu${menuOpen ? ' show' : ''}`}>
-            <Link href="/settings" className="avatar-menu-item" onClick={() => setMenuOpen(false)}>
-              Settings
-            </Link>
-            <div className="avatar-menu-divider" />
-            <button className="avatar-menu-item danger" type="button" onClick={handleSignOut}>
-              Sign out
-            </button>
           </div>
+          <button className="sidebar-signout-btn" type="button" onClick={handleSignOut}>
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Sign out
+          </button>
         </div>
       </aside>
     </>

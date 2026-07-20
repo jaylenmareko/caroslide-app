@@ -20,8 +20,10 @@ function HeroWords({ text }: { text: string }) {
 }
 
 const MARQUEE_IMAGES = [
-  '/mock/wagyu-founder.jpg', '/mock/swipemaxx-tinder.jpg', '/mock/ranchpad-succession.jpg',
-  '/mock/wagyu-seedoil.jpg', '/mock/swipemaxx-dating.jpg', '/mock/ranchpad-lawsuit.jpg',
+  '/mock/caroslide-the-odyssey.jpg', '/mock/caroslide-world-cup-final-preview.jpg', '/mock/caroslide-five-star-weekend.jpg', '/mock/caroslide-tiktok-emotions-trend.jpg',
+  '/mock/caroslide-glitter-freckles.jpg', '/mock/caroslide-grok-4-5-launch.jpg', '/mock/caroslide-anthropic-valuation.jpg', '/mock/caroslide-bangladesh-song.jpg',
+  '/mock/caroslide-grande-man.jpg', '/mock/caroslide-hotdog-summer.jpg', '/mock/caroslide-xiaomi-powerbank.jpg', '/mock/caroslide-dai-dai.jpg',
+  '/mock/caroslide-spiderman-bnd.jpg', '/mock/caroslide-2016-trend.jpg',
 ]
 
 function MarqueeRow({ images }: { images: string[] }) {
@@ -38,6 +40,54 @@ function MarqueeRow({ images }: { images: string[] }) {
   )
 }
 
+const STEP3_SLIDES = [
+  '/mock/five-star-weekend-1.jpg',
+  '/mock/five-star-weekend-2.jpg',
+  '/mock/five-star-weekend-3.jpg',
+  '/mock/five-star-weekend-4.jpg',
+  '/mock/five-star-weekend-5.jpg',
+]
+
+function Step3Carousel({ images }: { images: string[] }) {
+  const [current, setCurrent] = useState(0)
+  return (
+    <div className="lp-carousel">
+      <div className="lp-carousel-frame">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={images[current]} alt={`Example carousel slide ${current + 1}`} />
+        <button
+          className="lp-carousel-arrow left"
+          onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}
+          aria-label="Previous slide"
+        >
+          <svg viewBox="0 0 24 24" width={22} height={22} fill="none">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          className="lp-carousel-arrow right"
+          onClick={() => setCurrent((c) => (c + 1) % images.length)}
+          aria-label="Next slide"
+        >
+          <svg viewBox="0 0 24 24" width={22} height={22} fill="none">
+            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div className="lp-carousel-dots">
+        {images.map((_, i) => (
+          <button
+            key={i}
+            className={`lp-carousel-dot${i === current ? ' active' : ''}`}
+            onClick={() => setCurrent(i)}
+            aria-label={`Go to slide ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const FAQS = [
   {
     q: 'What is Caroslide and how does it work?',
@@ -45,7 +95,7 @@ const FAQS = [
   },
   {
     q: 'Do I need to write or design anything myself?',
-    a: 'No. That’s the difference between Caroslide and a template tool — you give us the topic, we give you the finished carousel, not a blank template to fill in.',
+    a: 'No — Caroslide handles the writing and design. But you still make the calls that matter: the angle, the look, and any change you want in chat afterward. You’re not filling in blanks, and you’re not stuck with the first draft either.',
   },
   {
     q: 'What if I don’t like the first draft?',
@@ -61,7 +111,7 @@ const FAQS = [
   },
   {
     q: 'How is this different from Canva or a template app?',
-    a: 'Template tools give you a layout and expect you to write the copy and pick the photos yourself. Caroslide generates the whole thing — copy, layout, and photo selection — from a topic.',
+    a: 'Template tools hand you a blank layout. Full-auto tools hand you a finished post and hope it sounds like you. Caroslide sits in between — it writes, designs, and picks photos from your angle, then lets you redirect anything in plain chat until it actually sounds like your brand.',
   },
 ]
 
@@ -102,7 +152,7 @@ export default function MarketingPage() {
           <HeroWords text="The AI that makes your carousels for you." />
         </h1>
         <p className="lp-hero-sub">
-          Caroslide turns a topic into a finished carousel — real slides, in your brand, not a template you fill in yourself.
+          Pick the angle. Caroslide handles the writing, design, and format — the voice stays yours.
         </p>
         <div className="lp-hero-cta">
           <span className="pill-label">Drop your topic or brand & watch what happens.</span>
@@ -196,12 +246,7 @@ export default function MarketingPage() {
             <p>No template to fill in — real, finished slides in your brand, in about a minute.</p>
           </div>
           <div className="lp-step-visual" style={{ display: 'flex', justifyContent: 'center' }}>
-            <div className="stage" style={{ width: 200 }}>
-              <div className="stage-frame">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/mock/wagyuvalue-1.jpg" alt="Example carousel slide" />
-              </div>
-            </div>
+            <Step3Carousel images={STEP3_SLIDES} />
           </div>
         </Reveal>
       </section>
@@ -218,7 +263,7 @@ export default function MarketingPage() {
         <div className="lp-pricing-row">
           <Reveal className="lp-pricing-card">
             <span className="plan-badge">Starter</span>
-            <div className="lp-pricing-amount">$19<span className="lp-pricing-period">/mo</span></div>
+            <div className="lp-pricing-amount">$15<span className="lp-pricing-period">/mo</span></div>
             <p className="lp-pricing-desc">10 carousels a month — every angle, format, and look.</p>
             <Link href="/login?mode=signup" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>

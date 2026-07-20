@@ -260,13 +260,13 @@ export default function SettingsForm({
         <div className="plan-current">
           <div>
             <span className="plan-badge">Free</span>
-            <div className="plan-current-desc">3 carousels / month</div>
+            <div className="plan-current-desc">1 carousel to start</div>
           </div>
           <button className="settings-save" style={{ marginTop: 0 }}>
             Upgrade
           </button>
         </div>
-        <p className="plan-upsell">Upgrade for unlimited carousels, priority generation, and more saved brand kits.</p>
+        <p className="plan-upsell">Upgrade for more carousels a month, priority generation, and a saved Brand Kit.</p>
       </div>
     </section>
   )

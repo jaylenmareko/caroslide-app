@@ -65,6 +65,35 @@ export async function updateCarouselTitle(id: string, title: string) {
   if (error) throw new Error(error.message)
 }
 
+export async function updateCarouselSlides(id: string, slides: { url: string }[]) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('carousels').update({ slides }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function updateCarouselBrand(
+  id: string,
+  input: { colors: string[]; logoUrl: string | null; font: string }
+) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('carousels')
+    .update({ brand_colors: input.colors, logo_url: input.logoUrl, font: input.font })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function deleteCarousel(id: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { error } = await supabase.from('carousels').delete().eq('id', id).eq('user_id', user.id)
+  if (error) throw new Error(error.message)
+}
+
 export async function saveBrandKit(input: {
   colors: string[]
   logoUrl?: string | null

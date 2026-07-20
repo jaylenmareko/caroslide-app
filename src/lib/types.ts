@@ -6,7 +6,7 @@ export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus
 // /carousel skill template (see NewCarouselWizard.tsx's variantsFor()) -- Plain
 // Text maps to exactly one (the pure-text keynote layout), so it's the only
 // Look that skips this sub-choice.
-export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Photo Column' | 'Editorial'
+export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay'
 
 export type Slide = {
   url: string

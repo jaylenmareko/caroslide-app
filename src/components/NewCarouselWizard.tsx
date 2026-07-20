@@ -123,12 +123,17 @@ const PHOTO_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[
   { title: 'Side by Side', desc: 'Two photos side by side, caption below.', preview: '/template-previews/2-side-by-side.png' },
   { title: 'Photo Column', desc: 'Photo column beside a text column.', preview: '/template-previews/4-photo-column.png' },
   { title: 'Editorial', desc: 'Full-bleed photo, caption sits right on it.', preview: '/template-previews/6-editorial.png' },
+  { title: 'Photo Grid', desc: 'One large photo plus two stacked, caption above.', preview: '/template-previews/8-photo-grid.png' },
+  { title: 'Split Flip', desc: 'Caption on top, two photos split below.', preview: '/template-previews/9-split-flip.png' },
+  { title: 'Overlay', desc: 'Two photos split full-bleed, caption on a bottom scrim.', preview: '/template-previews/10-split-overlay.png' },
 ]
 
 const STAT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
-  { title: 'Side by Side', desc: 'Two photos side by side, your number as the headline.', preview: '/template-previews/2-side-by-side-stat.png' },
+  { title: 'Side by Side', desc: 'Two photos side by side, a giant stat number below.', preview: '/template-previews/2-side-by-side-stat.png' },
   { title: 'Photo Column', desc: 'Full-height photo beside a giant stat number.', preview: '/template-previews/4-photo-column-stat.png' },
-  { title: 'Editorial', desc: 'Full-bleed photo, your number sits right on it.', preview: '/template-previews/6-editorial-stat.png' },
+  { title: 'Editorial', desc: 'Full-bleed photo, a giant stat number sits right on it.', preview: '/template-previews/6-editorial-stat.png' },
+  { title: 'Photo Grid', desc: 'One large photo plus two stacked, a giant stat number above.', preview: '/template-previews/8-photo-grid-stat.png' },
+  { title: 'Split Flip', desc: 'A giant stat number on top, two photos split below.', preview: '/template-previews/9-split-flip-stat.png' },
 ]
 
 function variantsFor(look: Look) {
@@ -145,7 +150,13 @@ function VariantMockup({ look, variant }: { look: Look; variant: TemplateVariant
 
 type Attachment = { file: File; previewUrl: string }
 
-export default function NewCarouselWizard({ existingBrandKit }: { existingBrandKit: BrandKit | null }) {
+export default function NewCarouselWizard({
+  existingBrandKit,
+  initialBrief,
+}: {
+  existingBrandKit: BrandKit | null
+  initialBrief?: string
+}) {
   const [step, setStep] = useState(0)
   const [format, setFormat] = useState<Format>('Post')
   const [formatTouched, setFormatTouched] = useState(false)
@@ -154,9 +165,10 @@ export default function NewCarouselWizard({ existingBrandKit }: { existingBrandK
   const [look, setLook] = useState<Look>(RECOMMENDED_LOOK)
   const [lookTouched, setLookTouched] = useState(false)
   const [variantTouched, setVariantTouched] = useState(false)
-  const [brief, setBrief] = useState('')
+  const [brief, setBrief] = useState(initialBrief ?? '')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -297,6 +309,7 @@ export default function NewCarouselWizard({ existingBrandKit }: { existingBrandK
   }
 
   function handleGenerate() {
+    setGenerateError(null)
     startTransition(async () => {
       setUploading(true)
       const supabase = createClient()
@@ -317,20 +330,29 @@ export default function NewCarouselWizard({ existingBrandKit }: { existingBrandK
       }
 
       setUploading(false)
-      await createCarousel({
-        angle,
-        format,
-        look: effectiveLook,
-        templateVariant: hasVariantStep ? templateVariant : null,
-        brief,
-        referenceImageUrls: urls,
-        // Whatever's currently set here -- prefilled default, edited for just
-        // this one, or brand new -- is what this carousel uses, independent of
-        // whether it also got saved as the account's new default below.
-        brandColors,
-        logoUrl,
-        font,
-      })
+      try {
+        await createCarousel({
+          angle,
+          format,
+          look: effectiveLook,
+          templateVariant: hasVariantStep ? templateVariant : null,
+          brief,
+          referenceImageUrls: urls,
+          // Whatever's currently set here -- prefilled default, edited for just
+          // this one, or brand new -- is what this carousel uses, independent of
+          // whether it also got saved as the account's new default below.
+          brandColors,
+          logoUrl,
+          font,
+        })
+      } catch (err) {
+        // createCarousel redirects on success, which Next.js implements by throwing
+        // an internal NEXT_REDIRECT error -- let that one propagate, don't swallow it.
+        if (err && typeof err === 'object' && 'digest' in err && typeof err.digest === 'string' && err.digest.startsWith('NEXT_REDIRECT')) {
+          throw err
+        }
+        setGenerateError("Something went wrong creating your carousel — try again.")
+      }
     })
   }
 
@@ -442,82 +464,88 @@ export default function NewCarouselWizard({ existingBrandKit }: { existingBrandK
 
       <div className={`wiz-step${step === brandColorStep ? ' active' : ''}`}>
         <p className="wiz-step-hint">
-          {existingBrandKit
-            ? 'Pre-filled from your saved brand — change anything just for this one, or continue to also update your default.'
-            : 'This carries into every carousel after this one — you can always change it later in Settings → Brand Kit.'}
+          Your default brand kit. Edit it here just for this carousel, or update it anytime in Settings → Brand Kit.
         </p>
 
-        <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
-        <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
-        {logoUrl ? (
-          <div className="brand-logo-preview">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt="Brand logo" />
-            <div className="brand-logo-preview-actions">
-              <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
-                Replace
-              </button>
-              <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
-                Remove
-              </button>
+        <div className="brandkit-grid">
+          <div className="brandkit-card">
+            <div className="brandkit-card-label">Logo<span className="brandkit-optional">optional</span></div>
+            <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
+            {logoUrl ? (
+              <div className="brand-logo-preview">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoUrl} alt="Brand logo" />
+                <div className="brand-logo-preview-actions">
+                  <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
+                    Replace
+                  </button>
+                  <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="brand-logo-upload" onClick={handleLogoClick} style={{ marginBottom: 0 }}>
+                {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
+              </div>
+            )}
+            {logoError && <p className="attach-limit-error">{logoError}</p>}
+          </div>
+
+          <div className="brandkit-card">
+            <div className="brandkit-card-label">Colors</div>
+            <div className="brand-color-picker">
+              {brandColors.map((c, i) => (
+                <div key={i} className="brand-color-card">
+                  <div className="brand-color-label">Color {i + 1}</div>
+                  <label className="color-swatch-input" style={{ background: c }}>
+                    <input
+                      type="color"
+                      value={c}
+                      aria-label={`Brand color ${i + 1}`}
+                      onChange={(e) => {
+                        const next = [...brandColors]
+                        next[i] = e.target.value
+                        setBrandColors(next)
+                      }}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    className="hex-input"
+                    value={c}
+                    aria-label={`Brand color ${i + 1} hex code`}
+                    maxLength={7}
+                    placeholder="#000000"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
+                      const next = [...brandColors]
+                      next[i] = v
+                      setBrandColors(next)
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
-        ) : (
-          <div className="brand-logo-upload" onClick={handleLogoClick}>
-            {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
-          </div>
-        )}
-        {logoError && <p className="attach-limit-error">{logoError}</p>}
 
-        <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Colors</div>
-        <div className="brand-color-picker">
-          {brandColors.map((c, i) => (
-            <div key={i} className="brand-color-card">
-              <label className="color-swatch-input" style={{ background: c }}>
-                <input
-                  type="color"
-                  value={c}
-                  aria-label={`Brand color ${i + 1}`}
-                  onChange={(e) => {
-                    const next = [...brandColors]
-                    next[i] = e.target.value
-                    setBrandColors(next)
-                  }}
-                />
-              </label>
-              <input
-                type="text"
-                className="hex-input"
-                value={c}
-                aria-label={`Brand color ${i + 1} hex code`}
-                maxLength={7}
-                placeholder="#000000"
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
-                  const next = [...brandColors]
-                  next[i] = v
-                  setBrandColors(next)
-                }}
-              />
-              <div className="brand-color-label">Color {i + 1}</div>
+          <div className="brandkit-card">
+            <div className="brandkit-card-label">Font</div>
+            <div className="brand-font-row" style={{ marginBottom: 0 }}>
+              {BRAND_FONTS.map((f) => (
+                <button
+                  type="button"
+                  key={f.name}
+                  className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
+                  style={{ fontFamily: f.cssVar }}
+                  onClick={() => setFont(f.name)}
+                >
+                  {f.name}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-
-        <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Font</div>
-        <div className="brand-font-row">
-          {BRAND_FONTS.map((f) => (
-            <button
-              type="button"
-              key={f.name}
-              className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
-              style={{ fontFamily: f.cssVar }}
-              onClick={() => setFont(f.name)}
-            >
-              {f.name}
-            </button>
-          ))}
+          </div>
         </div>
 
         <div className="wiz-step-actions" style={{ marginTop: 24 }}>
@@ -581,6 +609,7 @@ export default function NewCarouselWizard({ existingBrandKit }: { existingBrandK
             </button>
           </div>
           {attachError && <p className="attach-limit-error">{attachError}</p>}
+          {generateError && <p className="attach-limit-error">{generateError}</p>}
         </div>
       </div>
     </section>

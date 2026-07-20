@@ -40,12 +40,22 @@ export async function generateCaptions(input: {
 }): Promise<GeneratedCarousel> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
 
-  const [contentStrategies, templatesGuide, templateHtml, ctaHtml] = await Promise.all([
+  const [contentStrategies, templatesGuide, generationBehavior, templateHtml, ctaHtml] = await Promise.all([
     readFile(path.join(REFERENCE_DIR, 'content-strategies.md'), 'utf-8'),
     readFile(path.join(REFERENCE_DIR, 'templates-guide.md'), 'utf-8'),
+    readFile(path.join(REFERENCE_DIR, 'initial-generation-behavior.md'), 'utf-8'),
     loadTemplate(templateFile),
     loadTemplate(CTA_TEMPLATE),
   ])
+
+  // Several TemplateVariants (Side by Side, Photo Column, Editorial, Photo Grid, Split Flip) map
+  // to the EXACT SAME template file for both the "Photo Focus" and "Bold Stat" Looks -- the file
+  // alone can't tell the model which mode to fill (plain caption vs. a stat takeover). Without
+  // this being explicit, a Bold Stat carousel could silently come out in plain-caption mode.
+  const modeInstruction =
+    input.look === 'Bold Stat'
+      ? 'This carousel\'s Look is "Bold Stat" -- every content slide MUST use the template\'s stat-takeover mode (STAT_NUMBER + STAT_LABEL), even though the same file also supports a plain-caption mode. Leave CAPTION_HTML/HEADLINE_HTML/TAGLINE unset on content slides.'
+      : 'This carousel\'s Look is "' + input.look + '" -- do NOT use stat-takeover mode (STAT_NUMBER/STAT_LABEL) on any content slide even if the template file supports it; that mode is reserved for the separate "Bold Stat" Look. Use whichever non-stat mode the template\'s own comments describe (plain caption, or kicker+headline/story if this is a dual-mode template).'
 
   const briefInstruction = input.brief.trim()
     ? `The user's brief: "${input.brief.trim()}"\n\nParse this by shape: an empty/near-empty brief means research a real, current, relevant topic yourself; a bare topic phrase is the subject (research supporting facts if the phrase alone isn't enough for 5 real slides); a detailed paragraph should be extracted concretely, not compressed away -- a specific claim or credential beats a generic rewording.`
@@ -61,6 +71,8 @@ ${contentStrategies}
 
 ${templatesGuide}
 
+## ${modeInstruction}
+
 ## The actual template file for slides 1-4 -- read its own top comment block for exact dual/triple-mode field conventions
 
 \`\`\`html
@@ -72,6 +84,10 @@ ${templateHtml}
 \`\`\`html
 ${ctaHtml}
 \`\`\`
+
+## Generation rules (images, brief-parsing, captions) -- follow these exactly
+
+${generationBehavior}
 
 ## Word budgets (measured empirically against real renders -- exceeding these risks visible clipping)
 

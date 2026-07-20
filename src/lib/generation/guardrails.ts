@@ -23,6 +23,10 @@ const CHAR_BUDGETS: Record<string, Record<string, number>> = {
   // default BRAND_LINE_BOTTOM. This budget is the real, load-bearing safety net for that bug.
   '10-split-overlay.html': { CAPTION_HTML: 60 },
   '7-keynote.html': { STATEMENT_HTML: 70 },
+  // Tested clean with plenty of margin (headline <=9 words, subhead <=12 words, button <=4
+  // words) -- this was previously missing entirely from this table, meaning the CTA slide
+  // (every carousel's slide 5, always) had zero length enforcement. Real gap, closed 2026-07-20.
+  'cta.html': { HEADLINE_HTML: 70, SUBHEAD: 85, CTA_TEXT: 30 },
 }
 
 export type GuardrailViolation =

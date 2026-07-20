@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
-import { firstUsablePhoto, searchCandidatePhotoUrls } from './images'
+import { firstUsablePhoto, searchCandidatePhotoUrls, photosNeeded } from './images'
 import { renderSlide } from './render'
 import { checkSlide, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
@@ -149,6 +149,21 @@ export async function generateCarousel(input: {
       : `<span class="a">${input.accountName}</span><span class="b"></span>`,
     ...fontValues(input.font),
   }
+
+  // Sanity-check the model's own photoBriefs count against the template's real, measured photo
+  // count (images.ts's PHOTO_COUNT) -- not a hard failure (the raw template HTML in the prompt is
+  // the real source of truth and unresolved-placeholder detection catches a wrong field name
+  // after render), but worth surfacing loudly if the model under/over-counts, since that's a sign
+  // something else about the response may be off too.
+  const expectedPhotoCount = photosNeeded(input.templateVariant, input.look)
+  generated.slides.slice(0, -1).forEach((slide, i) => {
+    const actual = Object.keys(slide.photoBriefs).length
+    if (actual !== expectedPhotoCount) {
+      console.warn(
+        `[generation] slide ${i + 1} (${templateFile}) returned ${actual} photoBriefs, expected ${expectedPhotoCount}`
+      )
+    }
+  })
 
   const referenceImagePool = [...input.referenceImageUrls]
   const slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> = []

@@ -37,13 +37,12 @@ From `createCarousel`'s real input shape (`src/lib/actions.ts`) plus `BrandKit.v
 - `angle`, `format`, `look`, `templateVariant` — see table above.
 - `brandColors`, `logoUrl`, `font` — feed the template's `PRIMARY`/`SECONDARY`/`LOGO_HTML`/font
   placeholders directly, same as any `/carousel` skill brand config.
-- `BrandKit.voice_description` — **exists in the type (`src/lib/types.ts`) but is never actually
-  collected anywhere in real UI** (`SettingsForm.tsx` has no field for it; it only appears as a
-  hardcoded string in `src/app/preview/settings/page.tsx`'s mock data). This is the direct
-  equivalent of the skill's `carousel-brand.json` `context` field (`brand-config.md`) — real
-  founder background/voice/audience-gap notes that shape topic and tone choices. **Add a text area
-  for this to `SettingsForm.tsx` before relying on it in generation** — don't build the generation
-  prompt around a field that's always null in practice.
+- `BrandKit.voice_description` — real as of 2026-07-20: a "Voice & Tone" textarea in
+  `SettingsForm.tsx`, wired through `saveBrandKit()` to the existing `brand_kits.voice_description`
+  column. Optional, may still be null/empty for most users (nothing forces it) — treat an empty
+  value as "no voice guidance given," not an error. This is the direct equivalent of the skill's
+  `carousel-brand.json` `context` field (`brand-config.md`) — real founder background/voice/
+  audience-gap notes that shape topic and tone choices.
 
 ## Parsing the brief
 

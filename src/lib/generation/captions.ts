@@ -98,7 +98,9 @@ ${input.hasReferenceImages ? 'The user has uploaded their own reference photos f
 
 ${briefInstruction}
 
-Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.`
+Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.
+
+Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- you have web_search only, for looking up real facts/sources; there is no code execution tool available in this request.`
 
   const format = zodOutputFormat(GenerationOutput)
 
@@ -113,6 +115,12 @@ Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause conve
     // full 5-slide structured output (photoBriefs + values per slide) share this one turn's
     // budget, and research-heavy briefs can burn through it before the JSON closes.
     max_tokens: 16384,
+    // web_search re-enabled after isolating the refusal cause (see session log 2026-07-20):
+    // with it attached, the model was invoking an ungranted code_execution tool and getting cut
+    // off by a safety-classifier refusal. Removing web_search "fixed" it but starved the model of
+    // real research/photo-sourcing capability, shipping broken output (unresolved placeholders,
+    // empty photo circles) -- not a real fix. Trying an explicit no-code-execution instruction
+    // in the system prompt instead, below, to keep web_search while avoiding the phantom tool call.
     tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
     system: systemPrompt,
     messages: [

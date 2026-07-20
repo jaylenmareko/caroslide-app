@@ -92,7 +92,11 @@ export async function renderSlide(
       `Cloudflare screenshot API returned ${res.status} for ${templateFile}: ${body.slice(0, 500)}`
     )
     if (!RETRYABLE_STATUS.has(res.status) || attempt === maxAttempts) throw lastError
-    await sleep(500 * 2 ** (attempt - 1)) // 500ms, 1s, ...
+    // 500ms/1s was measured too short for a real 429 seen twice live: the first Browser
+    // Rendering call in a fresh sequence bounces, but an isolated retry moments later always
+    // succeeds -- looks like a cold-start concurrency limit that clears in a few seconds, not
+    // a token-bucket that refills in under a second.
+    await sleep(2000 * 2 ** (attempt - 1)) // 2s, 4s, ...
   }
 
   throw lastError ?? new RenderError(`Cloudflare screenshot API failed for ${templateFile}`)

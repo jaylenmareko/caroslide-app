@@ -22,6 +22,9 @@ function LoginForm() {
   const [confirmSent, setConfirmSent] = useState(false)
   const router = useRouter()
 
+  const topic = searchParams.get('topic')
+  const postAuthDest = topic ? `/new?topic=${encodeURIComponent(topic)}` : '/dashboard'
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -29,12 +32,15 @@ function LoginForm() {
     const supabase = createClient()
 
     if (mode === 'signup') {
+      const confirmUrl = new URL('/auth/confirm', window.location.origin)
+      if (topic) confirmUrl.searchParams.set('topic', topic)
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { name },
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          emailRedirectTo: confirmUrl.toString(),
         },
       })
       if (error) {
@@ -57,7 +63,7 @@ function LoginForm() {
       }
     }
 
-    router.push('/dashboard')
+    router.push(postAuthDest)
     router.refresh()
   }
 

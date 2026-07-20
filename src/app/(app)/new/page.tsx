@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import NewCarouselWizard from '@/components/NewCarouselWizard'
 import type { BrandKit } from '@/lib/types'
 
-export default async function NewCarouselPage() {
+export default async function NewCarouselPage(props: PageProps<'/new'>) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -14,5 +14,8 @@ export default async function NewCarouselPage() {
     .eq('user_id', user!.id)
     .maybeSingle()
 
-  return <NewCarouselWizard existingBrandKit={brandKit as BrandKit | null} />
+  const { topic } = await props.searchParams
+  const initialBrief = typeof topic === 'string' ? topic : undefined
+
+  return <NewCarouselWizard existingBrandKit={brandKit as BrandKit | null} initialBrief={initialBrief} />
 }

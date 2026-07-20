@@ -1,0 +1,17 @@
+{
+  "ig_folder": "C:/Users/Jaylen.Davis/OneDrive - Southwestern College/Desktop/CaroslideIG",
+  "default_format": "Post",
+  "image_mode": "auto",
+  "logo_image": null,
+  "logo_first": "Caroslide",
+  "logo_second": "",
+  "primary": "#A855F7",
+  "secondary": "#38BDF8",
+  "cta_domain": "caroslide.com",
+  "cta_headline": "Make your first carousel free.",
+  "cta_subhead": "Pick an angle. Caroslide writes it, designs it, hands you five slides.",
+  "hashtags": "#contentcreation #socialmediamarketing #carouselpost #smallbusinessmarketing #contentcreator",
+  "context": "This is Caroslide's own product marketing, not a client — the carousels shown here are landing-page demo content (the hero marquee), not posts going out under a client's real account. Product: AI carousel generator, positioning deliberately sits between 'blank template tool' and 'fully automatic, hope it sounds like you' — the pitch is Caroslide writes/designs, the user still picks the angle and can redirect anything in chat afterward ('augmentation, not automation' reframe, logged 2026-07-15). Brand color is a K-State-style purple + sky blue, NOT the literal site CSS variable value — the site's real accent hex is #512888 (dark purple), but that fails a basic legibility check against this skill's near-black template backgrounds (perceived luminance ~0.25, needs ~0.35+). `primary` here is intentionally set to #A855F7 instead — same hue family, lightened until it reads clearly as caption/stat text on black. Do not 'fix' this back to #512888; that reintroduces a real bug that already shipped once (two marquee covers had illegible caption text before this was caught). Logo has no image file — it's a single-color italic serif wordmark ('Caroslide', not a two-tone split like other brands use), which is why logo_second is empty. Logo color default (set 2026-07-18): render `LOGO_HTML` in plain WHITE (#ffffff), not `primary` — white reads cleanly against every template's near-black base and against most photo backgrounds. Only fall back to a different color (primary purple, or whatever the specific frame actually shows as legible) on a carousel-by-carousel basis if white itself turns out unreadable against that slide's particular background — check the actual render, don't assume white always wins just because it usually does.",
+  "target_audience": "People running social media for a small business or solo brand — no in-house designer, want carousel content without learning design or paying an agency. Someone who's tried Canva templates and found them still too much manual work.",
+  "current_audience": "N/A yet — pre-launch marketing page, no real posting history or engagement data to compare against."
+}

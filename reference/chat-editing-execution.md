@@ -59,7 +59,21 @@ away from the carousel's saved brand snapshot over repeated edits.
 ## Render + model
 
 Re-render only the touched slide(s) through the same pipeline as initial generation (see
-`initial-generation-behavior.md`'s render-dependency section) — never the whole carousel. Use
-`claude-opus-4-8` for both the instruction-classification step and any copy rewrite, matching
-`chat-editing-behavior.md`'s reasoning (chat edits are free to the user, so there's no cost pressure
-toward a cheaper model, and a wrong scope/edit call costs more in trust than it saves in latency).
+`initial-generation-behavior.md`'s render-dependency section) — never the whole carousel. The
+render step itself is deterministic code (`fill_template.py` + headless screenshot), not AI —
+free, same as generation.
+
+**Model choice per step — revised 2026-07-20, see `chat-editing-behavior.md`'s Model section for
+the full reasoning (edits are unlimited, so unbounded Opus-per-edit is real unbounded cost, not a
+"free to the user so no cost pressure" situation):**
+- Instruction classification (which taxonomy row above applies, which `values` field(s) it maps
+  to) — cheaper model, this is mechanical pattern-matching against the fixed table above.
+- Copy rewrite (the actual caption/headline text) — `claude-opus-4-8`, this is the one genuinely
+  brand-voice-sensitive step in an edit.
+- Photo-swap edits — no LLM copywriting call at all; reuse generation's capped photo-research step.
+- Template-change edits (mapping a caption onto a different template's placeholder set) — treat
+  the reframing (e.g. plain caption → `STAT_NUMBER`/`STAT_LABEL`) as a copy-rewrite-tier task,
+  `claude-opus-4-8` — this one does require real judgment about what the number/fact actually is.
+- One classify pass, one execute pass, no retry loop — same discipline as generation. An edit that
+  doesn't land right is what the user's *next* message is for, not a reason to spend a second AI
+  pass self-correcting inside one request.

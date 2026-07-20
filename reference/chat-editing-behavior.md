@@ -30,14 +30,27 @@ Matches the app's own copy (see the chat-box hint in `MarketingPage.tsx`'s FAQ: 
 from scratch"). Regenerating the whole carousel on every chat message would silently discard
 approved slides and undermine the one-slide undo/redo history already built in `Viewer.tsx`.
 
-## Model: Claude Opus 4.8
+## Model: split by step, not one tier for the whole edit
 
-Use `claude-opus-4-8` for the edit-parsing + copy-rewrite call, not a cheaper tier. Reasons:
+**Revised 2026-07-20** — the original reasoning here ("chat edits are free to the user, so no cost
+pressure toward a cheaper model") missed something: free-to-the-user is not free-to-Caroslide, and
+unlike generation (capped by credits), chat edits are **unlimited** — a user can send as many as
+they want, forever, on one carousel. Every edit that runs an unnecessary Opus call is unbounded cost
+exposure with no product lever (credits) to offset it. The fix isn't rate-limiting edits (that breaks
+the "always free" promise `MarketingPage.tsx` already makes publicly) — it's making each individual
+edit cheap by construction, same bounded-steps philosophy as
+`initial-generation-behavior.md`'s "Cost-conscious generation pipeline":
 
-- Scope decisions (this doc) and brand-voice-matched copywriting both benefit more from raw
-  capability than from shaving latency/cost — a wrong scope call or off-voice rewrite costs more
-  in user trust than a few cents saved per call.
-- Chat edits are already priced as free to the user (see `MarketingPage.tsx`'s pricing footnote:
-  "Chat edits and iterations are always free — credits are only spent on new carousels"), so
-  there's no per-message cost pressure pushing toward a cheaper model.
-- Matches Anthropic's own default guidance: use Opus 4.8 unless there's a specific reason not to.
+- **Scope classification** (which slide(s) this message touches, per the rules above) — a cheaper
+  model is fine. This is a narrow, mechanical classification task against a short fixed rule set,
+  not open-ended judgment.
+- **Copy rewrite** (the actual brand-voice-sensitive rewriting of a caption/headline field) —
+  `claude-opus-4-8`, unchanged from the original reasoning. This is the one part of an edit that's
+  genuinely judgment-heavy (does this sound like the brand, is it actually punchier) and worth
+  paying for.
+- **Photo-swap edits** — no copywriting judgment involved at all. Reuse the same capped
+  photo-research step from `initial-generation-behavior.md` (cheaper model, 2-3 search cap), not a
+  fresh Opus call.
+- No retry loop on edits, same as generation — one classify, one execute, done. If the result isn't
+  right, that's what the *next* chat message is for; don't burn a second AI pass trying to
+  self-correct within a single edit request.

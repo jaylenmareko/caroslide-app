@@ -68,22 +68,42 @@ export async function createCarousel(input: {
     accountName,
   })
 
+  // One folder per carousel (not one random folder per slide, the previous behavior) -- keeps a
+  // carousel's slides grouped together in Storage, and gives partial-failure cleanup below a
+  // single known prefix to target instead of no way to find what was already uploaded.
+  const carouselId = crypto.randomUUID()
+  const uploadedPaths: string[] = []
   const slides = []
-  for (let i = 0; i < generated.slides.length; i++) {
-    const slide = generated.slides[i]
-    const path = `${user!.id}/${crypto.randomUUID()}/slide-${i + 1}.png`
-    const { error: uploadError } = await supabase.storage
-      .from('carousel-slides')
-      .upload(path, slide.png, { contentType: 'image/png' })
-    if (uploadError) throw new Error(`Slide ${i + 1} upload failed: ${uploadError.message}`)
+  try {
+    for (let i = 0; i < generated.slides.length; i++) {
+      const slide = generated.slides[i]
+      const path = `${user!.id}/${carouselId}/slide-${i + 1}.png`
+      const { error: uploadError } = await supabase.storage
+        .from('carousel-slides')
+        .upload(path, slide.png, { contentType: 'image/png' })
+      if (uploadError) throw new Error(`Slide ${i + 1} upload failed: ${uploadError.message}`)
+      uploadedPaths.push(path)
 
-    const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(path)
-    slides.push({ url: pub.publicUrl, template: slide.template, values: slide.values })
+      const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(path)
+      slides.push({ url: pub.publicUrl, template: slide.template, values: slide.values })
+    }
+  } catch (error) {
+    // A later slide failing shouldn't leave earlier slides' real uploads orphaned in Storage with
+    // no DB row ever created to reference them -- best-effort cleanup, then let the real error
+    // surface (this is a resource-leak fix, not something that should mask the actual failure).
+    if (uploadedPaths.length > 0) {
+      await supabase.storage.from('carousel-slides').remove(uploadedPaths)
+    }
+    throw error
   }
 
   const { data, error } = await supabase
     .from('carousels')
     .insert({
+      // Explicit, not the column's own default -- matches the Storage folder name above, so
+      // deleteCarousel below can find and remove this carousel's images by a single known prefix
+      // instead of having no way to associate a DB row with its own uploaded files.
+      id: carouselId,
       user_id: user!.id,
       title: generated.title || input.brief.trim().slice(0, 60) || `${input.angle} carousel`,
       angle: input.angle,
@@ -140,6 +160,19 @@ export async function deleteCarousel(id: string) {
 
   const { error } = await supabase.from('carousels').delete().eq('id', id).eq('user_id', user.id)
   if (error) throw new Error(error.message)
+
+  // Real cleanup, not just the DB row -- previously left every deleted carousel's slide PNGs
+  // orphaned in Storage forever (no code anywhere ever removed them). The folder name matches
+  // this carousel's own `id` (see createCarousel), so this is a real, safe, precisely-scoped
+  // cleanup, not a guess at what might belong to it. Best-effort: the DB row is already gone
+  // (the part that matters to the user), so a Storage failure here shouldn't surface as an error.
+  const folder = `${user.id}/${id}`
+  const { data: files } = await supabase.storage.from('carousel-slides').list(folder)
+  if (files && files.length > 0) {
+    await supabase.storage
+      .from('carousel-slides')
+      .remove(files.map((f) => `${folder}/${f.name}`))
+  }
 }
 
 export async function saveBrandKit(input: {

@@ -51,9 +51,6 @@ export async function createCarousel(input: {
     .eq('user_id', user!.id)
     .maybeSingle()
 
-  const accountName =
-    (user!.user_metadata?.name as string | undefined) || user!.email!.split('@')[0]
-
   const generated = await generateCarousel({
     angle: input.angle,
     format: input.format,
@@ -65,7 +62,6 @@ export async function createCarousel(input: {
     brandColors: input.brandColors,
     logoUrl: input.logoUrl,
     font: input.font,
-    accountName,
   })
 
   // One folder per carousel (not one random folder per slide, the previous behavior) -- keeps a

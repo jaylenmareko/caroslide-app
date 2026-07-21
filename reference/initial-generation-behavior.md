@@ -36,7 +36,13 @@ From `createCarousel`'s real input shape (`src/lib/actions.ts`) plus `BrandKit.v
   before this call runs (see `Composer supports photo attachments` in `caroslide/CONTEXT.md`).
 - `angle`, `format`, `look`, `templateVariant` — see table above.
 - `brandColors`, `logoUrl`, `font` — feed the template's `PRIMARY`/`SECONDARY`/`LOGO_HTML`/font
-  placeholders directly, same as any `/carousel` skill brand config.
+  placeholders directly, same as any `/carousel` skill brand config. **`logoUrl` fallback rule
+  (Jaylen, 2026-07-21): if the user never uploaded a logo, `LOGO_HTML` falls back to Caroslide's
+  OWN wordmark, not the account's display name** — a carousel with no brand logo set should read
+  as "made with Caroslide," not silently promote whatever the account owner's name happens to be.
+  Implemented in `pipeline.ts` as a text wordmark (the same `.a`/`.b` two-tone span convention
+  every template already uses for a text-only brand fallback) since there's no up-to-date
+  Caroslide logo *image* asset in this repo yet — swap in a real `<img>` once one exists.
 - `BrandKit.voice_description` — real as of 2026-07-20: a "Voice & Tone" textarea in
   `SettingsForm.tsx`, wired through `saveBrandKit()` to the existing `brand_kits.voice_description`
   column. Optional, may still be null/empty for most users (nothing forces it) — treat an empty
@@ -109,6 +115,19 @@ color-clause convention (`templates-guide.md`'s caption section) and word-count 
 20-25 on mechanism slides). `voice_description`, once collected, shapes tone the same way a brand's
 `context` field does in manual generation — a specific voice quirk or founder detail belongs in the
 caption, not flattened into generic copy.
+
+**Real bug found and fixed 2026-07-21: `format` must reach the caption-writing call, not just the
+render step.** For a while this call never received `format` at all — it fed `CANVAS_H` at render
+time only, while the system prompt falsely claimed the model "has already been told" format. Since
+canvas width is fixed at 1080px and only height varies (Post 1350 / Square 1080 / Story 1920),
+Square has meaningfully less vertical room per word than Post and Story meaningfully more — the
+model is now told this explicitly and given qualitative guidance (favor the tighter end of the
+word budget on Square, a little more breathing room on Story, don't pad). **Still an open,
+honestly-flagged gap, not silently accepted:** the character budgets in `guardrails.ts`
+(`CHAR_BUDGETS`) were only ever empirically measured against Post's 1350px canvas (real
+boundary-case renders, see the pipeline section below) — Square/Story reuse the exact same numbers
+unverified. If Square/Story usage grows, they deserve their own measurement pass rather than
+assuming Post's numbers transfer cleanly.
 
 ## Cost-conscious generation pipeline (bounded steps, guardrails-first)
 

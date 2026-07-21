@@ -18,6 +18,43 @@ function isSafeHttpUrl(url: string): boolean {
   }
 }
 
+// Real bug found live 2026-07-21: og:image scraping pulled a watermarked, unlicensed Alamy stock
+// photo into a real render (caught by the AI vision-review fallback, which only runs when another
+// guardrail already flagged something on that slide -- a slide where every photo resolves would
+// have shipped it undetected). Stock-photo marketplace "photo detail" pages almost always set
+// og:image to their own watermarked preview thumbnail, not a licensable/usable image -- reject
+// these page URLs outright before ever fetching them, rather than relying on vision-review to
+// catch it after the fact.
+const STOCK_PHOTO_DOMAINS = [
+  'alamy.com',
+  'shutterstock.com',
+  'gettyimages.com',
+  'istockphoto.com',
+  'dreamstime.com',
+  '123rf.com',
+  'depositphotos.com',
+  'stock.adobe.com',
+  'canstockphoto.com',
+  'bigstockphoto.com',
+]
+
+function isStockPhotoHost(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    return STOCK_PHOTO_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))
+  } catch {
+    return false
+  }
+}
+
+/** A flat-color 1x1 SVG data URI -- used as a clean fallback (`background-image`/`<img src>`
+ * both accept it) when photo sourcing genuinely can't find a usable image, so a slide ships with
+ * a plain brand-color circle/panel instead of a broken or literal-unresolved-placeholder image. */
+export function solidColorPlaceholder(hexColor: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='${hexColor}'/></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 // How many real photo slots the mapped template needs -- one per {{...IMG}} placeholder in the
 // real .claude/skills/carousel/templates/*.html file. Measured directly off the templates
 // (grepped every {{BG_IMG}}/{{CIRCLE_IMG}}/etc.), not guessed -- see
@@ -68,6 +105,7 @@ export async function fetchOgImage(
   pageUrl: string
 ): Promise<{ url: string; buffer: Buffer; width: number; height: number } | null> {
   if (!isSafeHttpUrl(pageUrl)) return null
+  if (isStockPhotoHost(pageUrl)) return null
 
   let html: string
   try {
@@ -87,6 +125,7 @@ export async function fetchOgImage(
   if (!match) return null
   const imgUrl = match[1]
   if (!isSafeHttpUrl(imgUrl)) return null
+  if (isStockPhotoHost(imgUrl)) return null // defense in depth: a non-stock page hotlinking a stock CDN image directly
 
   let buffer: Buffer
   try {

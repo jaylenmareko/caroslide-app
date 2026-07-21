@@ -2,7 +2,13 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
-import { firstUsablePhoto, searchCandidatePhotoUrls, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE } from './images'
+import {
+  firstUsablePhoto,
+  searchCandidatePhotoUrls,
+  photosNeeded,
+  PHOTO_FIELDS_FOR_TEMPLATE,
+  solidColorPlaceholder,
+} from './images'
 import { renderSlide } from './render'
 import { checkSlide, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
@@ -10,10 +16,6 @@ import { fontValues } from './fonts'
 const anthropic = new Anthropic()
 
 const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 // Fields with a documented {{FIELD_SIZE}} override in at least one template -- shrinking this is
 // a legitimate fix for an over-budget field (a real, established pattern this session used
@@ -147,13 +149,13 @@ export async function generateCarousel(input: {
   brandColors: string[]
   logoUrl: string | null
   font: string
-  accountName: string
 }): Promise<{ title: string; slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> }> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
   const canvasH = CANVAS_H[input.format]
 
   const generated = await generateCaptions({
     angle: input.angle,
+    format: input.format,
     look: input.look,
     templateVariant: input.templateVariant,
     brief: input.brief,
@@ -164,15 +166,18 @@ export async function generateCarousel(input: {
   const brand = {
     PRIMARY: input.brandColors[0] ?? '#D97757',
     SECONDARY: input.brandColors[1] ?? '#F4C95D',
-    // accountName is user-controlled (Supabase auth display name or email prefix) and lands
-    // directly in HTML with no mediation -- escape it. Everything else that flows into a
-    // template field (captions, headlines, etc.) comes from Claude's own structured output
-    // following the c1/c2/c3 span convention, which is real markup by design, not raw user text,
-    // so it's correctly left unescaped -- this is the one field where that distinction doesn't
-    // hold.
+    // Real product decision (Jaylen, 2026-07-21): if the user never uploads a brand logo, fall
+    // back to Caroslide's OWN wordmark rather than the account's own name -- a carousel with no
+    // brand logo set should read as "made with Caroslide," not silently promote whatever text
+    // happens to be the account's display name. There's no up-to-date Caroslide logo IMAGE asset
+    // in this repo yet (the only existing files under projects/business/caroslide/assets/ are the
+    // old carosale-branded coins+legs mark, flagged stale in CONTEXT.md) -- falls back to a text
+    // wordmark using the same .a/.b two-tone span convention every template already expects,
+    // matching how any other brand's text-only fallback renders. Swap in a real logo `<img>` once
+    // an actual Caroslide brand-mark image exists.
     LOGO_HTML: input.logoUrl
       ? `<img src="${input.logoUrl}" alt="">`
-      : `<span class="a">${escapeHtml(input.accountName)}</span><span class="b"></span>`,
+      : `<span class="a">Caroslide</span><span class="b"></span>`,
     ...fontValues(input.font),
   }
 
@@ -214,6 +219,19 @@ export async function generateCarousel(input: {
       if (brief && brief.trim().length > 0) mappedPhotoBriefs[fieldName] = brief
     })
     const photoValues = needsPhotos ? await resolvePhotos(mappedPhotoBriefs, referenceImagePool) : {}
+    // Real gap found live 2026-07-21: when sourcing genuinely fails for a slot (~50% hit rate
+    // observed), the field was left unset entirely -- fillTemplate leaves the literal
+    // `{{FIELD}}` placeholder in the rendered HTML, shipping a visibly broken circle/panel.
+    // Fill any still-missing slot with a flat brand-color placeholder instead -- a clean, honest
+    // "no photo" panel beats a broken image, and it's what `checkUnresolvedPlaceholders` was
+    // actually meant to prevent from ever reaching a render.
+    if (needsPhotos) {
+      for (const fieldName of photoFieldOrder) {
+        if (!photoValues[fieldName]) {
+          photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+        }
+      }
+    }
 
     // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
     // returned in `slide.values` can override them. The model sees the raw template HTML

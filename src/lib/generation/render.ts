@@ -61,7 +61,7 @@ export async function renderSlide(
     throw new RenderError('CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN not set')
   }
 
-  const maxAttempts = 3
+  const maxAttempts = 4
   let lastError: RenderError | null = null
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -102,11 +102,24 @@ export async function renderSlide(
       `Cloudflare screenshot API returned ${res.status} for ${templateFile}: ${body.slice(0, 500)}`
     )
     if (!RETRYABLE_STATUS.has(res.status) || attempt === maxAttempts) throw lastError
-    // 500ms/1s was measured too short for a real 429 seen twice live: the first Browser
-    // Rendering call in a fresh sequence bounces, but an isolated retry moments later always
-    // succeeds -- looks like a cold-start concurrency limit that clears in a few seconds, not
-    // a token-bucket that refills in under a second.
-    await sleep(2000 * 2 ** (attempt - 1)) // 2s, 4s, ...
+
+    // Real, repeated pattern (2026-07-21): a 429 on this endpoint consistently hit the LAST
+    // (5th) render call of a carousel, 4 times in one night -- and manually waiting ~2 minutes
+    // before a fresh retry cleared it every time, while an immediate retry never did. That rules
+    // out the original "cold-start concurrency, clears in seconds" theory this backoff was tuned
+    // for; a 429 specifically needs a real rate-limit window to pass, not a quick bounce. Respect
+    // a real Retry-After header if Cloudflare sends one; otherwise back off far longer for 429
+    // than for a transient 5xx (which the original 2s/4s schedule is still reasonable for).
+    if (res.status === 429) {
+      const retryAfterHeader = res.headers.get('Retry-After')
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN
+      const waitMs = Number.isFinite(retryAfterSeconds)
+        ? Math.min(retryAfterSeconds * 1000, 90000)
+        : 15000 * 2 ** (attempt - 1) // 15s, 30s, 60s
+      await sleep(waitMs)
+    } else {
+      await sleep(2000 * 2 ** (attempt - 1)) // 2s, 4s, 8s
+    }
   }
 
   throw lastError ?? new RenderError(`Cloudflare screenshot API failed for ${templateFile}`)

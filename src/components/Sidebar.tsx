@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_ITEMS = [
@@ -37,10 +37,15 @@ export default function Sidebar({
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
-
-  useEffect(() => {
+  // Closing the drawer on navigation is "reset state when a prop changes," which React's own
+  // docs recommend doing directly during render (comparing against a ref of the previous value),
+  // not via a useEffect -- setState inside an effect body here would trigger a real lint error
+  // (react-hooks/set-state-in-effect: risks a cascading extra render) for zero benefit over this.
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname)
     setMobileOpen(false)
-  }, [pathname])
+  }
 
   async function handleSignOut() {
     const supabase = createClient()

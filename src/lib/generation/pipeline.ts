@@ -162,13 +162,23 @@ export async function generateCarousel(input: {
     // brand logo set should read as "made with Caroslide," not silently promote whatever text
     // happens to be the account's display name. There's no up-to-date Caroslide logo IMAGE asset
     // in this repo yet (the only existing files under projects/business/caroslide/assets/ are the
-    // old carosale-branded coins+legs mark, flagged stale in CONTEXT.md) -- falls back to a text
-    // wordmark using the same .a/.b two-tone span convention every template already expects,
-    // matching how any other brand's text-only fallback renders. Swap in a real logo `<img>` once
-    // an actual Caroslide brand-mark image exists.
+    // old carosale-branded coins+legs mark, flagged stale in CONTEXT.md) -- falls back to text.
+    //
+    // Real bug fixed 2026-07-21 (same day): the FIRST version of this fallback used the template's
+    // own `.a`/`.b` two-tone span convention (`<span class="a">Caroslide</span>`), but `.a` is
+    // styled `color:{{PRIMARY}}` in every template -- meaning "Caroslide" rendered in whatever
+    // brand color the CURRENT carousel's own user happened to pick, not a fixed Caroslide identity.
+    // Jaylen's explicit rule: Caroslide's own logo should always be white, never inherit a brand
+    // color, unless it sits on a background light enough that white is unreadable. Checked every
+    // real template file (2026-07-21): all 12 hardcode a dark background (#0a0a0a or #000000,
+    // photo-based slides additionally scrim the top for text legibility) -- none currently support
+    // a light background at all, so "always white" is safe for the entire current template set.
+    // Hardcoded here via inline style rather than the .a/.b convention specifically so it can never
+    // silently start following a template's PRIMARY color again. If a light-background template
+    // variant is ever added, this needs a real per-template light/dark flag, not a guess.
     LOGO_HTML: input.logoUrl
       ? `<img src="${input.logoUrl}" alt="">`
-      : `<span class="a">Caroslide</span><span class="b"></span>`,
+      : `<span style="color:#ffffff">Caroslide</span>`,
     ...fontValues(input.font),
   }
 

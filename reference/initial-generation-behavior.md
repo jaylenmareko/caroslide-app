@@ -95,9 +95,28 @@ Mirrors skill step 6 exactly:
 
   If the user uploaded 1 of the 3 a Classic carousel needs, research the other 2, not all 3 — don't
   discard a real user-supplied photo just because more are needed.
-- No reference images at all → source illustrative photos yourself, no API key needed
-  (`image-sourcing.md`'s technique — `fetch_og_image.py` against real article URLs, or equivalent,
-  via a **capped** number of searches — see the cost section below, this is not open-ended research).
+- No reference images at all → source illustrative photos via `images.ts`'s `findUsablePhoto()`,
+  a real three-tier pipeline (rewritten 2026-07-21 after measuring the original single-tier
+  approach at ~50% hit rate):
+  1. **Pexels** (`PEXELS_API_KEY`) tried first — a curated free-to-use photo library, no
+     attribution required (confirmed on pexels.com/license). Highest hit rate for generic
+     aesthetic briefs (e.g. "raw wagyu steak marbling close-up photo"), which is most of what a
+     caption-writing call actually generates.
+  2. **Tavily image search** (`include_images` mode) tried second — real data found live: this
+     underperforms Pexels for generic aesthetic briefs (mostly returns stock-marketplace previews,
+     see below) but *outperforms* it for literal/branded/retail-product briefs (e.g. "grocery
+     store ground beef package photo" returned real photos from Kroger/Meijer/a real ranch's own
+     site) — kept specifically for that case.
+  3. **Tavily page search + `og:image` scrape** (the original approach) tried last, as a genuine
+     fallback, not discarded.
+
+  All three sources are validated the same way: rejected outright if the host is a known
+  stock-photo marketplace (Alamy/Shutterstock/Getty/iStock/Dreamstime/123rf/Depositphotos/Adobe
+  Stock+its `ftcdn.net` CDN/Canstock/Bigstock/Vecteezy/Unsplash's paid `plus.` tier — a real
+  watermarked Alamy preview shipped in a render once, caught only by luck via vision-review), then
+  checked for real dimensions (≥400px both axes). If sourcing genuinely fails for a slot after all
+  three tiers, the field gets a flat brand-color placeholder (`solidColorPlaceholder()` in
+  `pipeline.ts`) instead of shipping a broken/unresolved image.
 - Never reuse the same photo as both `BG_IMG` and a circle image on templates that pair the two
   (Spotlight/Spotlight Left especially) — the whole point of a background-plus-circle-inset layout
   is pairing the main subject with a *different* related photo, not a duplicate crop of the same one

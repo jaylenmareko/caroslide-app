@@ -1,6 +1,6 @@
 import { imageSize } from 'image-size'
 import type { TemplateVariant } from '@/lib/types'
-import { tavilyCandidateUrls } from './research'
+import { tavilyCandidateUrls, tavilyImageSearch, pexelsSearch } from './research'
 
 const MIN_DIMENSION = 400 // reject tiny icons/thumbnails masquerading as og:image
 
@@ -36,6 +36,15 @@ const STOCK_PHOTO_DOMAINS = [
   'stock.adobe.com',
   'canstockphoto.com',
   'bigstockphoto.com',
+  // Found live 2026-07-21 testing Tavily's include_images mode against real photo briefs --
+  // these weren't in the original list and would have slipped through: vecteezy.com/its CDN,
+  // Adobe Stock's actual image-serving CDN (stock.adobe.com is their site, ftcdn.net is where the
+  // images themselves are hosted), and Unsplash's PAID tier specifically (plain unsplash.com is
+  // free/properly licensed and fine to use, plus.unsplash.com is a paid marketplace we have no
+  // rights to redistribute from).
+  'vecteezy.com',
+  'ftcdn.net',
+  'plus.unsplash.com',
 ]
 
 function isStockPhotoHost(url: string): boolean {
@@ -95,37 +104,14 @@ export const PHOTO_FIELDS_FOR_TEMPLATE: Record<string, string[]> = {
   '10-split-overlay.html': ['IMG_LEFT', 'IMG_RIGHT'],
 }
 
-/**
- * Direct port of .claude/skills/carousel/scripts/fetch_og_image.py -- pulls a page's og:image
- * meta tag (no API key needed, works because most photo/content pages set it server-side for
- * link-preview crawlers). Returns null on any failure so the caller can just try the next
- * candidate URL, matching the skill's own "first one that succeeds, don't chase perfection" rule.
- */
-export async function fetchOgImage(
-  pageUrl: string
-): Promise<{ url: string; buffer: Buffer; width: number; height: number } | null> {
-  if (!isSafeHttpUrl(pageUrl)) return null
-  if (isStockPhotoHost(pageUrl)) return null
+type UsablePhoto = { url: string; buffer: Buffer; width: number; height: number }
 
-  let html: string
-  try {
-    const pageRes = await fetch(pageUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(15000),
-    })
-    if (!pageRes.ok) return null
-    html = await pageRes.text()
-  } catch {
-    return null
-  }
-
-  const match =
-    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
-    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
-  if (!match) return null
-  const imgUrl = match[1]
+/** Fetches and validates a single image URL directly (dimension check + stock-domain check) --
+ * shared by both the direct image-search path and the og:image-scrape fallback below, so the same
+ * safety checks apply regardless of which path found the URL. */
+async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null> {
   if (!isSafeHttpUrl(imgUrl)) return null
-  if (isStockPhotoHost(imgUrl)) return null // defense in depth: a non-stock page hotlinking a stock CDN image directly
+  if (isStockPhotoHost(imgUrl)) return null
 
   let buffer: Buffer
   try {
@@ -152,10 +138,38 @@ export async function fetchOgImage(
   }
 }
 
-/** Tries each candidate URL in order, returns the first usable photo. Caps at candidates.length tries. */
-export async function firstUsablePhoto(
-  candidateUrls: string[]
-): Promise<{ url: string; buffer: Buffer; width: number; height: number } | null> {
+/**
+ * Direct port of .claude/skills/carousel/scripts/fetch_og_image.py -- pulls a page's og:image
+ * meta tag (no API key needed, works because most photo/content pages set it server-side for
+ * link-preview crawlers). Returns null on any failure so the caller can just try the next
+ * candidate URL, matching the skill's own "first one that succeeds, don't chase perfection" rule.
+ * Kept as a fallback tier (2026-07-21) -- `findUsablePhoto` below tries real image search first.
+ */
+export async function fetchOgImage(pageUrl: string): Promise<UsablePhoto | null> {
+  if (!isSafeHttpUrl(pageUrl)) return null
+  if (isStockPhotoHost(pageUrl)) return null
+
+  let html: string
+  try {
+    const pageRes = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!pageRes.ok) return null
+    html = await pageRes.text()
+  } catch {
+    return null
+  }
+
+  const match =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+  if (!match) return null
+  return fetchAndValidateImage(match[1])
+}
+
+/** Tries each candidate page URL in order, returns the first usable photo. */
+async function firstUsablePhotoFromPages(candidateUrls: string[]): Promise<UsablePhoto | null> {
   for (const url of candidateUrls) {
     const result = await fetchOgImage(url)
     if (result) return result
@@ -164,12 +178,37 @@ export async function firstUsablePhoto(
 }
 
 /**
- * Finds 2-3 real candidate page URLs for a photo brief (e.g. "man applying sunscreen outdoors
- * photo") via Tavily's search API -- plain HTTP, not an Anthropic tool call (avoids the same
- * refusal issue found in captions.ts, see session log 2026-07-20). Mirrors image-sourcing.md's
- * own guidance: specific, scene-level queries return better candidate pages than abstract topic
- * words.
+ * Primary photo-sourcing entrypoint, three tiers in priority order (2026-07-21):
+ *
+ * 1. Pexels -- a curated free-to-use photo library, tried FIRST. Real data found live: Tavily's
+ *    own image search returns mostly stock-photo-marketplace previews (already blocklisted) for
+ *    generic aesthetic briefs like "raw wagyu steak marbling close-up photo" -- exactly what
+ *    captions.ts generates most often. Pexels is built for this exact query shape and requires no
+ *    attribution, so it's the highest-hit-rate, cleanest-licensed source for the common case.
+ * 2. Tavily image search -- real data found live: for LITERAL/branded/retail queries (e.g.
+ *    "grocery store ground beef package photo") this actually outperforms Pexels, returning real
+ *    photos from the retailer's/brand's own site (Kroger, Meijer, a real ranch's Shopify CDN) --
+ *    kept as tier 2 for exactly that case, not discarded.
+ * 3. Tavily page-search + og:image scrape -- the original approach, ~50% hit rate alone but still
+ *    a real working fallback when both of the above come up empty.
+ *
+ * All three share the same dimension + stock-domain validation via fetchAndValidateImage.
  */
-export async function searchCandidatePhotoUrls(photoBrief: string): Promise<string[]> {
-  return tavilyCandidateUrls(`${photoBrief} photo`)
+export async function findUsablePhoto(photoBrief: string): Promise<UsablePhoto | null> {
+  const query = `${photoBrief} photo`
+
+  const pexelsUrls = await pexelsSearch(query)
+  for (const url of pexelsUrls) {
+    const result = await fetchAndValidateImage(url)
+    if (result) return result
+  }
+
+  const images = await tavilyImageSearch(query)
+  for (const image of images) {
+    const result = await fetchAndValidateImage(image.url)
+    if (result) return result
+  }
+
+  const candidatePages = await tavilyCandidateUrls(query)
+  return firstUsablePhotoFromPages(candidatePages)
 }

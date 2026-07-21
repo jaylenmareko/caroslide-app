@@ -2,13 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
-import {
-  firstUsablePhoto,
-  searchCandidatePhotoUrls,
-  photosNeeded,
-  PHOTO_FIELDS_FOR_TEMPLATE,
-  solidColorPlaceholder,
-} from './images'
+import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPlaceholder } from './images'
 import { renderSlide } from './render'
 import { checkSlide, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
@@ -45,16 +39,13 @@ async function resolvePhotos(
       resolved[field] = uploaded
       continue
     }
-    const candidates = await searchCandidatePhotoUrls(brief)
-    const photo = await firstUsablePhoto(candidates)
+    const photo = await findUsablePhoto(brief)
     if (photo) {
       resolved[field] = photo.url
     } else {
-      // If sourcing fails entirely, leave the field unset -- checkUnresolvedPlaceholders will
-      // catch the literal {{FIELD}} left in the rendered HTML rather than silently rendering a
-      // broken image. Was previously silent; added 2026-07-21 after finding blank/broken circles
-      // in a real render with no log evidence of why.
-      console.warn(`[generation] photo sourcing failed for ${field} ("${brief}") -- ${candidates.length} candidate URL(s) tried, none usable`)
+      // If sourcing fails entirely (real image search AND the page-scrape fallback both came up
+      // empty), leave the field unset -- the solid-color placeholder fallback below covers it.
+      console.warn(`[generation] photo sourcing failed for ${field} ("${brief}") -- image search + page-scrape fallback both failed`)
     }
   }
   return resolved

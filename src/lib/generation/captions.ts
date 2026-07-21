@@ -166,6 +166,15 @@ export async function generateCaptions(input: {
     Story: 'Story (1080x1920) is 42% taller than Post -- there is a little more breathing room than the budget below implies, but do not pad captions just to fill space.',
   }
 
+  // Real product decision (Jaylen, 2026-07-21): Classic's 2-circle "proof" motif is reserved for
+  // the cover slide only -- slides 2-4 render circle-free (pipeline.ts's CIRCLES_DISPLAY toggle)
+  // and need just 1 photo (BG_IMG), not 3. Every other template still uses the same photo count on
+  // every content slide, so this is the one real exception to the general instruction below.
+  const photoSlotsInstruction =
+    templateFile === '1-cover-circles.html'
+      ? `Slide 1 (the cover) needs 3 real photos: fill PHOTO_1, PHOTO_2, PHOTO_3 in top-to-bottom order (matching the template's real BG_IMG/CIRCLE_L_IMG/CIRCLE_R_IMG placeholders) with a short scene-level search brief each (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name. Slides 2-4 do NOT show circles at all -- a deliberate design choice so the circle "proof" motif doesn't repeat identically on every slide -- so each of those needs only 1 real photo: fill PHOTO_1 with a scene-level brief, leave PHOTO_2 and PHOTO_3 unset. The CTA slide (5) never needs photos -- leave all three unset there.`
+      : `Each of the 4 content slides in this template needs ${photoCount} real photo${photoCount === 1 ? '' : 's'}. The template's own HTML above uses real placeholder names for these (in top-to-bottom order) -- but your response uses generic slots instead: fill PHOTO_1${photoCount >= 2 ? ', PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''} in that same top-to-bottom order with a short scene-level search brief (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name.${photoCount < 3 ? ` Leave ${photoCount === 1 ? 'PHOTO_2 and PHOTO_3' : 'PHOTO_3'} unset on content slides -- this template doesn't use ${photoCount === 1 ? 'them' : 'it'}.` : ''} The CTA slide (5) never needs photos -- leave all three unset there.`
+
   const systemPrompt = `You are writing the real content for a 5-slide Instagram/social carousel. You have already been told the content strategy (Angle), visual template, and format -- your job is ONLY the topic, the images each slide needs (as search briefs, not URLs), and the actual caption/headline copy. Do not reconsider or override the Angle/Look/TemplateVariant choices below, even if the brief seems to suggest a different shape -- the explicit picks outrank an inferred vibe from free text.
 
 ## Format (${input.format})
@@ -205,7 +214,7 @@ Value angle: <=15 words/slide. Narrative (growth): no fixed cap, one story beat 
 ${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA specific voice quirk or founder detail belongs in the caption, not flattened into generic copy.\n` : ''}
 ## Photo slots
 
-Each of the 4 content slides in this template needs ${photoCount} real photo${photoCount === 1 ? '' : 's'}. The template's own HTML above uses real placeholder names for these (in top-to-bottom order) -- but your response uses generic slots instead: fill PHOTO_1${photoCount >= 2 ? ', PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''} in that same top-to-bottom order with a short scene-level search brief (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name.${photoCount < 3 ? ` Leave ${photoCount === 1 ? 'PHOTO_2 and PHOTO_3' : 'PHOTO_3'} unset on content slides -- this template doesn't use ${photoCount === 1 ? 'them' : 'it'}.` : ''} The CTA slide (5) never needs photos -- leave all three unset there.
+${photoSlotsInstruction}
 ${input.hasReferenceImages ? 'The user has uploaded their own reference photos for some slides -- still write a photo brief for every slot the template needs (used as a fallback description / for any slot their uploads don\'t cover), the caller decides which slots actually use the upload vs. your brief.' : ''}
 ${researchSection}
 ${briefInstruction}
@@ -214,7 +223,7 @@ Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause conve
 
 Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.
 
-CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide MUST have PHOTO_1${photoCount >= 2 ? ' (and PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''}${photoCount >= 2 ? ')' : ''} filled with a real scene description, per "Photo slots" above. Leaving these unset/empty on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
+CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide MUST have its required PHOTO_ slots filled with a real scene description, exactly as specified in "Photo slots" above (all 4 content slides need the same count for this template, EXCEPT if it's 1-cover-circles.html, where only slide 1 needs 3 and slides 2-4 need just 1). Leaving a required slot unset/empty on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
 
   const format = zodOutputFormat(GenerationOutput)
 

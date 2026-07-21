@@ -27,7 +27,13 @@
   /* Bumped 280px -> 320px 2026-07-20 per Jaylen -- read small next to Spotlight's single 410px
      circle. left/right recomputed to keep the same proportional margins/gap (150/200/170 ->
      125/170/145) rather than just growing outward into the edges or into each other. */
-  .circle-wrap { position:absolute; top:9.63vh; width:320px; height:320px; }
+  /* CIRCLES_DISPLAY added 2026-07-21: the 2-circle motif is a strong, distinctive "proof" device
+     meant for a cover, not identical repetition across 4 slides (real complaint + confirmed via a
+     real RanchPad carousel, whose actual inner slides drop the circles entirely). Cover slide sets
+     this to `block` (default), slides 2-4 set it to `none` via pipeline.ts -- everything else
+     (photo, scrims, divider, caption) keeps working independently since circles are absolutely
+     positioned, not in normal flow. */
+  .circle-wrap { position:absolute; top:9.63vh; width:320px; height:320px; display:{{CIRCLES_DISPLAY|block}}; }
   .circle-wrap.left { left:125px; }
   .circle-wrap.right { left:615px; }
   .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }

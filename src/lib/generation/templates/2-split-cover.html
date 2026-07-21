@@ -1,6 +1,7 @@
 <!-- VARIANT 2: Split-cover. Two photos side-by-side (edge to edge, no circles/borders) fill the top
-     ~43% of the frame, caption sits below on solid black. Good for "two examples" hooks. Use
-     .reversed on .split (flex-direction:row-reverse) to mirror it on alternating slides.
+     ~43% of the frame, caption sits below on solid black. Good for "two examples" hooks. Set
+     {{SPLIT_DIRECTION}} to `flex-direction:row-reverse;` to mirror it on alternating slides
+     (pipeline.ts does this automatically, see its 2026-07-21 comment).
 
      FORMAT SCALING: see note in 1-cover-circles.html — width is fixed at 1080 across formats,
      only the vertical split point (.split height) is expressed in vh. -->
@@ -13,7 +14,11 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
   .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
-  .split { width:100%; height:42.96vh; display:flex; position:relative; }
+  /* SPLIT_DIRECTION added 2026-07-21: this template's own top comment already called for
+     alternating which side the photo is on between slides ("mirror it on alternating slides") but
+     no real mechanism existed for it -- `.reversed` was just a comment, never a real CSS rule.
+     pipeline.ts now alternates this per content-slide index. */
+  .split { width:100%; height:42.96vh; display:flex; position:relative; {{SPLIT_DIRECTION|flex-direction:row;}} }
   .half { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
   .half img { width:100%; height:100%; object-fit:cover; display:block; }
   .logo { position:absolute; top:36px; left:36px; font-size:30px; font-weight:900; letter-spacing:1px; z-index:5; text-shadow:0 2px 8px rgba(0,0,0,0.6); }

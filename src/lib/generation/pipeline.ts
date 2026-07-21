@@ -11,6 +11,26 @@ const anthropic = new Anthropic()
 
 const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
 
+// Classic's 2-circle "proof" motif is a strong, distinctive device meant for a cover, not
+// identical repetition across all 4 content slides -- real complaint (2026-07-21), confirmed
+// against a real hand-built RanchPad carousel whose actual inner slides drop the circles entirely
+// and keep just the full-bleed photo. See `1-cover-circles.html`'s CIRCLES_DISPLAY comment.
+const CIRCLES_COVER_TEMPLATE = '1-cover-circles.html'
+
+// Templates with a real 2-photo-split alternation placeholder (added 2026-07-21). Both
+// `2-split-cover.html`'s (and its siblings') and `4-vertical-split.html`'s own top comments
+// already called for alternating which side the photo is on between slides so the carousel
+// "doesn't feel static" -- but the app's pipeline never actually implemented it. Keyed by file
+// (not TemplateVariant) since it's the file's own CSS mechanism; the two vertical-split-family
+// templates use a differently-named placeholder (ROW_DIRECTION) than the three horizontal-split
+// templates (SPLIT_DIRECTION), so this maps file -> its real placeholder name.
+const ALTERNATING_DIRECTION_FIELD: Record<string, string> = {
+  '2-split-cover.html': 'SPLIT_DIRECTION',
+  '9-split-flip.html': 'SPLIT_DIRECTION',
+  '10-split-overlay.html': 'SPLIT_DIRECTION',
+  '4-vertical-split.html': 'ROW_DIRECTION',
+}
+
 // Fields with a documented {{FIELD_SIZE}} override in at least one template -- shrinking this is
 // a legitimate fix for an over-budget field (a real, established pattern this session used
 // manually multiple times, e.g. STAT_SIZE:125px to fit "500M" instead of clipping at the 165px
@@ -182,26 +202,12 @@ export async function generateCarousel(input: {
     ...fontValues(input.font),
   }
 
-  // Sanity-check the model's own photoBriefs count against the template's real, measured photo
-  // count (images.ts's PHOTO_COUNT) -- not a hard failure (the raw template HTML in the prompt is
-  // the real source of truth and unresolved-placeholder detection catches a wrong field name
-  // after render), but worth surfacing loudly if the model under/over-counts, since that's a sign
-  // something else about the response may be off too.
-  const expectedPhotoCount = photosNeeded(input.templateVariant, input.look)
-  // Real field names for this template, in the same top-to-bottom order the model was told to
-  // fill PHOTO_1/2/3 in (captions.ts) -- maps the model's generic slots back onto what fillTemplate
-  // actually needs (e.g. BG_IMG, CIRCLE_L_IMG, CIRCLE_R_IMG for 1-cover-circles.html).
-  const photoFieldOrder = PHOTO_FIELDS_FOR_TEMPLATE[templateFile] ?? []
-  generated.slides.slice(0, -1).forEach((slide, i) => {
-    const actual = [slide.photoBriefs.PHOTO_1, slide.photoBriefs.PHOTO_2, slide.photoBriefs.PHOTO_3].filter(
-      (v) => v && v.trim().length > 0
-    ).length
-    if (actual !== expectedPhotoCount) {
-      console.warn(
-        `[generation] slide ${i + 1} (${templateFile}) returned ${actual} photoBriefs, expected ${expectedPhotoCount}`
-      )
-    }
-  })
+  // Base (cover-slide) expectations -- the template's real, measured photo count (images.ts's
+  // PHOTO_COUNT) and real field names in top-to-bottom order (captions.ts's PHOTO_1/2/3 -> real
+  // field mapping). Inner content slides of CIRCLES_COVER_TEMPLATE override both, below.
+  const baseExpectedPhotoCount = photosNeeded(input.templateVariant, input.look)
+  const basePhotoFieldOrder = PHOTO_FIELDS_FOR_TEMPLATE[templateFile] ?? []
+  const alternatingDirectionField = ALTERNATING_DIRECTION_FIELD[templateFile]
 
   const referenceImagePool = [...input.referenceImageUrls]
   const slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> = []
@@ -210,7 +216,33 @@ export async function generateCarousel(input: {
     const slide = generated.slides[i]
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
+    // Real product decision (Jaylen, 2026-07-21): Classic's 2-circle "proof" motif is reserved for
+    // the cover slide -- repeating it identically on slides 2-4 read as "same slide, new photo"
+    // (real complaint, confirmed against a real hand-built RanchPad carousel whose actual inner
+    // slides drop the circles too). Inner slides here render circle-free and only need 1 photo
+    // (BG_IMG), not 3 -- cheaper (2 fewer photo searches per inner slide) and removes the 2
+    // highest-risk photo-sourcing slots on those slides entirely.
+    const isCirclesInnerSlide = templateFile === CIRCLES_COVER_TEMPLATE && !isCta && i > 0
+    const photoFieldOrder = isCirclesInnerSlide ? ['BG_IMG'] : basePhotoFieldOrder
+    const expectedPhotoCount = isCirclesInnerSlide ? 1 : baseExpectedPhotoCount
     const needsPhotos = !isCta && expectedPhotoCount > 0
+
+    // Sanity-check the model's own photoBriefs count against what THIS slide actually expects --
+    // not a hard failure (the raw template HTML in the prompt is the real source of truth and
+    // unresolved-placeholder detection catches a wrong field name after render), but worth
+    // surfacing loudly if the model under/over-counts, since that's a sign something else about
+    // the response may be off too.
+    if (!isCta) {
+      const actual = [slide.photoBriefs.PHOTO_1, slide.photoBriefs.PHOTO_2, slide.photoBriefs.PHOTO_3].filter(
+        (v) => v && v.trim().length > 0
+      ).length
+      if (actual !== expectedPhotoCount) {
+        console.warn(
+          `[generation] slide ${i + 1} (${templateForSlide}) returned ${actual} photoBriefs, expected ${expectedPhotoCount}`
+        )
+      }
+    }
+
     // Remap the model's generic PHOTO_1/2/3 slots (captions.ts) onto this template's real field
     // names, positionally, dropping any slot the template doesn't use or the model left unset.
     const genericBriefs = [slide.photoBriefs.PHOTO_1, slide.photoBriefs.PHOTO_2, slide.photoBriefs.PHOTO_3]
@@ -232,6 +264,26 @@ export async function generateCarousel(input: {
           photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
         }
       }
+    }
+    if (templateFile === CIRCLES_COVER_TEMPLATE && !isCta) {
+      photoValues.CIRCLES_DISPLAY = isCirclesInnerSlide ? 'none' : 'block'
+      // Verified live (standalone fillTemplate test, 2026-07-21): with circles hidden, the
+      // template's own {{CIRCLE_L_IMG}}/{{CIRCLE_R_IMG}} placeholders (inside the now-invisible
+      // circle-wrap divs) still need SOME value or checkUnresolvedPlaceholders false-positives on
+      // every inner slide -- wasting a vision-review call over something nobody will ever see.
+      // photoFieldOrder is just ['BG_IMG'] on these slides, so the "fill any missing slot" loop
+      // above never touches these two fields -- fill them explicitly instead.
+      if (isCirclesInnerSlide) {
+        photoValues.CIRCLE_L_IMG = solidColorPlaceholder(brand.PRIMARY)
+        photoValues.CIRCLE_R_IMG = solidColorPlaceholder(brand.PRIMARY)
+      }
+    }
+    // Alternates a 2-photo-split template's own orientation placeholder per content-slide index
+    // (added 2026-07-21) -- these templates' own top comments already called for this ("mirror it
+    // on alternating slides" / "so the carousel doesn't feel static") but the pipeline never
+    // actually implemented it before now.
+    if (alternatingDirectionField && !isCta) {
+      photoValues[alternatingDirectionField] = i % 2 === 0 ? 'flex-direction:row;' : 'flex-direction:row-reverse;'
     }
 
     // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model

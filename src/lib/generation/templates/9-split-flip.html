@@ -34,7 +34,9 @@
   .stat { font-size:110px; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; }
   .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; }
 
-  .split { flex:1; display:flex; position:relative; }
+  /* SPLIT_DIRECTION added 2026-07-21 -- same mechanism as 2-split-cover.html, alternated per
+     content-slide index by pipeline.ts, so this 2-photo split doesn't feel static across 4 slides. */
+  .split { flex:1; display:flex; position:relative; {{SPLIT_DIRECTION|flex-direction:row;}} }
   .half { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
   .half img { width:100%; height:100%; object-fit:cover; display:block; }
 </style>

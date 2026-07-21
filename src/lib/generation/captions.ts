@@ -34,15 +34,21 @@ function extractSections(markdown: string, headings: string[]): string {
   return kept.join('\n').trim()
 }
 
-// The full, real universe of content placeholder names across every template file (grepped
-// directly from templates/*.html, not guessed) -- excludes image slots (own field, photoBriefs),
-// brand/layout fields (PRIMARY/SECONDARY/CANVAS_H/LOGO_HTML/FONT_*/*_SIZE/*_POSITION/etc., which
-// the pipeline sets itself from the brand kit or a repair step, never the model). Explicit named
-// fields instead of the previous open z.record(string,string): measured live (2026-07-20) that
-// Opus can satisfy an open record by returning `{}` for every slide -- valid JSON, none of the
-// actual writing done. Naming the exact real fields as the JSON schema (rather than making the
-// model synthesize arbitrary key names by reading them out of a buried HTML template) is a much
-// easier structured-output target, not just a stronger validation check.
+// Real, important discovery (2026-07-21): dumped the actual JSON schema z.record(string,string)
+// produces via this SDK and found it serializes to `{"type":"object","properties":{},
+// "additionalProperties":false}` -- the "any string key allowed" part (propertyNames) gets
+// demoted to an inert `description` annotation (same bug pattern already found for z.tuple()'s
+// prefixItems), while `additionalProperties:false` + empty `properties` stays a REAL, ENFORCED
+// constraint. That combination only validates against `{}` -- meaning an open record may be
+// why the model reliably returned empty objects all along, not a prompt-attention issue. So:
+// - `values` stays NAMED FIELDS (real properties, not a record) -- this is the one that actually
+//   needs to escape the "{} is the only valid answer" trap, since it's the real caption content.
+// - `photoBriefs` goes back to a plain record. Named-fields for BOTH was tried and made the
+//   whole request 400 with "Schema is too complex" (a hard Anthropic-side ceiling, not something
+//   prompt-wording fixes) -- reducing total schema surface by only naming the field that matters
+//   most is the compromise. photoBriefs likely still gets forced toward `{}` by the same
+//   record-schema quirk described above; that's an accepted, lesser degradation (photo-sourcing
+//   has its own fallback path) versus no real caption content at all.
 const ContentValues = z.object({
   CAPTION_HTML: z.string().optional(),
   HEADLINE_HTML: z.string().optional(),
@@ -54,60 +60,29 @@ const ContentValues = z.object({
   STATEMENT_HTML: z.string().optional(),
   SUBHEAD: z.string().optional(),
   CTA_TEXT: z.string().optional(),
-  MICRO_TEXT: z.string().optional(),
-  CIRCLE_BLOCK: z.string().optional(),
 })
 
-// Real IMG placeholder names for a given template file, e.g. ["BG_IMG", "CIRCLE_L_IMG",
-// "CIRCLE_R_IMG"] for 1-cover-circles.html -- extracted from the actual template text (grepped
-// live, matches the real universe found across templates/*.html: BG_IMG, CIRCLE_IMG,
-// CIRCLE_L_IMG, CIRCLE_R_IMG, IMG_MAIN, IMG_TOP/BOTTOM/LEFT/RIGHT), not a static guess. cta.html
-// has none, so the CTA slide's photoBriefs schema below correctly ends up requiring nothing.
-function extractImagePlaceholders(templateHtml: string): string[] {
-  const matches = templateHtml.matchAll(/\{\{([A-Z_]*IMG[A-Z_]*)(?:\|[^}]*)?\}\}/g)
-  return Array.from(new Set(Array.from(matches, (m) => m[1])))
-}
+const SlideOutput = z
+  .object({
+    // Which real photo slots this slide's template needs filled, described as a short scene-level
+    // search brief per IMG placeholder (e.g. {"BG_IMG": "man applying sunscreen outdoors photo"}) --
+    // NOT a URL. Actual photo sourcing (user uploads first, Tavily search for the shortfall)
+    // happens as a separate step; this call only decides what each photo should show.
+    photoBriefs: z.record(z.string(), z.string()),
+    // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
+    // conventions in the template's own comments below -- leave every other field unset/absent.
+    values: ContentValues,
+  })
+  .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
+    message: 'values must not be empty -- every slide needs real caption/headline content',
+  })
 
-// Same fix as ContentValues above, applied to photoBriefs: previously an open
-// z.record(string,string), which the model could (and did) satisfy with `{}`. Built per-call
-// (below) from whichever template is actually in use, since image field names differ per
-// template -- naming them explicitly gives the model a concrete target instead of an
-// open-ended "invent whatever keys you think apply" record. One shared schema for all 5 slides
-// (not a separate CTA-specific schema): measured live (2026-07-20) that z.tuple() -- the obvious
-// way to give slide 5 a different shape -- doesn't survive this SDK's zod-to-JSON-schema
-// conversion (the tuple's real per-position item constraints get serialized into an inert
-// `description` string instead of actual schema, so the model sees "slides: array" with no real
-// constraint on shape or count at all, and returns something close to nothing). A plain
-// z.array(...).length(5) does NOT have this bug (verified: item shape stays a real `$ref`
-// constraint, only `minItems`/`maxItems` land in `description` -- and that specific gap is
-// harmless, since format.parse()'s own zod validation still enforces the real slide count
-// locally regardless of what the model was told). The CTA slide (cta.html, no image fields ever)
-// just won't have any real names to fill in photoBriefs -- that's fine, photoBriefs emptiness is
-// only a soft warning downstream (pipeline.ts), not a hard requirement here, specifically so this
-// one shared schema doesn't force the CTA slide to invent irrelevant photo fields.
-function buildSlideSchema(imageFields: string[]) {
-  const photoBriefsShape: Record<string, z.ZodOptional<z.ZodString>> = {}
-  for (const field of imageFields) photoBriefsShape[field] = z.string().optional()
+const GenerationOutput = z.object({
+  title: z.string().max(60),
+  slides: z.array(SlideOutput).length(5),
+})
 
-  return z
-    .object({
-      photoBriefs: z.object(photoBriefsShape),
-      // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
-      // conventions in the template's own comments -- leave every other field unset/absent.
-      values: ContentValues,
-    })
-    .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
-      message: 'values must not be empty -- every slide needs real caption/headline content',
-    })
-}
-
-export type GeneratedCarousel = {
-  title: string
-  slides: {
-    photoBriefs: Record<string, string | undefined>
-    values: Record<string, string | undefined>
-  }[]
-}
+export type GeneratedCarousel = z.infer<typeof GenerationOutput>
 
 export async function generateCaptions(input: {
   angle: Angle
@@ -126,16 +101,6 @@ export async function generateCaptions(input: {
     loadTemplate(templateFile),
     loadTemplate(CTA_TEMPLATE),
   ])
-
-  // Built per-call since image field names differ per template -- see buildSlideSchema's comment
-  // above for why this is a plain array (not a tuple) shared across all 5 slides.
-  const contentImageFields = extractImagePlaceholders(templateHtml)
-  const SlideSchema = buildSlideSchema(contentImageFields)
-  const GenerationOutput = z.object({
-    title: z.string().max(60),
-    slides: z.array(SlideSchema).length(5),
-  })
-  console.log(`[generation] image fields for this template: [${contentImageFields.join(', ')}]`)
 
   // Trimmed to just what a caption-writing call needs -- see extractSections' comment above.
   const templatesGuide = extractSections(templatesGuideFull, [

@@ -7,6 +7,7 @@ import type { Angle, Look, TemplateVariant } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { loadTemplate } from './render'
 import { tavilySearch } from './research'
+import { photosNeeded } from './images'
 
 const anthropic = new Anthropic()
 const REFERENCE_DIR = path.join(process.cwd(), 'reference')
@@ -39,16 +40,16 @@ function extractSections(markdown: string, headings: string[]): string {
 // "additionalProperties":false}` -- the "any string key allowed" part (propertyNames) gets
 // demoted to an inert `description` annotation (same bug pattern already found for z.tuple()'s
 // prefixItems), while `additionalProperties:false` + empty `properties` stays a REAL, ENFORCED
-// constraint. That combination only validates against `{}` -- meaning an open record may be
-// why the model reliably returned empty objects all along, not a prompt-attention issue. So:
-// - `values` stays NAMED FIELDS (real properties, not a record) -- this is the one that actually
-//   needs to escape the "{} is the only valid answer" trap, since it's the real caption content.
-// - `photoBriefs` goes back to a plain record. Named-fields for BOTH was tried and made the
-//   whole request 400 with "Schema is too complex" (a hard Anthropic-side ceiling, not something
-//   prompt-wording fixes) -- reducing total schema surface by only naming the field that matters
-//   most is the compromise. photoBriefs likely still gets forced toward `{}` by the same
-//   record-schema quirk described above; that's an accepted, lesser degradation (photo-sourcing
-//   has its own fallback path) versus no real caption content at all.
+// constraint. That combination only validates against `{}` -- confirmed live the same day: a real
+// run returned real, non-empty `values` (named fields) but `photoBriefs: {}` on every slide, exactly
+// matching this theory, not a prompt-attention issue.
+// Fix: `photoBriefs` uses a FIXED set of 3 generic named slots (PHOTO_1/2/3, the max any template
+// needs) instead of a record OR a per-template-dynamic named object. Real JSON schema (verified via
+// the same standalone-dump technique), no record involved, and smaller than the combined schema
+// that already cleared the "Schema is too complex" ceiling once (990 vs. 1044 chars) -- so this
+// isn't a compromise, it's the actual fix for both prior bugs at once. images.ts's
+// PHOTO_FIELDS_FOR_TEMPLATE maps these generic slots back onto the template's real placeholder
+// names, in order.
 const ContentValues = z.object({
   CAPTION_HTML: z.string().optional(),
   HEADLINE_HTML: z.string().optional(),
@@ -62,13 +63,19 @@ const ContentValues = z.object({
   CTA_TEXT: z.string().optional(),
 })
 
+// Generic photo slots, in the same top-to-bottom order the template's own HTML presents its real
+// {{...IMG}} placeholders (told explicitly in the prompt below). NOT real field names, and NOT a
+// URL -- a short scene-level search brief per slot (e.g. "man applying sunscreen outdoors photo").
+// Leave a slot unset if this template needs fewer than 3 photos on this slide.
+const PhotoBriefs = z.object({
+  PHOTO_1: z.string().optional(),
+  PHOTO_2: z.string().optional(),
+  PHOTO_3: z.string().optional(),
+})
+
 const SlideOutput = z
   .object({
-    // Which real photo slots this slide's template needs filled, described as a short scene-level
-    // search brief per IMG placeholder (e.g. {"BG_IMG": "man applying sunscreen outdoors photo"}) --
-    // NOT a URL. Actual photo sourcing (user uploads first, Tavily search for the shortfall)
-    // happens as a separate step; this call only decides what each photo should show.
-    photoBriefs: z.record(z.string(), z.string()),
+    photoBriefs: PhotoBriefs,
     // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
     // conventions in the template's own comments below -- leave every other field unset/absent.
     values: ContentValues,
@@ -93,6 +100,7 @@ export async function generateCaptions(input: {
   hasReferenceImages: boolean
 }): Promise<GeneratedCarousel> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
+  const photoCount = photosNeeded(input.templateVariant, input.look)
 
   const [contentStrategies, templatesGuideFull, generationBehaviorFull, templateHtml, ctaHtml] = await Promise.all([
     readFile(path.join(REFERENCE_DIR, 'content-strategies.md'), 'utf-8'),
@@ -174,15 +182,18 @@ ${generationBehavior}
 Value angle: <=15 words/slide. Narrative (growth): no fixed cap, one story beat per slide. Education: <=15 words on hook/payoff slides, 20-25 on mechanism slides. These are word counts for the writing itself; a separate automated check enforces hard character ceilings per template field after you write, so err toward the tighter end rather than the maximum.
 
 ${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA specific voice quirk or founder detail belongs in the caption, not flattened into generic copy.\n` : ''}
-${input.hasReferenceImages ? 'The user has uploaded their own reference photos for some slides -- still write a photoBrief for every image slot (used as a fallback description / for any slot their uploads don\'t cover), the caller decides which slots actually use the upload vs. your brief.' : ''}
+## Photo slots
+
+Each of the 4 content slides in this template needs ${photoCount} real photo${photoCount === 1 ? '' : 's'}. The template's own HTML above uses real placeholder names for these (in top-to-bottom order) -- but your response uses generic slots instead: fill PHOTO_1${photoCount >= 2 ? ', PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''} in that same top-to-bottom order with a short scene-level search brief (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name.${photoCount < 3 ? ` Leave ${photoCount === 1 ? 'PHOTO_2 and PHOTO_3' : 'PHOTO_3'} unset on content slides -- this template doesn't use ${photoCount === 1 ? 'them' : 'it'}.` : ''} The CTA slide (5) never needs photos -- leave all three unset there.
+${input.hasReferenceImages ? 'The user has uploaded their own reference photos for some slides -- still write a photo brief for every slot the template needs (used as a fallback description / for any slot their uploads don\'t cover), the caller decides which slots actually use the upload vs. your brief.' : ''}
 ${researchSection}
 ${briefInstruction}
 
-Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.
+Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention is documented above, and photo-slot filling is documented in "Photo slots" above -- follow both exactly.
 
 Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.
 
-CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide's "photoBriefs" MUST contain a real scene description per image slot the template needs. An empty {} for either field on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
+CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide MUST have PHOTO_1${photoCount >= 2 ? ' (and PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''}${photoCount >= 2 ? ')' : ''} filled with a real scene description, per "Photo slots" above. Leaving these unset/empty on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
 
   const format = zodOutputFormat(GenerationOutput)
 

@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
-import { firstUsablePhoto, searchCandidatePhotoUrls, photosNeeded } from './images'
+import { firstUsablePhoto, searchCandidatePhotoUrls, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE } from './images'
 import { renderSlide } from './render'
 import { checkSlide, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
@@ -166,8 +166,14 @@ export async function generateCarousel(input: {
   // after render), but worth surfacing loudly if the model under/over-counts, since that's a sign
   // something else about the response may be off too.
   const expectedPhotoCount = photosNeeded(input.templateVariant, input.look)
+  // Real field names for this template, in the same top-to-bottom order the model was told to
+  // fill PHOTO_1/2/3 in (captions.ts) -- maps the model's generic slots back onto what fillTemplate
+  // actually needs (e.g. BG_IMG, CIRCLE_L_IMG, CIRCLE_R_IMG for 1-cover-circles.html).
+  const photoFieldOrder = PHOTO_FIELDS_FOR_TEMPLATE[templateFile] ?? []
   generated.slides.slice(0, -1).forEach((slide, i) => {
-    const actual = Object.keys(slide.photoBriefs).length
+    const actual = [slide.photoBriefs.PHOTO_1, slide.photoBriefs.PHOTO_2, slide.photoBriefs.PHOTO_3].filter(
+      (v) => v && v.trim().length > 0
+    ).length
     if (actual !== expectedPhotoCount) {
       console.warn(
         `[generation] slide ${i + 1} (${templateFile}) returned ${actual} photoBriefs, expected ${expectedPhotoCount}`
@@ -183,12 +189,15 @@ export async function generateCarousel(input: {
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
     const needsPhotos = !isCta && expectedPhotoCount > 0
-    // Same optional-fields shape as slide.values (captions.ts's photoBriefs schema is now a named
-    // per-template object, not an open record) -- filter out unset entries before resolvePhotos.
-    const definedPhotoBriefs = Object.fromEntries(
-      Object.entries(slide.photoBriefs).filter((entry): entry is [string, string] => entry[1] !== undefined)
-    )
-    const photoValues = needsPhotos ? await resolvePhotos(definedPhotoBriefs, referenceImagePool) : {}
+    // Remap the model's generic PHOTO_1/2/3 slots (captions.ts) onto this template's real field
+    // names, positionally, dropping any slot the template doesn't use or the model left unset.
+    const genericBriefs = [slide.photoBriefs.PHOTO_1, slide.photoBriefs.PHOTO_2, slide.photoBriefs.PHOTO_3]
+    const mappedPhotoBriefs: Record<string, string> = {}
+    photoFieldOrder.forEach((fieldName, idx) => {
+      const brief = genericBriefs[idx]
+      if (brief && brief.trim().length > 0) mappedPhotoBriefs[fieldName] = brief
+    })
+    const photoValues = needsPhotos ? await resolvePhotos(mappedPhotoBriefs, referenceImagePool) : {}
 
     // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
     // returned in `slide.values` can override them. The model sees the raw template HTML

@@ -40,6 +40,24 @@ export function photosNeeded(variant: TemplateVariant | null, look: string): num
   return variant ? PHOTO_COUNT[variant] : 0
 }
 
+// Real field names, in the same top-to-bottom order the model sees them in the template's own
+// HTML, per template FILE (mirrors CHAR_BUDGETS's file-keyed convention in guardrails.ts, for the
+// same reason -- one TemplateVariant label maps to the same file across two different Looks).
+// Used to map the model's generic PHOTO_1/PHOTO_2/PHOTO_3 slots (captions.ts) back onto the real
+// placeholder names this specific template needs -- see captions.ts's 2026-07-21 comment for why
+// the schema uses fixed generic slots instead of per-template-named or record fields.
+export const PHOTO_FIELDS_FOR_TEMPLATE: Record<string, string[]> = {
+  '1-cover-circles.html': ['BG_IMG', 'CIRCLE_L_IMG', 'CIRCLE_R_IMG'],
+  '3-flip.html': ['BG_IMG', 'CIRCLE_L_IMG', 'CIRCLE_R_IMG'],
+  '11-single-circle.html': ['BG_IMG', 'CIRCLE_IMG'],
+  '2-split-cover.html': ['IMG_LEFT', 'IMG_RIGHT'],
+  '4-vertical-split.html': ['BG_IMG'],
+  '6-minimal-magazine.html': ['BG_IMG'],
+  '8-photo-grid.html': ['IMG_MAIN', 'IMG_TOP', 'IMG_BOTTOM'],
+  '9-split-flip.html': ['IMG_LEFT', 'IMG_RIGHT'],
+  '10-split-overlay.html': ['IMG_LEFT', 'IMG_RIGHT'],
+}
+
 /**
  * Direct port of .claude/skills/carousel/scripts/fetch_og_image.py -- pulls a page's og:image
  * meta tag (no API key needed, works because most photo/content pages set it server-side for

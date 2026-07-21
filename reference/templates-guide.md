@@ -64,6 +64,8 @@ Every template's base background is near-black (`background:#0a0a0a`), and the s
 
 This check runs for every brand's colors on every carousel, not just when a color looks subjectively dark — a color that reads fine to the eye in a hex-picker swatch can still fail once it's actual text on `#0a0a0a`.
 
+**Real finding (2026-07-21): the threshold alone isn't sufficient for photo-scrim templates.** A muted sage green, `#5B7A5E`, computes to ≈0.43 — comfortably above the 0.35-0.4 cutoff, meaning it should "pass" by this formula — and it still read as hard to see in a real render on `1-cover-circles.html`. The formula assumes a pure `#0a0a0a` background, but the scrim templates (1, 6, 9's split zone, 10, 11) aren't actually pure black where captions sit — the gradient is only 85-97% opaque, so real photo color bleeds through underneath it, which can push an already-borderline color (0.4-0.5 range) below what's actually legible. **The real fix, added the same day:** every caption/headline/kicker/story span on every photo-scrim template now has a real `text-shadow` (`0 2px 6px rgba(0,0,0,0.55)` or similar) as a deterministic backstop — this doesn't depend on getting the luminance math exactly right for every possible brand color, unlike the threshold check alone. The luminance check is still the first-pass filter (an obviously-failing color like `#512888` should never be picked at all), but don't treat a borderline pass (0.4-0.5) as fully safe without the shadow doing real work underneath it.
+
 ## Caption length discipline
 
 This is **strategy-dependent, not a flat rule** — which content strategy (see content-strategies.md) a carousel uses decides how tight the caption needs to be.

@@ -39,12 +39,31 @@
   .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
   .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 25%}}; }
 
-  .divider { position:absolute; top:54.67vh; left:108px; right:108px; height:3px; background:#ffffff; }
-  .caption { position:absolute; top:58.52vh; left:100px; right:100px; text-align:center; font-size:50px; font-weight:800; line-height:1.32; }
-  /* caption spans use classes .c1 (secondary accent), .c2 (white/body), .c3 (primary accent) */
-  .caption .c1 { color:{{SECONDARY}}; }
-  .caption .c2 { color:#ffffff; }
-  .caption .c3 { color:{{PRIMARY}}; }
+  /* Divider hidden alongside the circles on inner slides (2026-07-21, real feedback: a stray line
+     with nothing above it looked orphaned once the circles were gone) -- reuses CIRCLES_DISPLAY
+     rather than a separate placeholder since the two are always toggled together. */
+  .divider { position:absolute; top:54.67vh; left:108px; right:108px; height:3px; background:#ffffff; display:{{CIRCLES_DISPLAY|block}}; }
+  /* Caption box now spans the whole zone below where the divider sits (54.67vh to the bottom) and
+     vertically centers its content via flex, instead of a fixed top offset -- real feedback
+     (2026-07-21): a short caption anchored near the top of a large black zone (now emptier with
+     circles/divider gone on inner slides) read as sparse/stranded, with a lot of dead space below
+     it. Centering makes a short caption look deliberate regardless of how many lines it runs. */
+  .caption { position:absolute; top:54.67vh; bottom:0; left:100px; right:100px; display:flex; align-items:center; justify-content:center; }
+  /* Real content (the multiple .c1/.c2/.c3 spans) lives in this inner block, not directly in the
+     flex container above -- a flex container turns its direct children into flex items laid out
+     in a row, which would break the spans' normal text-wrapping. This inner block stays a normal
+     block element so its own content wraps exactly as it always did; the outer .caption only
+     centers this one block as a whole. */
+  .caption-inner { text-align:center; font-size:50px; font-weight:800; line-height:1.32; }
+  /* caption spans use classes .c1 (secondary accent), .c2 (white/body), .c3 (primary accent).
+     text-shadow added 2026-07-21 -- real feedback: a brand's own PRIMARY/SECONDARY color can pass
+     the documented luminance-contrast check (see templates-guide.md) against a pure #0a0a0a
+     background and still read poorly in practice, since the scrim above this zone isn't 100%
+     opaque and real photo color bleeds through underneath it. A shadow is a robust backstop that
+     doesn't depend on getting threshold math exactly right for every possible brand color. */
+  .caption .c1 { color:{{SECONDARY}}; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .caption .c2 { color:#ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .caption .c3 { color:{{PRIMARY}}; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
 </style>
 </head>
 <body>
@@ -63,7 +82,7 @@
 
     <div class="divider"></div>
     <div class="caption">
-      {{CAPTION_HTML}}
+      <div class="caption-inner">{{CAPTION_HTML}}</div>
     </div>
   </div>
 </body>

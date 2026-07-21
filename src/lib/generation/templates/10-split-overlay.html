@@ -42,7 +42,11 @@
   .brand-badge .a { color:{{PRIMARY}}; } .brand-badge .b { color:#ffffff; }
   .brand-badge img { height:20px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
-  .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; }
+  /* text-shadow added 2026-07-21 -- this headline sits directly on a photo split via a bottom
+     gradient scrim, same real contrast risk as 1-cover-circles.html/6-minimal-magazine.html (a
+     brand color can pass the documented luminance check against pure #0a0a0a and still read
+     poorly once real photo color bleeds through underneath the scrim). */
+  .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
   .headline .c1 { color:{{SECONDARY}}; }
   .headline .c2 { color:#ffffff; }
   .headline .c3 { color:{{PRIMARY}}; }

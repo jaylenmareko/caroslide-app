@@ -174,6 +174,18 @@ export async function generateCarousel(input: {
     hasReferenceImages: input.referenceImageUrls.length > 0,
   })
 
+  const userFontValues = fontValues(input.font)
+  // Real bug fixed 2026-07-21: the Caroslide wordmark fallback rendered in whatever generic font
+  // the carousel's own brand happened to use (Inter Tight/Poppins/etc.) -- not Caroslide's actual
+  // brand typeface. The real app's wordmark is ALWAYS Fraunces italic weight 600 (confirmed exactly
+  // in globals.css's `.brand span` rule, used consistently sidebar/landing/auth-everywhere) -- a
+  // generated carousel's fallback logo should match that same real identity, not drift depending on
+  // which font a given carousel's brand kit happens to use. The rendered slide is a standalone HTML
+  // document (doesn't share the Next.js app's own font loading), so Fraunces needs its own real
+  // Google Fonts link here, appended to (not replacing) the carousel's own brand-font link.
+  const FRAUNCES_LOGO_FONT_LINK =
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&display=swap">'
+
   const brand = {
     PRIMARY: input.brandColors[0] ?? '#D97757',
     SECONDARY: input.brandColors[1] ?? '#F4C95D',
@@ -198,8 +210,11 @@ export async function generateCarousel(input: {
     // variant is ever added, this needs a real per-template light/dark flag, not a guess.
     LOGO_HTML: input.logoUrl
       ? `<img src="${input.logoUrl}" alt="">`
-      : `<span style="color:#ffffff">Caroslide</span>`,
-    ...fontValues(input.font),
+      : `<span style="font-family:'Fraunces',serif; font-style:italic; font-weight:600; color:#ffffff">Caroslide</span>`,
+    ...userFontValues,
+    FONT_LINK_HTML: input.logoUrl
+      ? userFontValues.FONT_LINK_HTML
+      : `${userFontValues.FONT_LINK_HTML}${FRAUNCES_LOGO_FONT_LINK}`,
   }
 
   // Base (cover-slide) expectations -- the template's real, measured photo count (images.ts's

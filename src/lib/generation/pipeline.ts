@@ -183,7 +183,12 @@ export async function generateCarousel(input: {
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
     const needsPhotos = !isCta && expectedPhotoCount > 0
-    const photoValues = needsPhotos ? await resolvePhotos(slide.photoBriefs, referenceImagePool) : {}
+    // Same optional-fields shape as slide.values (captions.ts's photoBriefs schema is now a named
+    // per-template object, not an open record) -- filter out unset entries before resolvePhotos.
+    const definedPhotoBriefs = Object.fromEntries(
+      Object.entries(slide.photoBriefs).filter((entry): entry is [string, string] => entry[1] !== undefined)
+    )
+    const photoValues = needsPhotos ? await resolvePhotos(definedPhotoBriefs, referenceImagePool) : {}
 
     // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
     // returned in `slide.values` can override them. The model sees the raw template HTML

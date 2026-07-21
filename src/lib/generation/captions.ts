@@ -58,29 +58,50 @@ const ContentValues = z.object({
   CIRCLE_BLOCK: z.string().optional(),
 })
 
-const SlideOutput = z
-  .object({
-    // Which real photo slots this slide's template needs filled, described as a short scene-level
-    // search brief per IMG placeholder (e.g. {"BG_IMG": "man applying sunscreen outdoors photo"}) --
-    // NOT a URL. Actual photo sourcing (user uploads first, web search for the shortfall) happens
-    // as a separate step; this call only decides what each photo should show.
-    photoBriefs: z.record(z.string(), z.string()),
-    // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
-    // conventions in the template's own comments below -- leave every other field unset/absent.
-    values: ContentValues,
-  })
-  // Same measured bug as above can still return `values: {}` (every field individually optional,
-  // so an empty object is structurally valid) -- this refine is what actually catches that.
-  .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
-    message: 'values must not be empty -- every slide needs real caption/headline content',
-  })
+// Real IMG placeholder names for a given template file, e.g. ["BG_IMG", "CIRCLE_L_IMG",
+// "CIRCLE_R_IMG"] for 1-cover-circles.html -- extracted from the actual template text (grepped
+// live, matches the real universe found across templates/*.html: BG_IMG, CIRCLE_IMG,
+// CIRCLE_L_IMG, CIRCLE_R_IMG, IMG_MAIN, IMG_TOP/BOTTOM/LEFT/RIGHT), not a static guess. cta.html
+// has none, so the CTA slide's photoBriefs schema below correctly ends up requiring nothing.
+function extractImagePlaceholders(templateHtml: string): string[] {
+  const matches = templateHtml.matchAll(/\{\{([A-Z_]*IMG[A-Z_]*)(?:\|[^}]*)?\}\}/g)
+  return Array.from(new Set(Array.from(matches, (m) => m[1])))
+}
 
-const GenerationOutput = z.object({
-  title: z.string().max(60),
-  slides: z.array(SlideOutput).length(5),
-})
+// Same fix as ContentValues above, applied to photoBriefs: previously an open
+// z.record(string,string), which the model could (and did) satisfy with `{}`. Built per-call
+// (below) from whichever template is actually in use, since image field names differ per
+// template -- naming them explicitly gives the model a concrete target instead of an
+// open-ended "invent whatever keys you think apply" record.
+function buildSlideSchema(imageFields: string[]) {
+  const photoBriefsShape: Record<string, z.ZodOptional<z.ZodString>> = {}
+  for (const field of imageFields) photoBriefsShape[field] = z.string().optional()
 
-export type GeneratedCarousel = z.infer<typeof GenerationOutput>
+  return z
+    .object({
+      photoBriefs: z.object(photoBriefsShape),
+      // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
+      // conventions in the template's own comments -- leave every other field unset/absent.
+      values: ContentValues,
+    })
+    .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
+      message: 'values must not be empty -- every slide needs real caption/headline content',
+    })
+    .refine(
+      (slide) => imageFields.length === 0 || Object.values(slide.photoBriefs).some((v) => v && v.trim().length > 0),
+      {
+        message: `photoBriefs must not be empty -- this template needs real photo descriptions for: ${imageFields.join(', ')}`,
+      }
+    )
+}
+
+export type GeneratedCarousel = {
+  title: string
+  slides: {
+    photoBriefs: Record<string, string | undefined>
+    values: Record<string, string | undefined>
+  }[]
+}
 
 export async function generateCaptions(input: {
   angle: Angle
@@ -99,6 +120,19 @@ export async function generateCaptions(input: {
     loadTemplate(templateFile),
     loadTemplate(CTA_TEMPLATE),
   ])
+
+  // Built per-call since image field names differ per template -- see buildSlideSchema's comment.
+  const contentImageFields = extractImagePlaceholders(templateHtml)
+  const ctaImageFields = extractImagePlaceholders(ctaHtml)
+  const ContentSlideSchema = buildSlideSchema(contentImageFields)
+  const CtaSlideSchema = buildSlideSchema(ctaImageFields)
+  const GenerationOutput = z.object({
+    title: z.string().max(60),
+    slides: z.tuple([ContentSlideSchema, ContentSlideSchema, ContentSlideSchema, ContentSlideSchema, CtaSlideSchema]),
+  })
+  console.log(
+    `[generation] image fields for this template: content=[${contentImageFields.join(', ')}], cta=[${ctaImageFields.join(', ')}]`
+  )
 
   // Trimmed to just what a caption-writing call needs -- see extractSections' comment above.
   const templatesGuide = extractSections(templatesGuideFull, [

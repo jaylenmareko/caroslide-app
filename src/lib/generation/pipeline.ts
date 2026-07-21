@@ -45,9 +45,15 @@ async function resolvePhotos(
     }
     const candidates = await searchCandidatePhotoUrls(brief)
     const photo = await firstUsablePhoto(candidates)
-    if (photo) resolved[field] = photo.url
-    // If sourcing fails entirely, leave the field unset -- checkImagesReachable will catch the
-    // empty/missing src later rather than silently rendering a broken image.
+    if (photo) {
+      resolved[field] = photo.url
+    } else {
+      // If sourcing fails entirely, leave the field unset -- checkUnresolvedPlaceholders will
+      // catch the literal {{FIELD}} left in the rendered HTML rather than silently rendering a
+      // broken image. Was previously silent; added 2026-07-21 after finding blank/broken circles
+      // in a real render with no log evidence of why.
+      console.warn(`[generation] photo sourcing failed for ${field} ("${brief}") -- ${candidates.length} candidate URL(s) tried, none usable`)
+    }
   }
   return resolved
 }
@@ -94,11 +100,20 @@ async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }>
 
 async function renderAndGuard(
   templateFile: string,
-  values: Record<string, string>
+  values: Record<string, string>,
+  slideNumber: number
 ): Promise<{ png: Buffer; values: Record<string, string> }> {
   let current = values
   let { png, filledHtml } = await renderSlide(templateFile, current)
   let violations = await checkSlide(templateFile, current, filledHtml)
+
+  // Silent until now -- no log statement anywhere surfaced these, meaning a partially-broken
+  // slide (e.g. a photo slot that never resolved, left as a literal unresolved {{...IMG}}
+  // placeholder) was only ever visible by eyeballing the rendered PNG. Real gap, found live
+  // 2026-07-21 debugging why some circles rendered blank/broken despite real photoBriefs.
+  if (violations.length > 0) {
+    console.warn(`[generation] slide ${slideNumber} (${templateFile}) guardrail violations: ${JSON.stringify(violations)}`)
+  }
 
   if (violations.length > 0) {
     current = repairOverBudget(current, violations)
@@ -112,6 +127,7 @@ async function renderAndGuard(
   if (violations.length > 0) {
     const review = await visionReview(png)
     if (!review.ok) {
+      console.warn(`[generation] slide ${slideNumber} (${templateFile}) shipped with unresolved issues: ${JSON.stringify(violations)}, vision note: ${review.note}`)
       current = repairOverBudget(current, violations)
       ;({ png } = await renderSlide(templateFile, current))
     }
@@ -219,7 +235,7 @@ export async function generateCarousel(input: {
     }
     if (input.templateVariant === 'Spotlight Left') values.CIRCLE_SIDE = 'left'
 
-    const result = await renderAndGuard(templateForSlide, values)
+    const result = await renderAndGuard(templateForSlide, values, i + 1)
     slides.push({ png: result.png, template: templateForSlide, values: result.values })
   }
 

@@ -76,7 +76,17 @@ export async function renderSlide(
         body: JSON.stringify({
           html: filledHtml,
           viewport: { width: 1080, height: Number(canvasH) },
-          gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
+          // Real bug found live (2026-07-21): 'networkidle0' waits for zero network connections
+          // for 500ms, but the sourced photo's third-party origin server (or a keep-alive CDN
+          // connection) can hold a connection open indefinitely with nothing left to actually
+          // load -- Cloudflare's own error pointed at gotoOptions/waitForTimeout, and their docs
+          // confirm 'load' (fires once every resource referenced in the initial HTML, including
+          // the photo <img>, has finished) is a supported alternative that doesn't wait on
+          // unrelated background connections. 'load' can in principle fire before Google Fonts
+          // (fetched via the <link> tag in fonts.ts) finishes rendering, so a short explicit
+          // waitForTimeout after load gives the font time to swap in before the screenshot.
+          gotoOptions: { waitUntil: 'load', timeout: 20000 },
+          waitForTimeout: 1000,
           screenshotOptions: { type: 'png' },
         }),
       }

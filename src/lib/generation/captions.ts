@@ -72,7 +72,19 @@ function extractImagePlaceholders(templateHtml: string): string[] {
 // z.record(string,string), which the model could (and did) satisfy with `{}`. Built per-call
 // (below) from whichever template is actually in use, since image field names differ per
 // template -- naming them explicitly gives the model a concrete target instead of an
-// open-ended "invent whatever keys you think apply" record.
+// open-ended "invent whatever keys you think apply" record. One shared schema for all 5 slides
+// (not a separate CTA-specific schema): measured live (2026-07-20) that z.tuple() -- the obvious
+// way to give slide 5 a different shape -- doesn't survive this SDK's zod-to-JSON-schema
+// conversion (the tuple's real per-position item constraints get serialized into an inert
+// `description` string instead of actual schema, so the model sees "slides: array" with no real
+// constraint on shape or count at all, and returns something close to nothing). A plain
+// z.array(...).length(5) does NOT have this bug (verified: item shape stays a real `$ref`
+// constraint, only `minItems`/`maxItems` land in `description` -- and that specific gap is
+// harmless, since format.parse()'s own zod validation still enforces the real slide count
+// locally regardless of what the model was told). The CTA slide (cta.html, no image fields ever)
+// just won't have any real names to fill in photoBriefs -- that's fine, photoBriefs emptiness is
+// only a soft warning downstream (pipeline.ts), not a hard requirement here, specifically so this
+// one shared schema doesn't force the CTA slide to invent irrelevant photo fields.
 function buildSlideSchema(imageFields: string[]) {
   const photoBriefsShape: Record<string, z.ZodOptional<z.ZodString>> = {}
   for (const field of imageFields) photoBriefsShape[field] = z.string().optional()
@@ -87,12 +99,6 @@ function buildSlideSchema(imageFields: string[]) {
     .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
       message: 'values must not be empty -- every slide needs real caption/headline content',
     })
-    .refine(
-      (slide) => imageFields.length === 0 || Object.values(slide.photoBriefs).some((v) => v && v.trim().length > 0),
-      {
-        message: `photoBriefs must not be empty -- this template needs real photo descriptions for: ${imageFields.join(', ')}`,
-      }
-    )
 }
 
 export type GeneratedCarousel = {
@@ -121,18 +127,15 @@ export async function generateCaptions(input: {
     loadTemplate(CTA_TEMPLATE),
   ])
 
-  // Built per-call since image field names differ per template -- see buildSlideSchema's comment.
+  // Built per-call since image field names differ per template -- see buildSlideSchema's comment
+  // above for why this is a plain array (not a tuple) shared across all 5 slides.
   const contentImageFields = extractImagePlaceholders(templateHtml)
-  const ctaImageFields = extractImagePlaceholders(ctaHtml)
-  const ContentSlideSchema = buildSlideSchema(contentImageFields)
-  const CtaSlideSchema = buildSlideSchema(ctaImageFields)
+  const SlideSchema = buildSlideSchema(contentImageFields)
   const GenerationOutput = z.object({
     title: z.string().max(60),
-    slides: z.tuple([ContentSlideSchema, ContentSlideSchema, ContentSlideSchema, ContentSlideSchema, CtaSlideSchema]),
+    slides: z.array(SlideSchema).length(5),
   })
-  console.log(
-    `[generation] image fields for this template: content=[${contentImageFields.join(', ')}], cta=[${ctaImageFields.join(', ')}]`
-  )
+  console.log(`[generation] image fields for this template: [${contentImageFields.join(', ')}]`)
 
   // Trimmed to just what a caption-writing call needs -- see extractSections' comment above.
   const templatesGuide = extractSections(templatesGuideFull, [

@@ -1,8 +1,6 @@
 import { imageSize } from 'image-size'
-import Anthropic from '@anthropic-ai/sdk'
 import type { TemplateVariant } from '@/lib/types'
-
-const anthropic = new Anthropic()
+import { tavilyCandidateUrls } from './research'
 
 const MIN_DIMENSION = 400 // reject tiny icons/thumbnails masquerading as og:image
 
@@ -110,28 +108,11 @@ export async function firstUsablePhoto(
 
 /**
  * Finds 2-3 real candidate page URLs for a photo brief (e.g. "man applying sunscreen outdoors
- * photo") via Claude's server-side web_search tool -- a cheap model, capped search count, per
- * initial-generation-behavior.md's cost-bounded pipeline (this is a "find and verify a match"
- * task, not brand-voice judgment, so it doesn't need Opus). Mirrors image-sourcing.md's own
- * guidance: specific, scene-level queries return better candidate pages than abstract topic words.
+ * photo") via Tavily's search API -- plain HTTP, not an Anthropic tool call (avoids the same
+ * refusal issue found in captions.ts, see session log 2026-07-20). Mirrors image-sourcing.md's
+ * own guidance: specific, scene-level queries return better candidate pages than abstract topic
+ * words.
  */
 export async function searchCandidatePhotoUrls(photoBrief: string): Promise<string[]> {
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: 1024,
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
-    messages: [
-      {
-        role: 'user',
-        content: `Find 2-3 real, direct webpage URLs (stock photo sites, editorial photography, news photo pages -- not random blogs) showing: ${photoBrief}\n\nReply with ONLY the URLs, one per line, nothing else.`,
-      },
-    ],
-  })
-
-  const text = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-
-  return Array.from(text.matchAll(/https?:\/\/\S+/g), (m) => m[0].replace(/[.,)>\]]+$/, ''))
+  return tavilyCandidateUrls(`${photoBrief} photo`)
 }

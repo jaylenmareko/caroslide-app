@@ -6,6 +6,7 @@ import path from 'path'
 import type { Angle, Look, TemplateVariant } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { loadTemplate } from './render'
+import { tavilySearch } from './research'
 
 const anthropic = new Anthropic()
 const REFERENCE_DIR = path.join(process.cwd(), 'reference')
@@ -57,9 +58,21 @@ export async function generateCaptions(input: {
       ? 'This carousel\'s Look is "Bold Stat" -- every content slide MUST use the template\'s stat-takeover mode (STAT_NUMBER + STAT_LABEL), even though the same file also supports a plain-caption mode. Leave CAPTION_HTML/HEADLINE_HTML/TAGLINE unset on content slides.'
       : 'This carousel\'s Look is "' + input.look + '" -- do NOT use stat-takeover mode (STAT_NUMBER/STAT_LABEL) on any content slide even if the template file supports it; that mode is reserved for the separate "Bold Stat" Look. Use whichever non-stat mode the template\'s own comments describe (plain caption, or kicker+headline/story if this is a dual-mode template).'
 
+  // Real research now happens BEFORE this call, via Tavily (plain HTTP, no Anthropic tool) --
+  // not by giving the model its own search tool. That was the actual fix for the refusal bug:
+  // Opus was invoking an ungranted code_execution tool whenever web_search was attached, and a
+  // safety classifier cut the response short. Removing all tools from this call closes that off
+  // entirely, at the cost of the model no longer being able to research on its own -- Tavily's
+  // findings (when there's a real brief to search on) are handed to it as plain text instead.
+  const research = input.brief.trim() ? await tavilySearch(input.brief.trim()) : null
+
+  const researchSection = research
+    ? `## Research findings (real, fetched just now -- ground the copy in these, don't contradict them)\n\n${research.answer ? `${research.answer}\n\n` : ''}${research.sources.map((s) => `- ${s.title} (${s.url}): ${s.content.slice(0, 300)}`).join('\n')}\n`
+    : ''
+
   const briefInstruction = input.brief.trim()
-    ? `The user's brief: "${input.brief.trim()}"\n\nParse this by shape: an empty/near-empty brief means research a real, current, relevant topic yourself; a bare topic phrase is the subject (research supporting facts if the phrase alone isn't enough for 5 real slides); a detailed paragraph should be extracted concretely, not compressed away -- a specific claim or credential beats a generic rewording.`
-    : `No brief was given -- this is the normal case, not an error. Research a real, current, relevant topic yourself${input.voiceDescription ? ", weighted toward the voice/audience notes below" : ''}.`
+    ? `The user's brief: "${input.brief.trim()}"\n\nParse this by shape: a bare topic phrase is the subject; a detailed paragraph should be extracted concretely, not compressed away -- a specific claim or credential beats a generic rewording. ${research ? "Real research findings are provided above -- use them, and if they contradict an assumption in the brief (e.g. the brief assumes X but the research shows otherwise), write the honest version, don't just repeat the brief's premise." : 'No research findings were available for this brief (lookup failed or returned nothing) -- write from the brief itself, don\'t invent statistics or sources you can\'t back.'}`
+    : `No brief was given and no research was possible without one -- write a real, honest, generically true carousel for this Angle/Look without inventing specific statistics, studies, or sources you can't back.${input.voiceDescription ? ' Weight it toward the voice/audience notes below.' : ''}`
 
   const systemPrompt = `You are writing the real content for a 5-slide Instagram/social carousel. You have already been told the content strategy (Angle), visual template, and format -- your job is ONLY the topic, the images each slide needs (as search briefs, not URLs), and the actual caption/headline copy. Do not reconsider or override the Angle/Look/TemplateVariant choices below, even if the brief seems to suggest a different shape -- the explicit picks outrank an inferred vibe from free text.
 
@@ -95,36 +108,27 @@ Value angle: <=15 words/slide. Narrative (growth): no fixed cap, one story beat 
 
 ${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA specific voice quirk or founder detail belongs in the caption, not flattened into generic copy.\n` : ''}
 ${input.hasReferenceImages ? 'The user has uploaded their own reference photos for some slides -- still write a photoBrief for every image slot (used as a fallback description / for any slot their uploads don\'t cover), the caller decides which slots actually use the upload vs. your brief.' : ''}
-
+${researchSection}
 ${briefInstruction}
 
-Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.
+Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names. Every content slide's photoBriefs must be filled with a real scene-level description for each image slot the template needs (per the photo-count table above) -- never leave photoBriefs empty for a slide that has image placeholders.
 
-Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no code execution tool available in this request, only whichever tools (if any) are attached above.`
+Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.`
 
   const format = zodOutputFormat(GenerationOutput)
 
-  // Deliberately using .create() instead of .parse(): with web_search attached, the model emits
-  // short natural-language text blocks ("Let me check current stats...") ahead of its final JSON
-  // answer, and the SDK's .parse() helper (lib/parser.js) always grabs the FIRST text block in
-  // message.content to run through the output format's parser -- that's the preamble, not the
-  // answer, so .parse() reliably fails here. Selecting the LAST text block ourselves instead.
+  // No tools attached, ever, for this call -- this is the real fix for the refusal bug (Opus was
+  // invoking an ungranted code_execution tool whenever web_search was attached, triggering a
+  // safety-classifier refusal that cut responses short; see session log 2026-07-20). Research now
+  // happens beforehand via Tavily (plain HTTP, above), handed to the model as plain text instead
+  // of giving it its own search tool. Still using .create() instead of .parse() and manually
+  // selecting the last text block -- harmless now that there's only ever one block, but no reason
+  // to revert since .parse()'s first-block-wins behavior was the second real bug found here.
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-8',
-    // 8192 was measured to truncate mid-JSON on a real run: 3 web_search round-trips plus the
-    // full 5-slide structured output (photoBriefs + values per slide) share this one turn's
-    // budget, and research-heavy briefs can burn through it before the JSON closes.
+    // 16384 (bumped from 8192, which measured too low for a full 5-slide structured payload).
     max_tokens: 16384,
-    // web_search stays attached deliberately -- without it the model can't research topics or
-    // find real photos, which is core to the product. With it attached, Opus was invoking an
-    // ungranted code_execution tool and getting cut off by a safety-classifier refusal; the
-    // no-code-execution instruction in the system prompt (below) is the attempted fix. It has
-    // never actually been verified -- every retry so far hit a real Anthropic 529 overloaded_error
-    // on this specific request shape before reaching the fix, not a failure of the fix itself.
-    // Next step: retry once Anthropic capacity is normal. If it still refuses, the next-cheapest
-    // option is splitting this into two calls (a small web_search-only research call, then a
-    // separate no-tools structured-output call) before reaching for an external search API.
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
+    tools: [],
     system: systemPrompt,
     messages: [
       {

@@ -190,8 +190,15 @@ export async function generateCarousel(input: {
     // (including PRIMARY/SECONDARY/LOGO_HTML/CANVAS_H placeholders) as context, so it's fully
     // capable of echoing one of those keys back in `values` even though it was told not to --
     // the ordering here is what actually prevents that from mattering, not just the instruction.
+    // `slide.values`' fields are all individually optional now (captions.ts) -- filter out any
+    // unset ones defensively before spreading, so fillTemplate's `key in values` check (which
+    // treats a present-but-undefined key as "resolved") can never render the literal word
+    // "undefined" for a field the model legitimately left blank.
+    const definedSlideValues = Object.fromEntries(
+      Object.entries(slide.values).filter(([, v]) => v !== undefined)
+    )
     const values: Record<string, string> = {
-      ...slide.values,
+      ...definedSlideValues,
       ...photoValues,
       ...brand,
       CANVAS_H: String(canvasH),

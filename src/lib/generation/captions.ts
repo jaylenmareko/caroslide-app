@@ -11,18 +11,69 @@ import { tavilySearch } from './research'
 const anthropic = new Anthropic()
 const REFERENCE_DIR = path.join(process.cwd(), 'reference')
 
-const SlideOutput = z.object({
-  // Which real photo slots this slide's template needs filled, described as a short scene-level
-  // search brief per IMG placeholder (e.g. {"BG_IMG": "man applying sunscreen outdoors photo"}) --
-  // NOT a URL. Actual photo sourcing (user uploads first, web search for the shortfall) happens
-  // as a separate step; this call only decides what each photo should show.
-  photoBriefs: z.record(z.string(), z.string()),
-  // Every non-image placeholder this slide's template needs (CAPTION_HTML, HEADLINE_HTML,
-  // KICKER, STORY_HTML, STAT_NUMBER, STAT_LABEL, TAGLINE, STATEMENT_HTML, etc.) -- only the
-  // ones that apply to whichever mode this slide uses, per the dual/triple-mode conventions in
-  // the template's own comments below. Leave every other template's fields out entirely.
-  values: z.record(z.string(), z.string()),
+// Measured live (2026-07-20): the full reference docs run the system prompt to ~21.8k input
+// tokens, and the model was reliably returning a real title but completely empty photoBriefs/
+// values for every slide (satisfies the JSON schema, does none of the actual writing) -- even
+// after a direct in-conversation correction telling it exactly that. Re-reading the source docs
+// found real cause for suspicion: `initial-generation-behavior.md` is mostly a BUILD spec (wizard
+// architecture, cost-pipeline reasoning, render/storage plumbing) irrelevant to what the model
+// should write, and `templates-guide.md` spends most of its length describing all 11 templates'
+// selection tradeoffs when this call only ever needs the ONE already-chosen template (whose real
+// HTML is injected separately below anyway). Extracting just the sections the model actually needs
+// -- not a guess, grounded in what's demonstrably about writing vs. about building.
+function extractSections(markdown: string, headings: string[]): string {
+  const lines = markdown.split('\n')
+  const kept: string[] = []
+  let keeping = false
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      keeping = headings.some((h) => line.trim() === `## ${h}`)
+    }
+    if (keeping) kept.push(line)
+  }
+  return kept.join('\n').trim()
+}
+
+// The full, real universe of content placeholder names across every template file (grepped
+// directly from templates/*.html, not guessed) -- excludes image slots (own field, photoBriefs),
+// brand/layout fields (PRIMARY/SECONDARY/CANVAS_H/LOGO_HTML/FONT_*/*_SIZE/*_POSITION/etc., which
+// the pipeline sets itself from the brand kit or a repair step, never the model). Explicit named
+// fields instead of the previous open z.record(string,string): measured live (2026-07-20) that
+// Opus can satisfy an open record by returning `{}` for every slide -- valid JSON, none of the
+// actual writing done. Naming the exact real fields as the JSON schema (rather than making the
+// model synthesize arbitrary key names by reading them out of a buried HTML template) is a much
+// easier structured-output target, not just a stronger validation check.
+const ContentValues = z.object({
+  CAPTION_HTML: z.string().optional(),
+  HEADLINE_HTML: z.string().optional(),
+  KICKER: z.string().optional(),
+  STORY_HTML: z.string().optional(),
+  STAT_NUMBER: z.string().optional(),
+  STAT_LABEL: z.string().optional(),
+  TAGLINE: z.string().optional(),
+  STATEMENT_HTML: z.string().optional(),
+  SUBHEAD: z.string().optional(),
+  CTA_TEXT: z.string().optional(),
+  MICRO_TEXT: z.string().optional(),
+  CIRCLE_BLOCK: z.string().optional(),
 })
+
+const SlideOutput = z
+  .object({
+    // Which real photo slots this slide's template needs filled, described as a short scene-level
+    // search brief per IMG placeholder (e.g. {"BG_IMG": "man applying sunscreen outdoors photo"}) --
+    // NOT a URL. Actual photo sourcing (user uploads first, web search for the shortfall) happens
+    // as a separate step; this call only decides what each photo should show.
+    photoBriefs: z.record(z.string(), z.string()),
+    // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
+    // conventions in the template's own comments below -- leave every other field unset/absent.
+    values: ContentValues,
+  })
+  // Same measured bug as above can still return `values: {}` (every field individually optional,
+  // so an empty object is structurally valid) -- this refine is what actually catches that.
+  .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
+    message: 'values must not be empty -- every slide needs real caption/headline content',
+  })
 
 const GenerationOutput = z.object({
   title: z.string().max(60),
@@ -41,13 +92,24 @@ export async function generateCaptions(input: {
 }): Promise<GeneratedCarousel> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
 
-  const [contentStrategies, templatesGuide, generationBehavior, templateHtml, ctaHtml] = await Promise.all([
+  const [contentStrategies, templatesGuideFull, generationBehaviorFull, templateHtml, ctaHtml] = await Promise.all([
     readFile(path.join(REFERENCE_DIR, 'content-strategies.md'), 'utf-8'),
     readFile(path.join(REFERENCE_DIR, 'templates-guide.md'), 'utf-8'),
     readFile(path.join(REFERENCE_DIR, 'initial-generation-behavior.md'), 'utf-8'),
     loadTemplate(templateFile),
     loadTemplate(CTA_TEMPLATE),
   ])
+
+  // Trimmed to just what a caption-writing call needs -- see extractSections' comment above.
+  const templatesGuide = extractSections(templatesGuideFull, [
+    'Caption color convention',
+    "Color contrast against the dark background — check it, don't eyeball it",
+    'Caption length discipline',
+  ])
+  const generationBehavior = extractSections(generationBehaviorFull, ['Parsing the brief', 'Images', 'Captions'])
+  console.log(
+    `[generation] trimmed reference docs: templatesGuide ${templatesGuideFull.length}->${templatesGuide.length} chars, generationBehavior ${generationBehaviorFull.length}->${generationBehavior.length} chars`
+  )
 
   // Several TemplateVariants (Side by Side, Photo Column, Editorial, Photo Grid, Split Flip) map
   // to the EXACT SAME template file for both the "Photo Focus" and "Bold Stat" Looks -- the file
@@ -65,6 +127,9 @@ export async function generateCaptions(input: {
   // entirely, at the cost of the model no longer being able to research on its own -- Tavily's
   // findings (when there's a real brief to search on) are handed to it as plain text instead.
   const research = input.brief.trim() ? await tavilySearch(input.brief.trim()) : null
+  console.log(
+    `[generation] tavily research: ${research ? `answer=${research.answer ? 'yes' : 'no'}, sources=${research.sources.length}` : 'null (brief empty or lookup failed)'}`
+  )
 
   const researchSection = research
     ? `## Research findings (real, fetched just now -- ground the copy in these, don't contradict them)\n\n${research.answer ? `${research.answer}\n\n` : ''}${research.sources.map((s) => `- ${s.title} (${s.url}): ${s.content.slice(0, 300)}`).join('\n')}\n`
@@ -111,9 +176,11 @@ ${input.hasReferenceImages ? 'The user has uploaded their own reference photos f
 ${researchSection}
 ${briefInstruction}
 
-Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names. Every content slide's photoBriefs must be filled with a real scene-level description for each image slot the template needs (per the photo-count table above) -- never leave photoBriefs empty for a slide that has image placeholders.
+Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention and per-template photo-slot names are both documented above -- follow them exactly, don't invent new placeholder names.
 
-Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.`
+Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.
+
+CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide's "photoBriefs" MUST contain a real scene description per image slot the template needs. An empty {} for either field on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
 
   const format = zodOutputFormat(GenerationOutput)
 
@@ -121,37 +188,67 @@ Do all reasoning and any arithmetic (percentages, unit conversions, word/charact
   // invoking an ungranted code_execution tool whenever web_search was attached, triggering a
   // safety-classifier refusal that cut responses short; see session log 2026-07-20). Research now
   // happens beforehand via Tavily (plain HTTP, above), handed to the model as plain text instead
-  // of giving it its own search tool. Still using .create() instead of .parse() and manually
-  // selecting the last text block -- harmless now that there's only ever one block, but no reason
-  // to revert since .parse()'s first-block-wins behavior was the second real bug found here.
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    // 16384 (bumped from 8192, which measured too low for a full 5-slide structured payload).
-    max_tokens: 16384,
-    tools: [],
-    system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: 'Write the real content for this carousel now.',
-      },
-    ],
-    output_config: { format },
-  })
+  // of giving it its own search tool.
+  async function attempt(messages: Anthropic.MessageParam[]): Promise<string> {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      // 16384 (bumped from 8192, which measured too low for a full 5-slide structured payload).
+      max_tokens: 16384,
+      tools: [],
+      system: systemPrompt,
+      messages,
+      output_config: { format },
+    })
 
-  const textBlocks = message.content.filter((block) => block.type === 'text')
-  console.log(
-    `[generation] captions call: stop_reason=${message.stop_reason}, content blocks=[${message.content.map((b) => b.type).join(', ')}], text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}]`
-  )
-  const finalBlock = textBlocks[textBlocks.length - 1]
-  if (!finalBlock) {
-    throw new Error(`Caption generation returned no text content (stop_reason: ${message.stop_reason})`)
+    // Still using .create() instead of .parse() and manually selecting the last text block --
+    // harmless now that there's only ever one block (no tools means no preamble text), but no
+    // reason to revert since .parse()'s first-block-wins behavior was a real bug found here.
+    const textBlocks = message.content.filter((block) => block.type === 'text')
+    console.log(
+      `[generation] captions call: stop_reason=${message.stop_reason}, content blocks=[${message.content.map((b) => b.type).join(', ')}], text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}], usage=${JSON.stringify(message.usage)}`
+    )
+    const finalBlock = textBlocks[textBlocks.length - 1]
+    if (!finalBlock) {
+      throw new Error(`Caption generation returned no text content (stop_reason: ${message.stop_reason})`)
+    }
+    console.log(`[generation] full raw output (${finalBlock.text.length} chars): ${finalBlock.text}`)
+    return finalBlock.text
   }
 
+  const openingMessage: Anthropic.MessageParam = {
+    role: 'user',
+    content: 'Write the real content for this carousel now.',
+  }
+
+  const firstRawText = await attempt([openingMessage])
   try {
-    return format.parse(finalBlock.text)
+    return format.parse(firstRawText)
   } catch (error) {
-    console.log(`[generation] failed text block (last 300 chars): ...${finalBlock.text.slice(-300)}`)
+    // Measured live (2026-07-20): Opus can satisfy the JSON schema with `{}` for every slide's
+    // values/photoBriefs while doing almost none of the actual writing (one real run: 21k input
+    // tokens, 125 output tokens, real title, five empty slide objects) -- the .refine() above
+    // catches that as a validation failure. One retry, in the SAME conversation so the model sees
+    // its own incomplete answer plus a direct correction -- much stronger than silently re-issuing
+    // the identical prompt from scratch.
+    console.log(
+      `[generation] first attempt failed validation, retrying once with a direct correction: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+
+  const secondRawText = await attempt([
+    openingMessage,
+    { role: 'assistant', content: firstRawText },
+    {
+      role: 'user',
+      content:
+        'That response left "values" and/or "photoBriefs" empty (or near-empty) on one or more slides -- that is an incomplete response, not a valid shortcut. Write the real caption/headline/stat text and real photo scene descriptions for every slide now, following all the same rules as before.',
+    },
+  ])
+
+  try {
+    return format.parse(secondRawText)
+  } catch (error) {
+    console.log(`[generation] retry also failed validation (last 300 chars): ...${secondRawText.slice(-300)}`)
     throw error
   }
 }

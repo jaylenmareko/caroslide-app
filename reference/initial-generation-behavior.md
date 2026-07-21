@@ -87,26 +87,31 @@ Mirrors skill step 6 exactly:
   | TemplateVariant | Photos needed |
   |---|---|
   | Classic — slide 1 (cover) | 3 (`BG_IMG` + 2 circle photos) |
-  | Classic — slides 2-4 | **1** (`BG_IMG` only — see the circles note below) |
+  | Classic — slides 2-4 | **1** (`BG_IMG` only — see the cover-only-motif note below) |
   | Flipped | 3 on every content slide (`BG_IMG` + 2 circle photos) |
   | Spotlight, Spotlight Left | 2 (`BG_IMG` + 1 circle photo) |
   | Side by Side, Split Flip, Overlay | 2 |
-  | Photo Grid | 3 |
+  | Photo Grid — slide 1 (cover) | 3 (`IMG_MAIN` + `IMG_TOP` + `IMG_BOTTOM`) |
+  | Photo Grid — slides 2-4 | **1** (`IMG_MAIN` only — see the cover-only-motif note below) |
   | Photo Column, Editorial | 1 |
   | Plain Text | 0 — never triggers research |
 
-  If the user uploaded 1 of the 3 a Classic COVER slide needs, research the other 2, not all 3 —
-  don't discard a real user-supplied photo just because more are needed.
-- **Classic's circles are cover-only (real decision, Jaylen 2026-07-21, not a bug).** The 2-circle
-  "proof" motif is a strong, distinctive device meant for a cover slide — repeating it identically
-  on slides 2-4 read as "same slide, new photo" (a real complaint, confirmed against a hand-built
-  RanchPad carousel whose actual inner slides drop the circles too and keep just the full-bleed
-  photo). `pipeline.ts` sets `CIRCLES_DISPLAY:none` on slides 2-4 for this template specifically
-  (the template's own CSS, `1-cover-circles.html`, handles this via a real `display` toggle — the
-  photo/scrims/divider/caption keep working independently since circles are absolutely positioned,
-  not in normal document flow). **Flipped keeps circles on every slide** — its own template
-  comment explicitly says "apply to every content slide (1-4) for a consistent look," a
-  deliberately different design choice from Classic that this doesn't override.
+  If the user uploaded 1 of the 3 a Classic/Photo Grid COVER slide needs, research the other 2,
+  not all 3 — don't discard a real user-supplied photo just because more are needed.
+- **Some templates reserve their strong multi-photo motif for the cover slide only (real decision,
+  Jaylen 2026-07-21, not a bug).** Classic's 2-circle "proof" motif was the first real case — a
+  strong, distinctive device meant for a cover slide, repeating it identically on slides 2-4 read
+  as "same slide, new photo" (a real complaint, confirmed against a hand-built RanchPad carousel
+  whose actual inner slides drop the circles too and keep just the full-bleed photo). Photo Grid's
+  fixed asymmetric 3-photo layout is the same category of risk (a distinctive fixed shape, no
+  built-in variation mechanism the way the alternating-split templates have) — extended the same
+  day. `pipeline.ts`'s `COVER_ONLY_MOTIF` config sets each template's own CSS toggle to hide the
+  extra photo slots on slides 2-4 (`1-cover-circles.html`'s `CIRCLES_DISPLAY`, `8-photo-grid.html`'s
+  `GRID_MAIN_WIDTH`/`GRID_SIDE_DISPLAY` — the remaining photo/main-grid-cell keeps working
+  independently since the hidden elements are absolutely positioned or a separate flex sibling, not
+  something the remaining layout depends on). **Flipped keeps circles on every slide** — its own
+  template comment explicitly says "apply to every content slide (1-4) for a consistent look," a
+  deliberately different design choice this doesn't override.
 - **2-photo-split templates now actually alternate orientation between slides** (`Side by Side`,
   `Split Flip`, `Overlay`, `Photo Column` — real fix, 2026-07-21). Several of these templates' own
   top comments already called for this ("mirror it on alternating slides" / "so the carousel

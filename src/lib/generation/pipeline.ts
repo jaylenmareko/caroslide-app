@@ -11,11 +11,39 @@ const anthropic = new Anthropic()
 
 const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
 
-// Classic's 2-circle "proof" motif is a strong, distinctive device meant for a cover, not
-// identical repetition across all 4 content slides -- real complaint (2026-07-21), confirmed
-// against a real hand-built RanchPad carousel whose actual inner slides drop the circles entirely
-// and keep just the full-bleed photo. See `1-cover-circles.html`'s CIRCLES_DISPLAY comment.
-const CIRCLES_COVER_TEMPLATE = '1-cover-circles.html'
+// Templates where the cover slide (i===0) uses a strong, distinctive multi-photo motif that reads
+// as repetitive if identical on every content slide -- reserved for the cover only. Classic's
+// 2-circle "proof" device was the first real case (2026-07-21 complaint, confirmed against a real
+// hand-built RanchPad carousel whose actual inner slides drop the circles entirely); Photo Grid's
+// fixed asymmetric 3-photo layout is the same category of risk (a distinctive fixed shape, no
+// built-in variation mechanism the way the alternating-split templates have), extended the same
+// day. Inner slides use just `innerFieldOrder` (a subset of the cover's real photo fields) and
+// `hiddenFields` still need a placeholder filled (even though invisible) so
+// checkUnresolvedPlaceholders doesn't false-trip on them -- `coverExtraValues`/`innerExtraValues`
+// are each template's own CSS-toggle placeholders (see `1-cover-circles.html`'s CIRCLES_DISPLAY /
+// `8-photo-grid.html`'s GRID_MAIN_WIDTH+GRID_SIDE_DISPLAY comments).
+const COVER_ONLY_MOTIF: Record<
+  string,
+  {
+    innerFieldOrder: string[]
+    hiddenFields: string[]
+    coverExtraValues: Record<string, string>
+    innerExtraValues: Record<string, string>
+  }
+> = {
+  '1-cover-circles.html': {
+    innerFieldOrder: ['BG_IMG'],
+    hiddenFields: ['CIRCLE_L_IMG', 'CIRCLE_R_IMG'],
+    coverExtraValues: { CIRCLES_DISPLAY: 'block' },
+    innerExtraValues: { CIRCLES_DISPLAY: 'none' },
+  },
+  '8-photo-grid.html': {
+    innerFieldOrder: ['IMG_MAIN'],
+    hiddenFields: ['IMG_TOP', 'IMG_BOTTOM'],
+    coverExtraValues: { GRID_MAIN_WIDTH: '60%', GRID_SIDE_DISPLAY: 'flex' },
+    innerExtraValues: { GRID_MAIN_WIDTH: '100%', GRID_SIDE_DISPLAY: 'none' },
+  },
+}
 
 // Templates with a real 2-photo-split alternation placeholder (added 2026-07-21). Both
 // `2-split-cover.html`'s (and its siblings') and `4-vertical-split.html`'s own top comments
@@ -219,10 +247,11 @@ export async function generateCarousel(input: {
 
   // Base (cover-slide) expectations -- the template's real, measured photo count (images.ts's
   // PHOTO_COUNT) and real field names in top-to-bottom order (captions.ts's PHOTO_1/2/3 -> real
-  // field mapping). Inner content slides of CIRCLES_COVER_TEMPLATE override both, below.
+  // field mapping). Inner content slides of a COVER_ONLY_MOTIF template override both, below.
   const baseExpectedPhotoCount = photosNeeded(input.templateVariant, input.look)
   const basePhotoFieldOrder = PHOTO_FIELDS_FOR_TEMPLATE[templateFile] ?? []
   const alternatingDirectionField = ALTERNATING_DIRECTION_FIELD[templateFile]
+  const coverOnlyMotif = COVER_ONLY_MOTIF[templateFile]
 
   const referenceImagePool = [...input.referenceImageUrls]
   const slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> = []
@@ -231,15 +260,15 @@ export async function generateCarousel(input: {
     const slide = generated.slides[i]
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
-    // Real product decision (Jaylen, 2026-07-21): Classic's 2-circle "proof" motif is reserved for
-    // the cover slide -- repeating it identically on slides 2-4 read as "same slide, new photo"
-    // (real complaint, confirmed against a real hand-built RanchPad carousel whose actual inner
-    // slides drop the circles too). Inner slides here render circle-free and only need 1 photo
-    // (BG_IMG), not 3 -- cheaper (2 fewer photo searches per inner slide) and removes the 2
-    // highest-risk photo-sourcing slots on those slides entirely.
-    const isCirclesInnerSlide = templateFile === CIRCLES_COVER_TEMPLATE && !isCta && i > 0
-    const photoFieldOrder = isCirclesInnerSlide ? ['BG_IMG'] : basePhotoFieldOrder
-    const expectedPhotoCount = isCirclesInnerSlide ? 1 : baseExpectedPhotoCount
+    // Real product decision (Jaylen, 2026-07-21): a COVER_ONLY_MOTIF template's strong repeatable
+    // photo motif is reserved for the cover slide -- repeating it identically on slides 2-4 read as
+    // "same slide, new photo" (real complaint on Classic, confirmed against a real hand-built
+    // RanchPad carousel whose actual inner slides drop the circles too; extended to Photo Grid the
+    // same day on the same reasoning). Inner slides use fewer photo fields -- cheaper (fewer photo
+    // searches per inner slide) and removes the extra fields' photo-sourcing risk entirely.
+    const isMotifInnerSlide = !!coverOnlyMotif && !isCta && i > 0
+    const photoFieldOrder = isMotifInnerSlide ? coverOnlyMotif.innerFieldOrder : basePhotoFieldOrder
+    const expectedPhotoCount = isMotifInnerSlide ? coverOnlyMotif.innerFieldOrder.length : baseExpectedPhotoCount
     const needsPhotos = !isCta && expectedPhotoCount > 0
 
     // Sanity-check the model's own photoBriefs count against what THIS slide actually expects --
@@ -280,17 +309,18 @@ export async function generateCarousel(input: {
         }
       }
     }
-    if (templateFile === CIRCLES_COVER_TEMPLATE && !isCta) {
-      photoValues.CIRCLES_DISPLAY = isCirclesInnerSlide ? 'none' : 'block'
-      // Verified live (standalone fillTemplate test, 2026-07-21): with circles hidden, the
-      // template's own {{CIRCLE_L_IMG}}/{{CIRCLE_R_IMG}} placeholders (inside the now-invisible
-      // circle-wrap divs) still need SOME value or checkUnresolvedPlaceholders false-positives on
-      // every inner slide -- wasting a vision-review call over something nobody will ever see.
-      // photoFieldOrder is just ['BG_IMG'] on these slides, so the "fill any missing slot" loop
-      // above never touches these two fields -- fill them explicitly instead.
-      if (isCirclesInnerSlide) {
-        photoValues.CIRCLE_L_IMG = solidColorPlaceholder(brand.PRIMARY)
-        photoValues.CIRCLE_R_IMG = solidColorPlaceholder(brand.PRIMARY)
+    if (coverOnlyMotif && !isCta) {
+      Object.assign(photoValues, isMotifInnerSlide ? coverOnlyMotif.innerExtraValues : coverOnlyMotif.coverExtraValues)
+      // Verified live (standalone fillTemplate test, 2026-07-21, Classic; same reasoning applies
+      // to any COVER_ONLY_MOTIF template): with the extra photo fields hidden via CSS, their
+      // {{FIELD}} placeholders still need SOME value or checkUnresolvedPlaceholders false-
+      // positives on every inner slide -- wasting a vision-review call over something nobody will
+      // ever see. photoFieldOrder is just the inner set on these slides, so the "fill any missing
+      // slot" loop above never touches the hidden fields -- fill them explicitly instead.
+      if (isMotifInnerSlide) {
+        for (const fieldName of coverOnlyMotif.hiddenFields) {
+          photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+        }
       }
     }
     // Alternates a 2-photo-split template's own orientation placeholder per content-slide index

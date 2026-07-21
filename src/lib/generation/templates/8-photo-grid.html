@@ -49,8 +49,14 @@
   .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; }
 
   .grid { flex:1; display:flex; gap:6px; position:relative; }
-  .grid-main { width:60%; overflow:hidden; position:relative; background:#3a3a3a; }
-  .grid-side { width:40%; display:flex; flex-direction:column; gap:6px; }
+  /* GRID_MAIN_WIDTH/GRID_SIDE_DISPLAY added 2026-07-21: this asymmetric 3-photo grid is a strong,
+     distinctive shape (same category of risk as 1-cover-circles.html's 2-circle motif) -- reserved
+     for the cover slide only, inner slides drop to just the one main photo at full width. Cover
+     sets GRID_MAIN_WIDTH:60%/GRID_SIDE_DISPLAY:flex (the original fixed layout); inner slides set
+     GRID_MAIN_WIDTH:100%/GRID_SIDE_DISPLAY:none. No gap artifact when the side is hidden --
+     flexbox `gap` only applies between visible items, and with one item there's nothing to gap. */
+  .grid-main { width:{{GRID_MAIN_WIDTH|60%}}; overflow:hidden; position:relative; background:#3a3a3a; }
+  .grid-side { width:40%; display:{{GRID_SIDE_DISPLAY|flex}}; flex-direction:column; gap:6px; }
   .grid-side .cell { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
   .grid img { width:100%; height:100%; object-fit:cover; display:block; }
 </style>

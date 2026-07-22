@@ -40,6 +40,9 @@ yarn-error.log*
 # QA screenshots
 /artifacts/
 
+# throwaway design mockups (design.md is the real spec, this folder is scratch)
+/design/mocks/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

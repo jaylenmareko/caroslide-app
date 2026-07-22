@@ -50,7 +50,9 @@ function extractSections(markdown: string, headings: string[]): string {
 // isn't a compromise, it's the actual fix for both prior bugs at once. images.ts's
 // PHOTO_FIELDS_FOR_TEMPLATE maps these generic slots back onto the template's real placeholder
 // names, in order.
-const ContentValues = z.object({
+// Exported (2026-07-21, chat-editing build) -- a copy-rewrite edit needs the exact same field
+// universe as initial generation, not a second drifted schema.
+export const ContentValues = z.object({
   CAPTION_HTML: z.string().optional(),
   HEADLINE_HTML: z.string().optional(),
   KICKER: z.string().optional(),

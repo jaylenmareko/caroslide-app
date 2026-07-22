@@ -2,8 +2,9 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
-import { generateCarousel } from '@/lib/generation/pipeline'
+import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
+import { generateCarousel, renderAndGuard } from '@/lib/generation/pipeline'
+import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/lib/generation/edit'
 
 export async function createCarousel(input: {
   angle: Angle
@@ -129,10 +130,140 @@ export async function updateCarouselTitle(id: string, title: string) {
   if (error) throw new Error(error.message)
 }
 
-export async function updateCarouselSlides(id: string, slides: { url: string }[]) {
+export async function updateCarouselSlides(id: string, slides: Slide[]) {
   const supabase = await createClient()
   const { error } = await supabase.from('carousels').update({ slides }).eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export type EditSlideResult =
+  | { type: 'clarify' | 'redirect' | 'unsupported' | 'error'; message: string }
+  | { type: 'updated'; slides: Slide[] }
+
+/** Pulls the real Storage path back out of a Supabase public URL (everything after the bucket
+ * name) so a re-uploaded slide's old file can be cleaned up -- same no-orphaned-storage
+ * discipline as createCarousel/deleteCarousel, just for a single edited slide instead of a whole
+ * deleted carousel. */
+function storagePathFromPublicUrl(url: string): string | null {
+  const marker = '/carousel-slides/'
+  const idx = url.indexOf(marker)
+  return idx === -1 ? null : url.slice(idx + marker.length)
+}
+
+/**
+ * Real chat-editing entrypoint (2026-07-21) -- governed by chat-editing-behavior.md (scope) and
+ * chat-editing-execution.md (what an edit actually changes). Classifies the message, executes a
+ * copy-rewrite or photo-swap on just the in-scope slide(s), re-renders only those, and returns the
+ * updated slides array for the caller to run through the existing commitSlides()/undo-redo path --
+ * no separate persistence mechanism, this rides the one already built for delete/undo/redo.
+ */
+export async function editSlide(carouselId: string, message: string, currentSlideIndex: number): Promise<EditSlideResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: carousel, error: fetchError } = await supabase
+    .from('carousels')
+    .select('slides, user_id')
+    .eq('id', carouselId)
+    .single()
+  if (fetchError || !carousel) return { type: 'error', message: 'Could not find this carousel.' }
+  if (carousel.user_id !== user!.id) return { type: 'error', message: 'Not authorized to edit this carousel.' }
+
+  const slides = carousel.slides as Slide[]
+  if (currentSlideIndex < 0 || currentSlideIndex >= slides.length) {
+    return { type: 'error', message: 'Invalid slide.' }
+  }
+
+  // voice_description read live, same as createCarousel -- it shapes new writing choices, it
+  // isn't baked pixel-for-pixel into a past render, so there's no reason to freeze it here either.
+  const { data: brandKit } = await supabase
+    .from('brand_kits')
+    .select('voice_description')
+    .eq('user_id', user!.id)
+    .maybeSingle()
+
+  const classification = await classifyEdit({ message, currentSlideIndex, slides })
+
+  if (classification.editType === 'ambiguous') {
+    return {
+      type: 'clarify',
+      message: classification.clarifyingQuestion || 'Which slide(s) do you mean, and what should change?',
+    }
+  }
+  if (classification.editType === 'brand_kit_redirect') {
+    return { type: 'redirect', message: 'Brand colors, logo, and font live in the Brand Kit button above, not chat edits.' }
+  }
+  if (classification.editType === 'template_change') {
+    return {
+      type: 'unsupported',
+      message: "Changing a slide's whole layout isn't supported yet -- try describing a text or photo change instead.",
+    }
+  }
+
+  const targetIndices = classification.slideIndices.length > 0 ? classification.slideIndices : [currentSlideIndex]
+  const updatedSlides = [...slides]
+
+  for (const idx of targetIndices) {
+    const slide = slides[idx]
+    if (!slide?.template || !slide.values) {
+      return {
+        type: 'error',
+        message: `Slide ${idx + 1} was created before editing was supported on this carousel -- try a new one.`,
+      }
+    }
+
+    const newValues = { ...slide.values }
+
+    if (classification.editType === 'copy_rewrite') {
+      const changed = await rewriteCopy({
+        message,
+        currentValues: slide.values,
+        voiceDescription: brandKit?.voice_description ?? null,
+      })
+      Object.assign(newValues, changed)
+    } else {
+      // photo_swap
+      const field = classification.targetField
+      if (!field || !(field in slide.values)) {
+        return { type: 'clarify', message: 'Which photo on this slide do you mean?' }
+      }
+      const brief = await generateSwapBrief({ message, currentValues: slide.values })
+      const newUrl = await swapPhoto(brief)
+      if (!newUrl) {
+        return {
+          type: 'error',
+          message: `Couldn't find a new photo for slide ${idx + 1} -- try again or describe it differently.`,
+        }
+      }
+      newValues[field] = newUrl
+    }
+
+    const result = await renderAndGuard(slide.template, newValues, idx + 1)
+
+    // Fresh filename per edit, not an overwrite at the same path -- a same-path overwrite keeps
+    // the exact same public URL, which risks the browser/any CDN serving a stale cached copy of
+    // the OLD image even though the file itself changed. Old file cleaned up best-effort after,
+    // same no-orphaned-storage discipline as createCarousel/deleteCarousel.
+    const newPath = `${user!.id}/${carouselId}/slide-${idx + 1}-${Date.now()}.png`
+    const { error: uploadError } = await supabase.storage
+      .from('carousel-slides')
+      .upload(newPath, result.png, { contentType: 'image/png' })
+    if (uploadError) return { type: 'error', message: `Failed to save the edited slide: ${uploadError.message}` }
+
+    const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(newPath)
+
+    const oldPath = storagePathFromPublicUrl(slide.url)
+    if (oldPath) {
+      await supabase.storage.from('carousel-slides').remove([oldPath])
+    }
+
+    updatedSlides[idx] = { url: pub.publicUrl, template: slide.template, values: result.values }
+  }
+
+  return { type: 'updated', slides: updatedSlides }
 }
 
 export async function updateCarouselBrand(

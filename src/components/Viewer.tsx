@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/lib/types'
 import { BRAND_FONTS, DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand } from '@/lib/actions'
+import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSlide } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 
 export default function Viewer({ carousel }: { carousel: Carousel }) {
@@ -49,6 +49,38 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     setSlides(next)
     updateCarouselSlides(carousel.id, next)
     setCurrent((c) => Math.min(c, next.length - 1))
+  }
+
+  // Real chat-editing build (2026-07-21) -- the box existed visually but had zero wiring behind
+  // it (uncontrolled input, no onClick at all). chatReply covers every non-"silently worked" case
+  // (clarifying question, redirect to Brand Kit, unsupported edit type, error) since a chat edit
+  // that just silently updates the image with no confirmation reads as broken/unresponsive.
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatSending, setChatSending] = useState(false)
+  const [chatReply, setChatReply] = useState<string | null>(null)
+
+  async function handleChatSend() {
+    const message = chatMessage.trim()
+    if (!message || chatSending) return
+    setChatSending(true)
+    setChatReply(null)
+    try {
+      const result = await editSlide(carousel.id, message, current)
+      if (result.type === 'updated') {
+        commitSlides(result.slides)
+        setChatMessage('')
+        setChatReply('Updated.')
+      } else {
+        // clarify / redirect / unsupported / error -- none of these touch slides, just tell the
+        // user what happened instead of silently doing nothing (the original bug: the button did
+        // nothing at all, with zero feedback either way).
+        setChatReply(result.message)
+      }
+    } catch {
+      setChatReply('Something went wrong making that edit -- try again.')
+    } finally {
+      setChatSending(false)
+    }
   }
 
   const [brandModalOpen, setBrandModalOpen] = useState(false)
@@ -310,16 +342,29 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
 
         <div className="chat-group">
           <div className="chat-box">
-            <input type="text" placeholder="e.g. slide 3: punchier hook, swap the CTA…" />
-            <button className="chat-send-btn" aria-label="Send">
+            <input
+              type="text"
+              placeholder="e.g. slide 3: punchier hook, swap the CTA…"
+              value={chatMessage}
+              disabled={chatSending}
+              onChange={(e) => setChatMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleChatSend()
+              }}
+            />
+            <button className="chat-send-btn" aria-label="Send" onClick={handleChatSend} disabled={chatSending || !chatMessage.trim()}>
               <svg viewBox="0 0 24 24" width={16} height={16} fill="none">
                 <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
-          <p className="chat-hint">
-            Be specific about which slide(s) you mean (e.g. &quot;slide 2&quot;) — otherwise only the slide you&apos;re viewing gets updated.
-          </p>
+          {chatReply ? (
+            <p className="chat-reply">{chatReply}</p>
+          ) : (
+            <p className="chat-hint">
+              Be specific about which slide(s) you mean (e.g. &quot;slide 2&quot;) — otherwise only the slide you&apos;re viewing gets updated.
+            </p>
+          )}
         </div>
       </div>
 

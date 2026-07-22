@@ -9,7 +9,61 @@ import { fontValues } from './fonts'
 
 const anthropic = new Anthropic()
 
-const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
+// Exported (2026-07-21, chat-editing build) -- a single-slide edit re-render needs the same real
+// canvas height as initial generation, keyed the same way.
+export const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
+
+// Extracted into its own exported function (2026-07-21, chat-editing build) -- a single-slide edit
+// re-render needs the exact same brand values (colors, logo/Caroslide-wordmark fallback, font) as
+// initial generation, not a second drifted copy of this logic.
+export function buildBrandValues(input: {
+  brandColors: string[]
+  logoUrl: string | null
+  font: string
+}): Record<string, string> {
+  const userFontValues = fontValues(input.font)
+  // Real bug fixed 2026-07-21: the Caroslide wordmark fallback rendered in whatever generic font
+  // the carousel's own brand happened to use (Inter Tight/Poppins/etc.) -- not Caroslide's actual
+  // brand typeface. The real app's wordmark is ALWAYS Fraunces italic weight 600 (confirmed exactly
+  // in globals.css's `.brand span` rule, used consistently sidebar/landing/auth-everywhere) -- a
+  // generated carousel's fallback logo should match that same real identity, not drift depending on
+  // which font a given carousel's brand kit happens to use. The rendered slide is a standalone HTML
+  // document (doesn't share the Next.js app's own font loading), so Fraunces needs its own real
+  // Google Fonts link here, appended to (not replacing) the carousel's own brand-font link.
+  const FRAUNCES_LOGO_FONT_LINK =
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&display=swap">'
+
+  return {
+    PRIMARY: input.brandColors[0] ?? '#D97757',
+    SECONDARY: input.brandColors[1] ?? '#F4C95D',
+    // Real product decision (Jaylen, 2026-07-21): if the user never uploads a brand logo, fall
+    // back to Caroslide's OWN wordmark rather than the account's own name -- a carousel with no
+    // brand logo set should read as "made with Caroslide," not silently promote whatever text
+    // happens to be the account's display name. There's no up-to-date Caroslide logo IMAGE asset
+    // in this repo yet (the only existing files under projects/business/caroslide/assets/ are the
+    // old carosale-branded coins+legs mark, flagged stale in CONTEXT.md) -- falls back to text.
+    //
+    // Real bug fixed 2026-07-21 (same day): the FIRST version of this fallback used the template's
+    // own `.a`/`.b` two-tone span convention (`<span class="a">Caroslide</span>`), but `.a` is
+    // styled `color:{{PRIMARY}}` in every template -- meaning "Caroslide" rendered in whatever
+    // brand color the CURRENT carousel's own user happened to pick, not a fixed Caroslide identity.
+    // Jaylen's explicit rule: Caroslide's own logo should always be white, never inherit a brand
+    // color, unless it sits on a background light enough that white is unreadable. Checked every
+    // real template file (2026-07-21): all 12 hardcode a dark background (#0a0a0a or #000000,
+    // photo-based slides additionally scrim the top for text legibility) -- none currently support
+    // a light background at all, so "always white" is safe for the entire current template set.
+    // Hardcoded here via inline style rather than the .a/.b convention specifically so it can never
+    // silently start following a template's PRIMARY color again. If a light-background template
+    // variant is ever added, this needs a real per-template light/dark flag, not a guess.
+    LOGO_HTML: input.logoUrl
+      ? `<img src="${input.logoUrl}" alt="">`
+      : `<span style="font-family:'Fraunces',serif; font-style:italic; font-weight:600; color:#ffffff">Caroslide</span>`,
+    ...userFontValues,
+    FONT_LINK_HTML: input.logoUrl
+      ? userFontValues.FONT_LINK_HTML
+      : `${userFontValues.FONT_LINK_HTML}${FRAUNCES_LOGO_FONT_LINK}`,
+  }
+}
 
 // Templates where the cover slide (i===0) uses a strong, distinctive multi-photo motif that reads
 // as repetitive if identical on every content slide -- reserved for the cover only. Classic's
@@ -139,7 +193,9 @@ async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }>
   return { ok: text.toUpperCase().startsWith('OK'), note: text }
 }
 
-async function renderAndGuard(
+// Exported (2026-07-21, chat-editing build) so a single-slide edit can reuse the exact same
+// repair/vision-fallback discipline as initial generation instead of a second, drifted copy.
+export async function renderAndGuard(
   templateFile: string,
   values: Record<string, string>,
   slideNumber: number
@@ -202,48 +258,7 @@ export async function generateCarousel(input: {
     hasReferenceImages: input.referenceImageUrls.length > 0,
   })
 
-  const userFontValues = fontValues(input.font)
-  // Real bug fixed 2026-07-21: the Caroslide wordmark fallback rendered in whatever generic font
-  // the carousel's own brand happened to use (Inter Tight/Poppins/etc.) -- not Caroslide's actual
-  // brand typeface. The real app's wordmark is ALWAYS Fraunces italic weight 600 (confirmed exactly
-  // in globals.css's `.brand span` rule, used consistently sidebar/landing/auth-everywhere) -- a
-  // generated carousel's fallback logo should match that same real identity, not drift depending on
-  // which font a given carousel's brand kit happens to use. The rendered slide is a standalone HTML
-  // document (doesn't share the Next.js app's own font loading), so Fraunces needs its own real
-  // Google Fonts link here, appended to (not replacing) the carousel's own brand-font link.
-  const FRAUNCES_LOGO_FONT_LINK =
-    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&display=swap">'
-
-  const brand = {
-    PRIMARY: input.brandColors[0] ?? '#D97757',
-    SECONDARY: input.brandColors[1] ?? '#F4C95D',
-    // Real product decision (Jaylen, 2026-07-21): if the user never uploads a brand logo, fall
-    // back to Caroslide's OWN wordmark rather than the account's own name -- a carousel with no
-    // brand logo set should read as "made with Caroslide," not silently promote whatever text
-    // happens to be the account's display name. There's no up-to-date Caroslide logo IMAGE asset
-    // in this repo yet (the only existing files under projects/business/caroslide/assets/ are the
-    // old carosale-branded coins+legs mark, flagged stale in CONTEXT.md) -- falls back to text.
-    //
-    // Real bug fixed 2026-07-21 (same day): the FIRST version of this fallback used the template's
-    // own `.a`/`.b` two-tone span convention (`<span class="a">Caroslide</span>`), but `.a` is
-    // styled `color:{{PRIMARY}}` in every template -- meaning "Caroslide" rendered in whatever
-    // brand color the CURRENT carousel's own user happened to pick, not a fixed Caroslide identity.
-    // Jaylen's explicit rule: Caroslide's own logo should always be white, never inherit a brand
-    // color, unless it sits on a background light enough that white is unreadable. Checked every
-    // real template file (2026-07-21): all 12 hardcode a dark background (#0a0a0a or #000000,
-    // photo-based slides additionally scrim the top for text legibility) -- none currently support
-    // a light background at all, so "always white" is safe for the entire current template set.
-    // Hardcoded here via inline style rather than the .a/.b convention specifically so it can never
-    // silently start following a template's PRIMARY color again. If a light-background template
-    // variant is ever added, this needs a real per-template light/dark flag, not a guess.
-    LOGO_HTML: input.logoUrl
-      ? `<img src="${input.logoUrl}" alt="">`
-      : `<span style="font-family:'Fraunces',serif; font-style:italic; font-weight:600; color:#ffffff">Caroslide</span>`,
-    ...userFontValues,
-    FONT_LINK_HTML: input.logoUrl
-      ? userFontValues.FONT_LINK_HTML
-      : `${userFontValues.FONT_LINK_HTML}${FRAUNCES_LOGO_FONT_LINK}`,
-  }
+  const brand = buildBrandValues(input)
 
   // Base (cover-slide) expectations -- the template's real, measured photo count (images.ts's
   // PHOTO_COUNT) and real field names in top-to-bottom order (captions.ts's PHOTO_1/2/3 -> real

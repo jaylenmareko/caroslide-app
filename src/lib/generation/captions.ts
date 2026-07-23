@@ -113,11 +113,23 @@ const requireRealContent = {
 // (title/photoBriefs/values themselves never once went missing); this makes the same guarantee
 // apply per-field instead of just per-object, closing the actual escape hatch instead of asking
 // the model nicely not to use it.
-function buildValuesSchema(templateFile: string, rawTemplateHtml: string) {
+// Real bug found live (2026-07-22, same day, right after this schema fix's own real-required-field
+// win): dual-mode templates' STAT_NUMBER/STAT_LABEL have no `|default` in the raw HTML either (the
+// same signal that correctly makes HEADLINE_HTML required on Bold Hook), so this made them
+// schema-required on EVERY carousel using a dual-mode template -- including a plain-mode (Photo
+// Focus) carousel that should never need them at all, forcing a spurious validation failure and an
+// extra retry every single time. `requiredPlaceholderFields` reads the template's raw HTML alone --
+// it has no idea a field only applies in ONE of two modes. Real fix: a field belonging to the mode
+// NOT in use this carousel is never schema-required, regardless of what the raw HTML says --
+// pipeline.ts force-blanks it to "" after the fact anyway (see its own comment), so requiring it
+// here only ever produced a false failure, never a real one.
+function buildValuesSchema(templateFile: string, rawTemplateHtml: string, isStatMode: boolean) {
   const requiredSet = requiredPlaceholderFields(rawTemplateHtml)
   const shape: Record<string, z.ZodTypeAny> = {}
   for (const field of validValuesFieldsFor(templateFile)) {
-    shape[field] = requiredSet.has(field) ? z.string().min(1) : z.string().optional()
+    const isStatField = field === 'STAT_NUMBER' || field === 'STAT_LABEL'
+    const required = requiredSet.has(field) && isStatField === isStatMode
+    shape[field] = required ? z.string().min(1) : z.string().optional()
   }
   return z.object(shape)
 }
@@ -419,8 +431,10 @@ CRITICAL, checked automatically after you respond: "values" MUST contain real ke
 
   // Built once per real call (not module scope) -- the schema depends on which template THIS
   // carousel resolved to, per the real-bug comment above buildValuesSchema/slideSchemasFor.
-  const contentSchemas = slideSchemasFor(buildValuesSchema(templateFile, templateHtml))
-  const ctaSchemas = slideSchemasFor(buildValuesSchema(CTA_TEMPLATE, ctaHtml))
+  // isStatMode: false is correct for CTA_TEMPLATE too -- cta.html has no STAT_NUMBER/STAT_LABEL
+  // fields at all, so isStatMode never affects that schema either way.
+  const contentSchemas = slideSchemasFor(buildValuesSchema(templateFile, templateHtml, input.look === 'Bold Stat'))
+  const ctaSchemas = slideSchemasFor(buildValuesSchema(CTA_TEMPLATE, ctaHtml, false))
 
   const [cover, slide2, slide3, slide4, cta] = await Promise.all([
     generateOneSlide(buildSlideSystemPrompt(1), contentSchemas.cover),

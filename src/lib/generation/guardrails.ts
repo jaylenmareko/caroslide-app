@@ -51,7 +51,21 @@ const CHAR_BUDGETS: Record<string, Record<string, number>> = {
   // Not fixed at the template level -- collides with the brand badge past ~15-18 words at the
   // default BRAND_LINE_BOTTOM. This budget is the real, load-bearing safety net for that bug.
   '10-split-overlay.html': { CAPTION_HTML: 60 },
-  '7-keynote.html': { STATEMENT_HTML: 70 },
+  // STATEMENT_HTML bumped 70->150 (2026-07-23): 3 independent real generations, 9 of 12 content
+  // slides, ALL landed 113-233 chars against this 70-char ceiling -- never once close to it. That's
+  // not model variance, it's a wrong budget, and it tripled/quadrupled render volume every single
+  // run (every over-budget slide re-renders once for the deterministic repair, and this many
+  // simultaneous violations is exactly what caused Overlay's compounding-429 problem earlier
+  // tonight) -- 3 consecutive generations 429'd before completing, purely from this. `.slide` is
+  // flexbox vertically-centered with justify-content:center (like cta.html above) and 120px padding
+  // on all sides (840px real usable width) -- real slack, not a fixed top-anchored zone. Checked the
+  // worst case: even the observed 233-char outlier, after this budget's own rewrite-escalation caps
+  // it at <=150 chars, comfortably fits Post format's (4:5, tightest format) ~1110px usable height
+  // at the default 84px font; the boundary case just under the new 0.75 escalation cutoff (~199
+  // chars, shrunk to ~63px via the existing font-shrink path) still fits with margin. 150 keeps a
+  // real ceiling -- this is a "one bold statement" template, not unlimited text -- while no longer
+  // manufacturing an escalation on nearly every slide of nearly every generation.
+  '7-keynote.html': { STATEMENT_HTML: 150 },
   // Tested clean with plenty of margin (headline <=9 words, subhead <=12 words, button <=4
   // words) -- this was previously missing entirely from this table, meaning the CTA slide
   // (every carousel's slide 5, always) had zero length enforcement. Real gap, closed 2026-07-20.

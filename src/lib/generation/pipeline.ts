@@ -7,6 +7,7 @@ import { renderSlide, sanitizeStrayEscapes } from './render'
 import { checkSlide, budgetsFor, textLength, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
+import { EDITABLE_FIELDS } from './editableFields'
 
 const anthropic = new Anthropic()
 
@@ -521,6 +522,29 @@ export async function generateCarousel(input: {
           .filter((entry): entry is [string, string] => entry[1] !== undefined)
           .map(([k, v]) => [k, sanitizeStrayEscapes(v)])
       )
+
+      // Real bug found live (2026-07-22, Photo Column/4-vertical-split.html under Photo Focus): the
+      // model filled BOTH the plain-mode fields (TAGLINE/CAPTION_HTML) AND the stat-mode fields
+      // (STAT_NUMBER/STAT_LABEL) on the same slide, despite the prose modeInstruction saying only
+      // one mode applies -- the model also sees this template's own raw HTML/comments describing
+      // "cover slide: use .stat + .statlbl," which apparently competes with the modeInstruction
+      // instead of being overridden by it. A prose fix isn't reliable here (same lesson as the
+      // required-field bug earlier tonight) -- `input.look` already tells us with certainty which
+      // mode is correct, so force-blank whichever mode's fields don't apply, regardless of what the
+      // model wrote. Deliberately NOT simply omitting the wrong-mode keys from the schema instead:
+      // `{{STAT_NUMBER}}`/`{{STAT_LABEL}}` have no `|default` in the dual-mode templates, so an
+      // absent key would render as a literal broken placeholder -- an explicit empty string is what
+      // actually keeps the unused mode's markup invisible.
+      if (!isCta) {
+        const isStatMode = input.look === 'Bold Stat'
+        const templateTextFields = (EDITABLE_FIELDS[templateForSlide] ?? [])
+          .filter((f) => f.kind === 'text')
+          .map((f) => f.field)
+        for (const field of templateTextFields) {
+          const isStatField = field === 'STAT_NUMBER' || field === 'STAT_LABEL'
+          if (isStatField !== isStatMode) definedSlideValues[field] = ''
+        }
+      }
       const values: Record<string, string> = {
         ...definedSlideValues,
         ...photoValues,

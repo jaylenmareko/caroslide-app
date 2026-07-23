@@ -33,7 +33,7 @@
      an actual test slide for any stat string before shipping — same caution as template 5's
      STRIP_POSITION note, a size that fits "80%" isn't guaranteed to fit every stat. Confirmed live:
      "500M" (4 chars, all wide numerals/letterforms — no narrow "1" or "%" to lean on) still clipped
-     off the right edge at 165px. Use {{STAT_SIZE}} to size down per-stat rather than shrinking the
+     off the right edge at 165px. Use the STAT_SIZE placeholder to size down per-stat rather than shrinking the
      default for every carousel — e.g. 130px for a 4-5 char wide-glyph stat like this one. */
   .stat { font-size:{{STAT_SIZE|165px}}; font-weight:900; color:{{SECONDARY}}; letter-spacing:-6px; line-height:1; margin-bottom:8px; }
   .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; margin-bottom:40px; }

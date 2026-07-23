@@ -294,11 +294,35 @@ async function repairMissingText(
 ): Promise<Record<string, string>> {
   const missing = violations.find((v): v is Extract<GuardrailViolation, { type: 'missing_required_text' }> => v.type === 'missing_required_text')
   const unresolved = violations.find((v): v is Extract<GuardrailViolation, { type: 'unresolved_placeholders' }> => v.type === 'unresolved_placeholders')
-  if (!missing && !unresolved) return values
+
+  // Real bug found live (2026-07-22, Overlay's real generation): repairOverBudget only shrinks the
+  // font, capped at a 60% floor (below that, text becomes illegibly small) -- but the model can
+  // overshoot a genuinely tight budget by 3-4x (239 chars against Overlay's real 60-char ceiling,
+  // the load-bearing safety net for its known, unfixed brand-badge collision), and shrinking alone
+  // can never close a gap that large. Confirmed live: the slide still shipped with the badge visibly
+  // overlapping the caption even after the existing repair + one vision-triggered repair. When the
+  // shrink ratio a field would need is already below the 60% floor, shrinking literally cannot work
+  // -- escalate to a REAL rewrite asking for genuinely short text instead of shipping shrunk-but-
+  // still-too-long text.
+  const severelyOverBudget = violations.filter(
+    (v): v is Extract<GuardrailViolation, { type: 'over_budget' }> => v.type === 'over_budget' && v.budget / v.length < 0.6
+  )
+  if (!missing && !unresolved && severelyOverBudget.length === 0) return values
 
   const fields = [...(missing?.fields ?? []), ...(unresolved?.placeholders.map((p) => p.replace(/[{}]/g, '')) ?? [])]
+  const messages: string[] = []
+  if (fields.length > 0) {
+    messages.push(
+      `This slide was left with ${fields.join(', ')} completely blank -- that's not a valid shortcut, every field this template's current mode uses must have real content. Write real text for ${fields.join(' and ')} now, fitting the rest of this slide's content.`
+    )
+  }
+  for (const v of severelyOverBudget) {
+    messages.push(
+      `${v.field} is way too long for this template (${v.length} characters against a real ${v.budget}-character ceiling) -- shrinking the font can't fix an overage this large without becoming illegible. Rewrite ${v.field} from scratch as a genuinely short version, at or under ${v.budget} characters, keeping the same core point.`
+    )
+  }
   const changed = await rewriteCopy({
-    message: `This slide was left with ${fields.join(', ')} completely blank -- that's not a valid shortcut, every field this template's current mode uses must have real content. Write real text for ${fields.join(' and ')} now, fitting the rest of this slide's content.`,
+    message: messages.join(' '),
     currentValues: values,
     voiceDescription,
   })

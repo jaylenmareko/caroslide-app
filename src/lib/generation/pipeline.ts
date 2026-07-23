@@ -178,6 +178,12 @@ const DEFAULT_SIZE_PX: Record<string, number> = {
   STATEMENT_SIZE: 84,
 }
 
+// See the real-bug comment where this is used (generateCarousel's per-slide loop) -- these two
+// templates share the exact kicker+headline / story / stat 3-way pattern (confirmed via
+// guardrails.ts's REQUIRED_TEXT_FIELDS), the only ones where HEADLINE_HTML and STORY_HTML are
+// genuine alternatives that can visually collide if both get filled at once.
+const HEADLINE_STORY_ALTERNATIVE_TEMPLATES = new Set(['11-single-circle.html', '6-minimal-magazine.html'])
+
 // Split into a sync allocation pass + an async search pass (2026-07-22, generation-speed work) --
 // previously one function did both `.shift()` off the shared reference-image pool AND the real
 // (slow) findUsablePhoto search in the same sequential loop, which forced every slide's photo
@@ -543,6 +549,23 @@ export async function generateCarousel(input: {
         for (const field of templateTextFields) {
           const isStatField = field === 'STAT_NUMBER' || field === 'STAT_LABEL'
           if (isStatField !== isStatMode) definedSlideValues[field] = ''
+        }
+
+        // Real bug found live (2026-07-22, direct visual review, Spotlight/11-single-circle.html):
+        // the model filled BOTH a real kicker+headline pair AND a full STORY_HTML paragraph on the
+        // same slide -- these two are genuine alternatives on this template (and
+        // 6-minimal-magazine.html, the only other one sharing this exact 3-way pattern), not a
+        // both-at-once option, but unlike the stat/plain split above there's no external input
+        // (like `input.look`) that tells us which one the model intended -- it's the model's own
+        // creative choice of "bookend kicker+headline" vs "narrative paragraph" per slide. Since
+        // `.cover-block` (kicker+headline) and `.story` are both absolute-positioned with only
+        // ~20px of separation, having both non-empty doesn't just waste text, it visually piles the
+        // two blocks on top of each other into illegible overlapping text. Prefer the kicker+
+        // headline pair when both are present -- shorter, and matches this template's own top
+        // comment framing kicker+headline as the cover/resolution (bookend) convention, the more
+        // common real case for this to fire on.
+        if (HEADLINE_STORY_ALTERNATIVE_TEMPLATES.has(templateForSlide) && definedSlideValues.HEADLINE_HTML && definedSlideValues.STORY_HTML) {
+          definedSlideValues.STORY_HTML = ''
         }
       }
       const values: Record<string, string> = {

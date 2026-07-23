@@ -300,12 +300,15 @@ async function repairMissingText(
   // overshoot a genuinely tight budget by 3-4x (239 chars against Overlay's real 60-char ceiling,
   // the load-bearing safety net for its known, unfixed brand-badge collision), and shrinking alone
   // can never close a gap that large. Confirmed live: the slide still shipped with the badge visibly
-  // overlapping the caption even after the existing repair + one vision-triggered repair. When the
-  // shrink ratio a field would need is already below the 60% floor, shrinking literally cannot work
-  // -- escalate to a REAL rewrite asking for genuinely short text instead of shipping shrunk-but-
-  // still-too-long text.
+  // overlapping the caption even after the existing repair + one vision-triggered repair. Threshold
+  // widened 0.6 -> 0.75 the same night, still live-testing Overlay: a 97-char/60-budget case (ratio
+  // 0.62, just above the original 0.6 cutoff) got ONLY shrunk, not rewritten, and vision-review
+  // still confirmed the badge overlapping the text -- a "just barely shrinkable" case is still a
+  // real collision risk on this specific template, not a safe edge case. When the shrink ratio a
+  // field would need is below 75%, escalate to a REAL rewrite asking for genuinely short text
+  // instead of shipping shrunk-but-still-too-long text.
   const severelyOverBudget = violations.filter(
-    (v): v is Extract<GuardrailViolation, { type: 'over_budget' }> => v.type === 'over_budget' && v.budget / v.length < 0.6
+    (v): v is Extract<GuardrailViolation, { type: 'over_budget' }> => v.type === 'over_budget' && v.budget / v.length < 0.75
   )
   if (!missing && !unresolved && severelyOverBudget.length === 0) return values
 

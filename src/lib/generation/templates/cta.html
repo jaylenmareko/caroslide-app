@@ -10,7 +10,12 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
   .slide { width:1080px; height:{{CANVAS_H}}px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:90px; background:radial-gradient(circle at 50% 30%, {{DARK_TINT|#1a0a0a}} 0%, #0a0a0a 65%); }
-  .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; text-transform:uppercase; margin-bottom:70px; }
+  /* text-transform:uppercase removed 2026-07-22: this was the only template applying it to
+     .logo, and it forced the Caroslide wordmark fallback (a real mixed-case, italic Fraunces
+     span -- see pipeline.ts's buildBrandValues) into all-caps, breaking the exact brand
+     treatment every other template already renders correctly. Real bug, not a design choice --
+     no other template does this. */
+  .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; margin-bottom:70px; }
   .logo span { color:#ffffff; }
   .logo img { height:40px; width:auto; display:block; margin:0 auto; } /* used instead of the text+span when the brand has a real logo image, see LOGO_HTML */
   h1 { font-size:80px; font-weight:900; color:#ffffff; line-height:1.1; letter-spacing:-2px; margin-bottom:36px; }

@@ -3,8 +3,8 @@ import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
 import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPlaceholder } from './images'
-import { renderSlide } from './render'
-import { checkSlide, type GuardrailViolation } from './guardrails'
+import { renderSlide, sanitizeStrayEscapes } from './render'
+import { checkSlide, budgetsFor, textLength, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
 
@@ -238,6 +238,36 @@ function repairOverBudget(
   return repaired
 }
 
+// Real bug found live (2026-07-22, direct visual review of test carousels): repairOverBudget ran
+// independently PER SLIDE, so a carousel's 3 content slides could each get a DIFFERENT shrink
+// ratio depending on how long THAT slide's own text happened to be -- slide 2's caption barely
+// over budget shrinks a little, slide 4's caption badly over budget shrinks a lot, and the result
+// is captions that visibly get smaller slide-to-slide within the same carousel. Real fix: compute
+// ONE shared size per field, from the LONGEST content across all of a carousel's non-CTA slides
+// (cover + 3 content slides all share the same templateFile, so the same char budgets apply),
+// BEFORE any slide renders at all -- every slide gets the same font size whether its own text is
+// short or long, so the carousel reads as one consistent design instead of a shrinking cascade.
+// This also means the common over-budget case now resolves on the FIRST render instead of needing
+// a repair-triggered re-render at all -- fewer real Cloudflare render calls per carousel, which
+// directly helps the render-volume/429-risk pattern already fixed elsewhere in this file.
+function computeSharedSizeOverrides(
+  templateFile: string,
+  slides: Array<{ values: Record<string, string | undefined> }>
+): Record<string, string> {
+  const budgets = budgetsFor(templateFile)
+  if (!budgets) return {}
+  const overrides: Record<string, string> = {}
+  for (const [field, budget] of Object.entries(budgets)) {
+    const sizeField = SIZE_OVERRIDE_FOR[field]
+    if (!sizeField) continue
+    const maxLength = Math.max(0, ...slides.map((s) => textLength(s.values[field] ?? '')))
+    if (maxLength <= budget) continue // nobody's over -- every slide already uses the same default size
+    const shrinkRatio = Math.max(0.6, budget / maxLength) // never shrink below 60% of original
+    overrides[sizeField] = `${Math.round(DEFAULT_SIZE_PX[sizeField] * shrinkRatio)}px`
+  }
+  return overrides
+}
+
 /** Real repair (not just a resize) for a `missing_required_text` or `unresolved_placeholders`
  * violation -- either way a field was left completely blank (silently, or as a literal
  * `{{FIELD}}` string that survived to the render), so there's nothing to shrink; regenerate it via
@@ -362,6 +392,11 @@ export async function generateCarousel(input: {
 
   const brand = buildBrandValues(input)
 
+  // Computed ONCE from every non-CTA slide's real text (cover + 3 content slides all share
+  // templateFile, so the same char budgets apply to all of them) -- see computeSharedSizeOverrides'
+  // own comment for why this replaced independent per-slide shrinking.
+  const sharedSizeOverrides = computeSharedSizeOverrides(templateFile, generated.slides.slice(0, -1))
+
   // Base (cover-slide) expectations -- the template's real, measured photo count (images.ts's
   // PHOTO_COUNT) and real field names in top-to-bottom order (captions.ts's PHOTO_1/2/3 -> real
   // field mapping). Inner content slides of a COVER_ONLY_MOTIF template override both, below.
@@ -482,11 +517,14 @@ export async function generateCarousel(input: {
       // treats a present-but-undefined key as "resolved") can never render the literal word
       // "undefined" for a field the model legitimately left blank.
       const definedSlideValues = Object.fromEntries(
-        Object.entries(slide.values).filter(([, v]) => v !== undefined)
+        Object.entries(slide.values)
+          .filter((entry): entry is [string, string] => entry[1] !== undefined)
+          .map(([k, v]) => [k, sanitizeStrayEscapes(v)])
       )
       const values: Record<string, string> = {
         ...definedSlideValues,
         ...photoValues,
+        ...(isCta ? {} : sharedSizeOverrides),
         ...brand,
         CANVAS_H: String(canvasH),
       }
@@ -503,7 +541,7 @@ export async function generateCarousel(input: {
     })
   )
 
-  return { title: generated.title, slides }
+  return { title: sanitizeStrayEscapes(generated.title), slides }
 }
 
 export type { Slide }

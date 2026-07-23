@@ -26,6 +26,27 @@ export function unresolvedPlaceholders(filledHtml: string): string[] {
 // since nothing distinguished required-with-no-fallback from merely-allowed. Scans the template's
 // own real HTML rather than hand-maintaining a second list, so this can never drift from the
 // template file itself.
+// Real bug found live (2026-07-22, direct byte-level inspection of a stored slide via Supabase's
+// SQL editor -- confirmed exact codepoints, not guessed): a rendered caption showed "50\f." where
+// the model clearly meant "50°F." -- the STORED value literally contains a backslash (codepoint
+// 92) followed by the letter f (codepoint 102), two real characters, not a rendering glitch or a
+// genuine form-feed control char. Same family as an earlier-spotted literal "—" artifact
+// (an em-dash that rendered as 6 visible characters instead of "—"): the model tried to escape a
+// special character defensively within its own JSON string value, and something about that
+// self-escaping survived JSON.parse as literal backslash-prefixed text instead of decoding to the
+// real character it meant. Real fix, not a guess: a literal backslash is never legitimate content
+// in real caption prose for this app, so any survivor is unambiguously this bug, not real user
+// intent -- recover the ones we CAN decode (a literal "\uXXXX" is fully recoverable, since we know
+// exactly which Unicode codepoint it names) and strip the backslash on the ones we can't (a bare
+// "\f"/"\n"/"\r"/"\t"/"\b"/"\v" has no way to recover the originally-intended character, but
+// shipping a visible stray backslash is strictly worse than just dropping it). Lives here (not
+// pipeline.ts/captions.ts) so both initial generation and chat-edit rewrites (edit.ts) can share
+// it without a circular import between those two files.
+export function sanitizeStrayEscapes(text: string): string {
+  const decoded = text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+  return decoded.replace(/\\([fnrtbv])/g, '$1')
+}
+
 export function requiredPlaceholderFields(templateHtml: string): Set<string> {
   const required = new Set<string>()
   const re = /\{\{([A-Z0-9_]+)(?:\|([^}]*))?\}\}/g

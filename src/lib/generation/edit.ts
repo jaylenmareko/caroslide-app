@@ -9,6 +9,7 @@ import { z } from 'zod'
 import type { Slide } from '@/lib/types'
 import { ContentValues } from './captions'
 import { findUsablePhoto } from './images'
+import { sanitizeStrayEscapes } from './render'
 
 const anthropic = new Anthropic()
 
@@ -158,7 +159,13 @@ Do all reasoning yourself, directly in plain text. Do not write or execute code 
   const parsed = format.parse(text)
   // ContentValues' fields are all individually optional -- only return the ones the model
   // actually set, so the caller's merge never overwrites an untouched field with `undefined`.
-  return Object.fromEntries(Object.entries(parsed).filter(([, v]) => v !== undefined)) as Record<string, string>
+  // sanitizeStrayEscapes here too -- chat-edit rewrites go through the same model/JSON path as
+  // initial generation, so they're just as exposed to the stray-escape bug (see its own comment).
+  return Object.fromEntries(
+    Object.entries(parsed)
+      .filter((entry): entry is [string, string] => entry[1] !== undefined)
+      .map(([k, v]) => [k, sanitizeStrayEscapes(v)])
+  )
 }
 
 /**

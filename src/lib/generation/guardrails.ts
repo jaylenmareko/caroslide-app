@@ -11,7 +11,13 @@ import { unresolvedPlaceholders } from './render'
 // TemplateVariant label (e.g. "Side by Side") maps to the same file in both Photo Focus and Bold
 // Stat Looks -- the file is the real unit that has a measured box size, not the label.
 const CHAR_BUDGETS: Record<string, Record<string, number>> = {
-  '1-cover-circles.html': { CAPTION_HTML: 165 },
+  // CAPTION_HTML bumped 165->185 (2026-07-22): a real generation ran 183 chars against this
+  // budget, triggering an avoidable repair-and-re-render (real render volume, real 429 risk, per
+  // 12-hook-block.html's own comment below on why that matters). `.caption` is a vertically
+  // centered, non-fixed-height flex zone (top:54.67vh to bottom:0, see the template's own comment
+  // on the caption-centering fix from 2026-07-21) -- real slack here, not a tight fixed box, so a
+  // modest bump is low-risk, not a guess.
+  '1-cover-circles.html': { CAPTION_HTML: 185 },
   '3-flip.html': { CAPTION_HTML: 165 },
   '11-single-circle.html': { HEADLINE_HTML: 165, STORY_HTML: 250 },
   // Re-measured 2026-07-22 after real accumulated evidence, per this entry's own note to revisit
@@ -40,7 +46,11 @@ const CHAR_BUDGETS: Record<string, Record<string, number>> = {
   // Tested clean with plenty of margin (headline <=9 words, subhead <=12 words, button <=4
   // words) -- this was previously missing entirely from this table, meaning the CTA slide
   // (every carousel's slide 5, always) had zero length enforcement. Real gap, closed 2026-07-20.
-  'cta.html': { HEADLINE_HTML: 70, SUBHEAD: 85, CTA_TEXT: 30 },
+  // SUBHEAD bumped 85->100 (2026-07-22): a real generation ran 91 chars against this budget --
+  // `.sub` has no max-width and the whole `.slide` is vertically centered (justify-content:center,
+  // not a fixed-height reserved zone), so real slack here too. High-leverage fix -- cta.html is
+  // slide 5 of EVERY carousel, so this budget's violations compound across every single test.
+  'cta.html': { HEADLINE_HTML: 70, SUBHEAD: 100, CTA_TEXT: 30 },
 }
 
 // Real bug found live (2026-07-21, Photo Grid): these 6 templates support a dual mode (a plain
@@ -70,8 +80,16 @@ export type GuardrailViolation =
   | { type: 'missing_required_text'; fields: string[] }
 
 /** Strips markup before counting -- budgets are measured against visible text length, not HTML. */
-function textLength(html: string): number {
+// Exported (2026-07-22, caption-consistency fix) -- pipeline.ts needs the exact same measure to
+// pre-compute a shared font size across a carousel's slides, not a second, potentially-drifted
+// length calculation.
+export function textLength(html: string): number {
   return html.replace(/<[^>]+>/g, '').length
+}
+
+// Exported (2026-07-22, same fix) -- real per-template budgets, not a second hand-copied table.
+export function budgetsFor(templateFile: string): Record<string, number> | undefined {
+  return CHAR_BUDGETS[templateFile]
 }
 
 export function checkCharBudgets(

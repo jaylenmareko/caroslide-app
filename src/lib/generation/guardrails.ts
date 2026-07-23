@@ -34,7 +34,16 @@ const CHAR_BUDGETS: Record<string, Record<string, number>> = {
   // protecting quality, it was just manufacturing avoidable repairs. 320/145 comfortably covers the
   // real observed range with margin; still a real ceiling, not removed.
   '12-hook-block.html': { HEADLINE_HTML: 145, STORY_HTML: 320 },
-  '2-split-cover.html': { CAPTION_HTML: 165, STAT_LABEL: 40 },
+  // CAPTION_HTML bumped 165->185 (2026-07-22), same reasoning/value as 1-cover-circles.html above:
+  // a real generation ran 199 chars against this budget, and `.textzone` here is `flex:1` (real
+  // slack, confirmed by reading the template's own CSS, not guessed) -- NOT bumping the OTHER
+  // templates still at 165 (3-flip.html, 8-photo-grid.html) in the same pass, since those two use a
+  // genuinely FIXED-height, top-anchored zone instead of flex:1/vertically-centered -- overflowing
+  // text there would visually bleed into the zone below rather than cleanly resize, so their
+  // existing shrink-to-fit repair path is the safer real protection until each is verified with an
+  // actual boundary render, not a blanket budget increase applied to every template that shares
+  // this default.
+  '2-split-cover.html': { CAPTION_HTML: 185, STAT_LABEL: 40 },
   '4-vertical-split.html': { CAPTION_HTML: 165, STAT_LABEL: 40 },
   '6-minimal-magazine.html': { HEADLINE_HTML: 165, STORY_HTML: 250, STAT_LABEL: 40 },
   '8-photo-grid.html': { CAPTION_HTML: 165, STAT_LABEL: 40 },

@@ -7,9 +7,10 @@
      the headline zone at once. Fill whichever pair fits (plain caption vs. a stat takeover) and
      leave the other pair's placeholders unset — an empty div renders invisibly.
 
-     FORMAT SCALING: width is fixed 1080 across formats. HEAD_H is the one measurement that should
-     vary by format/slide-type (taller headline zone reads fine on a 1920 Story canvas, cramped on
-     a 1080 Square) — everything below it is flex:1 and fills the remainder automatically. -->
+     FORMAT SCALING: width is fixed 1080. HEAD_H is the one measurement that would need to vary by
+     format/slide-type if a taller or shorter canvas is ever used again -- everything below it is
+     flex:1 and fills the remainder automatically. Only Post (1080x1350) is in real use as of
+     2026-07-23 (Square/Story removed from the platform). -->
 <!doctype html>
 <html>
 <head>

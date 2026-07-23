@@ -59,7 +59,7 @@ const globalRenderLimit = createLimiter(2)
 
 // Exported (2026-07-21, chat-editing build) -- a single-slide edit re-render needs the same real
 // canvas height as initial generation, keyed the same way.
-export const CANVAS_H: Record<Format, number> = { Post: 1350, Square: 1080, Story: 1920 }
+export const CANVAS_H: Record<Format, number> = { Post: 1350 }
 
 // Extracted into its own exported function (2026-07-21, chat-editing build) -- a single-slide edit
 // re-render needs the exact same brand values (colors, logo/Caroslide-wordmark fallback, font) as

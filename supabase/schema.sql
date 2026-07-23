@@ -5,7 +5,7 @@ create table if not exists public.carousels (
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Untitled carousel',
   angle text not null check (angle in ('Value', 'Growth', 'Education')),
-  format text not null check (format in ('Post', 'Square', 'Story')),
+  format text not null check (format in ('Post')),
   look text not null check (look in ('Circles + Photo', 'Plain Text', 'Bold Stat')),
   brief text,
   slides jsonb not null default '[]'::jsonb, -- array of { url: string }

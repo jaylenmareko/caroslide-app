@@ -91,7 +91,7 @@ function Step3Carousel({ images }: { images: string[] }) {
 const FAQS = [
   {
     q: 'What is Caroslide and how does it work?',
-    a: 'Pick an angle (Value, Growth, or Education), a format, and a look. Tell us about your brand. Caroslide writes the copy, designs the slides, and hands you five finished images — ready to post.',
+    a: 'Pick an angle (Value, Growth, or Education) and a look. Tell us about your brand. Caroslide writes the copy, designs the slides, and hands you five finished images — ready to post.',
   },
   {
     q: 'Do I need to write or design anything myself?',
@@ -100,10 +100,6 @@ const FAQS = [
   {
     q: 'What if I don’t like the first draft?',
     a: 'Tell the chat what to change — "punchier hook on slide 2," "swap the CTA" — and it edits the draft in place. No re-generating from scratch.',
-  },
-  {
-    q: 'Which formats does Caroslide support?',
-    a: 'Post (feed carousel), Square (feed or LinkedIn), and Story — pick whichever fits where you’re posting.',
   },
   {
     q: 'Can I use my own brand colors and photos?',

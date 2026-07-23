@@ -230,20 +230,11 @@ export async function generateCaptions(input: {
     ? `The user's brief: "${input.brief.trim()}"\n\nParse this by shape: a bare topic phrase is the subject; a detailed paragraph should be extracted concretely, not compressed away -- a specific claim or credential beats a generic rewording. ${research ? "Real research findings are provided above -- use them, and if they contradict an assumption in the brief (e.g. the brief assumes X but the research shows otherwise), write the honest version, don't just repeat the brief's premise." : 'No research findings were available for this brief (lookup failed or returned nothing) -- write from the brief itself, don\'t invent statistics or sources you can\'t back.'}`
     : `No brief was given and no research was possible without one -- write a real, honest, generically true carousel for this Angle/Look without inventing specific statistics, studies, or sources you can't back.${input.voiceDescription ? ' Weight it toward the voice/audience notes below.' : ''}`
 
-  // Real bug found and fixed 2026-07-21: this call previously never received `format` at all --
-  // the prompt claimed the model "has already been told" it, but Format (Post/Square/Story) only
-  // ever reached the render step (CANVAS_H), never this call. The canvas WIDTH is always 1080px;
-  // only the HEIGHT differs, so Square is meaningfully shorter (less vertical room per word) and
-  // Story meaningfully taller than Post -- worth telling the model, since the per-template
-  // character budgets in guardrails.ts were only empirically measured against Post's 1350px
-  // height (see initial-generation-behavior.md's Captions section) and haven't been separately
-  // measured for Square/Story. Giving qualitative guidance here (favor the tighter end on Square,
-  // a little more room on Story) is a reasonable stopgap; the guardrail's hard ceiling is
-  // unchanged and still Post-tuned regardless of what the model writes.
+  // Square/Story removed 2026-07-23 (Jaylen: focus strictly on Post) -- this used to vary by
+  // Format, but Post is the only format now and the word budgets below were always measured
+  // against it, so the guidance is just a flat statement of that fact.
   const formatGuidance: Record<Format, string> = {
     Post: 'Post (1080x1350) is the format these word budgets were measured against -- use them as given.',
-    Square: 'Square (1080x1080) is 20% shorter than Post -- favor the TIGHTER end of the word budget below, every word costs more vertical room here.',
-    Story: 'Story (1080x1920) is 42% taller than Post -- there is a little more breathing room than the budget below implies, but do not pad captions just to fill space.',
   }
 
   // Real product decision (Jaylen, 2026-07-21): some templates reserve their strong, distinctive

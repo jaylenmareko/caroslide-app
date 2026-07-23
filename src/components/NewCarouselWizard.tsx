@@ -1,47 +1,12 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import type { Angle, BrandKit, Format, Look, TemplateVariant } from '@/lib/types'
+import type { Angle, BrandKit, Look, TemplateVariant } from '@/lib/types'
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
 import { createCarousel, saveBrandKit } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 
 const RECOMMENDED_LOOK: Look = 'Circles + Photo'
-
-const FORMATS: { title: Format; desc: string }[] = [
-  { title: 'Post', desc: 'Feed carousel — needs a real hook.' },
-  { title: 'Square', desc: 'Feed or LinkedIn, same idea.' },
-  { title: 'Story', desc: 'Warm audience — hook optional.' },
-]
-
-// Real canvas dimensions from the /carousel skill's templates -- width is always
-// 1080, only height differs (1350 / 1080 / 1920). Using an SVG viewBox (not CSS
-// aspect-ratio + max-width) because that combo doesn't reliably shrink both
-// dimensions together -- SVG's native viewBox scaling does, like object-fit:contain.
-const FORMAT_CANVAS: Record<Format, [number, number]> = {
-  Post: [1080, 1350],
-  Square: [1080, 1080],
-  Story: [1080, 1920],
-}
-const FORMAT_LABEL: Record<Format, string> = {
-  Post: '4:5',
-  Square: '1:1',
-  Story: '9:16',
-}
-
-function FormatMockup({ format }: { format: Format }) {
-  const [w, h] = FORMAT_CANVAS[format]
-  return (
-    <div className="format-mock">
-      <svg className="format-mock-frame" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet">
-        <rect x="14" y="14" width={w - 28} height={h - 28} rx="24" fill="none" stroke="var(--line-strong)" strokeWidth="14" strokeDasharray="26 20" />
-        <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle" fontSize="72" fontWeight="700" fill="var(--ink-faint)">
-          {FORMAT_LABEL[format]}
-        </text>
-      </svg>
-    </div>
-  )
-}
 
 const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Value', desc: 'Direct tips, no story.' },
@@ -162,8 +127,6 @@ export default function NewCarouselWizard({
   initialBrief?: string
 }) {
   const [step, setStep] = useState(0)
-  const [format, setFormat] = useState<Format>('Post')
-  const [formatTouched, setFormatTouched] = useState(false)
   const [angle, setAngle] = useState<Angle>('Value')
   const [angleTouched, setAngleTouched] = useState(false)
   const [look, setLook] = useState<Look>(RECOMMENDED_LOOK)
@@ -193,31 +156,25 @@ export default function NewCarouselWizard({
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
   const hasVariantStep = effectiveLook !== 'Plain Text' && effectiveLook !== 'Bold Hook'
-  const brandColorStep = hasVariantStep ? 4 : 3
-  const composerStep = 3 + (hasVariantStep ? 1 : 0) + 1
+  const brandColorStep = hasVariantStep ? 3 : 2
+  const composerStep = 2 + (hasVariantStep ? 1 : 0) + 1
 
   const stepTitle =
-    step === 0 ? 'Choose a Format'
-    : step === 1 ? 'Choose an Angle'
-    : step === 2 ? 'Choose a Look'
-    : hasVariantStep && step === 3 ? 'Choose a Style for Your Selected Look'
+    step === 0 ? 'Choose an Angle'
+    : step === 1 ? 'Choose a Look'
+    : hasVariantStep && step === 2 ? 'Choose a Style for Your Selected Look'
     : step === composerStep ? 'Tell Us Everything'
     : 'Add Your Brand Kit'
 
-  function pickFormat(f: Format) {
-    setFormat(f)
-    setFormatTouched(true)
-    setStep(1)
-  }
   function pickAngle(a: Angle) {
     setAngle(a)
     setAngleTouched(true)
-    setStep(2)
+    setStep(1)
   }
   function pickLook(l: Look) {
     setLook(l)
     setLookTouched(true)
-    setStep(3)
+    setStep(2)
   }
   function pickVariant(v: TemplateVariant) {
     setTemplateVariant(v)
@@ -337,7 +294,7 @@ export default function NewCarouselWizard({
       try {
         await createCarousel({
           angle,
-          format,
+          format: 'Post',
           look: effectiveLook,
           templateVariant: hasVariantStep ? templateVariant : null,
           brief,
@@ -381,24 +338,6 @@ export default function NewCarouselWizard({
 
       <div className={`wiz-step${step === 0 ? ' active' : ''}`}>
         <div className="pick-row">
-          {FORMATS.map((f) => (
-            <div
-              key={f.title}
-              className={`pick-card${formatTouched && format === f.title ? ' selected' : ''}`}
-              onClick={() => pickFormat(f.title)}
-            >
-              <div className="pick-card-preview">
-                <FormatMockup format={f.title} />
-              </div>
-              <div className="title">{f.title}</div>
-              <div className="desc">{f.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className={`wiz-step${step === 1 ? ' active' : ''}`}>
-        <div className="pick-row">
           {ANGLES.map((a) => (
             <div
               key={a.title}
@@ -415,7 +354,7 @@ export default function NewCarouselWizard({
         </div>
       </div>
 
-      <div className={`wiz-step${step === 2 ? ' active' : ''}`}>
+      <div className={`wiz-step${step === 1 ? ' active' : ''}`}>
         <div className="pick-row pick-row-2col">
           {LOOKS.map((l) => (
             <div
@@ -439,7 +378,7 @@ export default function NewCarouselWizard({
       </div>
 
       {hasVariantStep && (
-        <div className={`wiz-step${step === 3 ? ' active' : ''}`}>
+        <div className={`wiz-step${step === 2 ? ' active' : ''}`}>
           <div className="variant-look-context">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="variant-look-context-thumb" src={LOOK_PREVIEW[effectiveLook]} alt="" />

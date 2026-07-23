@@ -1,5 +1,9 @@
 export type Angle = 'Value' | 'Growth' | 'Education'
-export type Format = 'Post' | 'Square' | 'Story'
+// Square and Story were removed 2026-07-23 (Jaylen: focus strictly on Post) -- never had real
+// live usage (every test all build used Post), and Square/Story's character budgets were only
+// ever a stopgap qualitative guess, never separately measured. 'Post' kept as a named type
+// (not inlined everywhere) since Carousel.format still exists as a real column.
+export type Format = 'Post'
 export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus' | 'Bold Hook'
 
 // Circles + Photo, Bold Stat, and Photo Focus each map to more than one real

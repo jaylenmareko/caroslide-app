@@ -20,6 +20,22 @@ export function unresolvedPlaceholders(filledHtml: string): string[] {
   return found ? Array.from(new Set(found)) : []
 }
 
+// A placeholder with no `|default` clause has nothing to fall back to -- fillTemplate leaves it
+// as literal broken `{{FIELD}}` text if the model skips it. Real bug found live (2026-07-22,
+// 12-hook-block.html's HEADLINE_HTML): the model kept treating a "valid key" as an optional one,
+// since nothing distinguished required-with-no-fallback from merely-allowed. Scans the template's
+// own real HTML rather than hand-maintaining a second list, so this can never drift from the
+// template file itself.
+export function requiredPlaceholderFields(templateHtml: string): Set<string> {
+  const required = new Set<string>()
+  const re = /\{\{([A-Z0-9_]+)(?:\|([^}]*))?\}\}/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(templateHtml))) {
+    if (match[2] === undefined) required.add(match[1])
+  }
+  return required
+}
+
 const TEMPLATES_DIR = path.join(process.cwd(), 'src/lib/generation/templates')
 
 export async function loadTemplate(templateFile: string): Promise<string> {
@@ -29,6 +45,13 @@ export async function loadTemplate(templateFile: string): Promise<string> {
 export class RenderError extends Error {}
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+// Cloudflare's own error code for "the headless browser navigation timed out" -- returned as a 422,
+// which isn't in RETRYABLE_STATUS (422 usually means a permanently malformed request, not worth
+// retrying). A navigation timeout is genuinely transient (slow page load, not a bad request) and
+// found live 2026-07-22 hard-failing a whole carousel on its first and only occurrence -- check the
+// body for this specific code rather than retrying every 422 blind, since a real malformed-HTML 422
+// (if one ever occurs) should still fail fast, not burn 3 retries on something that can't succeed.
+const RETRYABLE_CLOUDFLARE_ERROR_CODES = new Set([6002])
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -101,7 +124,16 @@ export async function renderSlide(
     lastError = new RenderError(
       `Cloudflare screenshot API returned ${res.status} for ${templateFile}: ${body.slice(0, 500)}`
     )
-    if (!RETRYABLE_STATUS.has(res.status) || attempt === maxAttempts) throw lastError
+
+    let isRetryableTimeout = false
+    try {
+      const parsedBody = JSON.parse(body) as { errors?: Array<{ code?: number }> }
+      isRetryableTimeout = parsedBody.errors?.some((e) => e.code !== undefined && RETRYABLE_CLOUDFLARE_ERROR_CODES.has(e.code)) ?? false
+    } catch {
+      // Non-JSON body -- leave isRetryableTimeout false, fall through to the status-only check.
+    }
+
+    if ((!RETRYABLE_STATUS.has(res.status) && !isRetryableTimeout) || attempt === maxAttempts) throw lastError
 
     // Real, repeated pattern (2026-07-21): a 429 on this endpoint consistently hit the LAST
     // (5th) render call of a carousel, 4 times in one night -- and manually waiting ~2 minutes
@@ -113,10 +145,15 @@ export async function renderSlide(
     if (res.status === 429) {
       const retryAfterHeader = res.headers.get('Retry-After')
       const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN
-      const waitMs = Number.isFinite(retryAfterSeconds)
+      const baseWaitMs = Number.isFinite(retryAfterSeconds)
         ? Math.min(retryAfterSeconds * 1000, 90000)
         : 15000 * 2 ** (attempt - 1) // 15s, 30s, 60s
-      await sleep(waitMs)
+      // Jitter added 2026-07-22: now that pipeline.ts renders multiple slides concurrently, a 429
+      // can legitimately hit several of them within the same rate-limit window at once -- a fixed
+      // backoff means they'd all retry at the exact same computed instant and likely re-collide
+      // on the same window again. +/-20% random jitter spreads simultaneous retries apart without
+      // meaningfully changing the real wait for any single one.
+      await sleep(baseWaitMs * (0.8 + Math.random() * 0.4))
     } else {
       await sleep(2000 * 2 ** (attempt - 1)) // 2s, 4s, 8s
     }

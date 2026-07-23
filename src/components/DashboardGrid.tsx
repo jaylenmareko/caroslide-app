@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Carousel } from '@/lib/types'
 import { timeAgo } from '@/lib/types'
 import { deleteCarousel } from '@/lib/actions'
 
-export default function DashboardGrid({ carousels: initialCarousels }: { carousels: Carousel[] }) {
+type DashboardCarousel = Pick<Carousel, 'id' | 'title' | 'angle' | 'format' | 'updated_at' | 'slides'>
+
+export default function DashboardGrid({ carousels: initialCarousels }: { carousels: DashboardCarousel[] }) {
   const [carousels, setCarousels] = useState(initialCarousels)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -47,7 +50,7 @@ export default function DashboardGrid({ carousels: initialCarousels }: { carouse
           </div>
         </Link>
 
-        {carousels.map((c) => (
+        {carousels.map((c, i) => (
           <div
             key={c.id}
             className="dash-card"
@@ -69,8 +72,24 @@ export default function DashboardGrid({ carousels: initialCarousels }: { carouse
             </button>
             <Link href={`/carousel/${c.id}`} className="dash-card-link">
               <div className="thumb">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.slides[0]?.url} alt="" />
+                {c.slides[0]?.url && (
+                  <Image
+                    src={c.slides[0].url}
+                    alt=""
+                    fill
+                    sizes="(max-width: 700px) 45vw, 220px"
+                    style={{ objectFit: 'cover' }}
+                    // Real ask (2026-07-22, Jaylen): cards shouldn't visibly "load in" -- priority
+                    // skips next/image's default lazy-loading (which waits for an
+                    // IntersectionObserver check before even starting the fetch) and adds a
+                    // <link rel="preload"> so the browser starts fetching immediately on page
+                    // load. Capped to the first 8 -- roughly the first couple of rows on a normal
+                    // screen -- so a long list doesn't force-eager-load everything and compete for
+                    // bandwidth; cards past that still benefit from the smaller optimized size
+                    // from the earlier fix, just not force-prioritized.
+                    priority={i < 8}
+                  />
+                )}
               </div>
               <div className="meta">
                 <div className="k">{c.title}</div>

@@ -84,6 +84,7 @@ const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Photo Focus', desc: 'Clean photo layouts, no circles or stat.' },
   { title: 'Plain Text', desc: 'One strong cover, plain slides after.' },
   { title: 'Bold Stat', desc: 'A number takes over the frame.' },
+  { title: 'Bold Hook', desc: 'No photo -- a punchy hook headline on a bold color block.' },
 ]
 
 // Real rendered screenshots of the actual /carousel skill templates (real fonts,
@@ -94,6 +95,7 @@ const LOOK_PREVIEW: Record<Look, string> = {
   'Photo Focus': '/template-previews/2-side-by-side.png',
   'Plain Text': '/template-previews/7-plain-text.png',
   'Bold Stat': '/template-previews/5-bold-stat.png',
+  'Bold Hook': '/template-previews/12-hook-block.png',
 }
 
 function LookMockup({ look }: { look: Look }) {
@@ -190,7 +192,7 @@ export default function NewCarouselWizard({
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
-  const hasVariantStep = effectiveLook !== 'Plain Text'
+  const hasVariantStep = effectiveLook !== 'Plain Text' && effectiveLook !== 'Bold Hook'
   const brandColorStep = hasVariantStep ? 4 : 3
   const composerStep = 3 + (hasVariantStep ? 1 : 0) + 1
 

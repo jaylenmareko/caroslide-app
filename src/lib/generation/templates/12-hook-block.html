@@ -1,0 +1,84 @@
+<!-- VARIANT 12: Hook Block. Added 2026-07-22 after auditing CarouselMaker.co's real template
+     library (Jaylen's ask: "more viral looking carousels") -- every other Caroslide template is
+     photo-led (a hero photo with a caption overlay); this is the one deliberately NOT photo-led.
+     The dominant real format for high-performing IG/LinkedIn creator carousels right now is a flat
+     bold color block + a giant punchy hook headline, no photo at all -- this template is that
+     format, not a photo template with the photo removed.
+
+     Single mode only (kicker + headline + story) -- no stat-takeover pair, and NOT the
+     headline-only-OR-story-only either/or split that 6-minimal-magazine.html/11-single-circle.html
+     use. Real bug found live (2026-07-22, first real generation): the model kept pattern-matching
+     THIS template onto that other, more common 3-way convention and left HEADLINE_HTML completely
+     blank whenever it wrote a STORY_HTML paragraph, shipping a literal unresolved
+     "{{HEADLINE_HTML}}" on every slide. HEADLINE_HTML is the one required field here (no
+     `|default`, on purpose) -- KICKER is optional, STORY_HTML is optional supporting detail under
+     it, but HEADLINE_HTML must always be written, every slide, no exceptions.
+
+     Bold Stat Look only ever routes to the 4 STAT_VARIANTS files (see NewCarouselWizard.tsx); this
+     template is never reachable from that Look, so a STAT_NUMBER/STAT_LABEL pair here would be
+     dead markup with no way to invoke it. Left out on purpose, not an oversight.
+
+     No embedded CTA-pill graphic (a real element on CarouselMaker's templates) -- every Caroslide
+     carousel already ends on a dedicated cta.html slide; a second CTA button on a content slide
+     would compete with that, not add to it.
+
+     FORMAT SCALING: .block is flex column, height:{{CANVAS_H}}px -- .stage is flex:1 and
+     auto-fills the remainder under the logo, so nothing here needs per-format tuning beyond the
+     existing CANVAS_H mechanism every other template already uses. -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+{{FONT_LINK_HTML|}}
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
+  .block { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; background:linear-gradient(145deg, {{PRIMARY}} 0%, #0a0a0a 68%); overflow:hidden; }
+
+  /* Real bug caught on the first real render (2026-07-22): a hook headline is SUPPOSED to be
+     short -- but top-anchoring the text (deliberate, see .stage's comment) means short copy left
+     the entire bottom two-thirds of the frame as a dead, empty void, same category of complaint
+     Jaylen had about Photo Grid's inner slides earlier tonight. A text-length-independent glow
+     anchored low in the frame gives the bottom real visual weight regardless of how short the
+     headline ends up being, without touching the safe top-anchored text growth direction at all. */
+  .glow { position:absolute; bottom:-320px; left:-160px; width:900px; height:900px; border-radius:50%; background:radial-gradient({{SECONDARY}} 0%, transparent 70%); opacity:0.28; filter:blur(40px); z-index:1; }
+  .glow2 { position:absolute; bottom:-260px; right:-220px; width:700px; height:700px; border-radius:50%; background:radial-gradient({{PRIMARY}} 0%, transparent 70%); opacity:0.35; filter:blur(40px); z-index:1; }
+
+  /* Pure-CSS dot-grid accent -- same corner-decoration idea CarouselMaker's templates use (a
+     small repeating motif, not a stock photo), done as a radial-gradient tile so it costs no
+     image asset and automatically tints with the brand's own SECONDARY color. */
+  .dots { position:absolute; top:60px; right:60px; width:160px; height:160px; opacity:0.35; background-image:radial-gradient({{SECONDARY}} 2.5px, transparent 2.5px); background-size:18px 18px; z-index:1; }
+
+  .logo { position:absolute; top:50px; left:60px; font-size:32px; font-weight:900; letter-spacing:1px; z-index:5; }
+  .logo .a { color:{{SECONDARY}}; } .logo .b { color:#ffffff; }
+  .logo img { height:32px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
+
+  /* Top-anchored (justify-content:flex-start), same reasoning 8-photo-grid.html's .head already
+     documents: text can only grow DOWNWARD from a fixed top offset, never back up into the logo,
+     regardless of how long the headline/story end up being. */
+  .stage { flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding:190px 85px 90px; position:relative; z-index:2; }
+
+  .kicker { font-size:26px; font-weight:800; color:{{SECONDARY}}; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; }
+
+  .headline { font-size:{{HEADLINE_SIZE|78px}}; font-weight:900; line-height:1.08; letter-spacing:-1px; }
+  .headline .c1 { color:{{SECONDARY}}; }
+  .headline .c2 { color:#ffffff; }
+  .headline .c3 { color:{{PRIMARY}}; -webkit-text-stroke:2px #ffffff; }
+
+  .story { font-size:32px; font-weight:600; line-height:1.45; color:#d8d8d8; margin-top:36px; max-width:880px; }
+</style>
+</head>
+<body>
+  <div class="block">
+    <div class="glow"></div>
+    <div class="glow2"></div>
+    <div class="dots"></div>
+    <div class="logo">{{LOGO_HTML}}</div>
+    <div class="stage">
+      <div class="kicker">{{KICKER|}}</div>
+      <div class="headline">{{HEADLINE_HTML}}</div>
+      <div class="story">{{STORY_HTML|}}</div>
+    </div>
+  </div>
+</body>
+</html>

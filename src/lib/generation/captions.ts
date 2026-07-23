@@ -5,9 +5,10 @@ import { readFile } from 'fs/promises'
 import path from 'path'
 import type { Angle, Format, Look, TemplateVariant } from '@/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
-import { loadTemplate } from './render'
+import { loadTemplate, requiredPlaceholderFields } from './render'
 import { tavilySearch } from './research'
 import { photosNeeded } from './images'
+import { EDITABLE_FIELDS } from './editableFields'
 
 const anthropic = new Anthropic()
 const REFERENCE_DIR = path.join(process.cwd(), 'reference')
@@ -65,6 +66,24 @@ export const ContentValues = z.object({
   CTA_TEXT: z.string().optional(),
 })
 
+// Real bug found live (2026-07-22, right after the per-slide-call redesign): with each slide
+// generated in isolation, the model started using WRONG field names for content slides -- e.g.
+// STATEMENT_HTML/SUBHEAD/TAGLINE/STAT_NUMBER on Bold Hook, a template that only ever has
+// KICKER/HEADLINE_HTML/STORY_HTML -- and even wrote the literal string "HEADLINE_HTML" as a
+// field's VALUE, a clear sign of genuine confusion about which of ContentValues' 10 possible keys
+// actually apply to THIS specific template. The original 5-in-1 call never showed this (the
+// other 4 slides' context may have implicitly reinforced the right fields); each isolated call
+// needs to be told explicitly. Reuses editableFields.ts's real per-template field map (already
+// built for the click-in-place editor) rather than a second, drifted list -- filtered to just the
+// 'text' kind entries that are also real ContentValues keys (excludes photo fields, and excludes
+// cta.html's MICRO_TEXT, which has its own template default and was never part of this schema).
+const CONTENT_VALUES_KEYS = new Set(Object.keys(ContentValues.shape))
+function validValuesFieldsFor(templateFile: string): string[] {
+  return (EDITABLE_FIELDS[templateFile] ?? [])
+    .filter((f) => f.kind === 'text' && CONTENT_VALUES_KEYS.has(f.field))
+    .map((f) => f.field)
+}
+
 // Generic photo slots, in the same top-to-bottom order the template's own HTML presents its real
 // {{...IMG}} placeholders (told explicitly in the prompt below). NOT real field names, and NOT a
 // URL -- a short scene-level search brief per slot (e.g. "man applying sunscreen outdoors photo").
@@ -75,23 +94,70 @@ const PhotoBriefs = z.object({
   PHOTO_3: z.string().optional(),
 })
 
-const SlideOutput = z
-  .object({
-    photoBriefs: PhotoBriefs,
-    // Only the fields that apply to whichever mode this slide uses, per the dual/triple-mode
-    // conventions in the template's own comments below -- leave every other field unset/absent.
-    values: ContentValues,
-  })
-  .refine((slide) => Object.values(slide.values).some((v) => v && v.trim().length > 0), {
-    message: 'values must not be empty -- every slide needs real caption/headline content',
-  })
+const requireRealContent = {
+  refine: (slide: { values: Record<string, unknown> }) =>
+    Object.values(slide.values).some((v) => typeof v === 'string' && v.trim().length > 0),
+  message: 'values must not be empty -- every slide needs real caption/headline content',
+}
 
-const GenerationOutput = z.object({
-  title: z.string().max(60),
-  slides: z.array(SlideOutput).length(5),
-})
+// Real bug found live (2026-07-22, AFTER the wrong-key whitelist fix above shipped): a per-template
+// prose "these keys are REQUIRED" instruction still let the model just omit HEADLINE_HTML on
+// 12-hook-block.html and pour the same content into STORY_HTML/CTA_TEXT instead -- because
+// ContentValues makes every key `.optional()`, the schema itself never actually forbade skipping a
+// required key, so "required" was pure prose the model could and did ignore. Real fix: build the
+// `values` schema PER TEMPLATE, at the moment each of the 5 calls is made, from the same two real
+// sources of truth already used for the prose whitelist (validValuesFieldsFor for which keys apply,
+// requiredPlaceholderFields for which of those have no `|default` in the template's own HTML) --
+// and make a required field a plain non-optional z.string() instead of `.optional()`. A required
+// (non-optional) object key is the one construct this SDK/API has reliably enforced all session
+// (title/photoBriefs/values themselves never once went missing); this makes the same guarantee
+// apply per-field instead of just per-object, closing the actual escape hatch instead of asking
+// the model nicely not to use it.
+function buildValuesSchema(templateFile: string, rawTemplateHtml: string) {
+  const requiredSet = requiredPlaceholderFields(rawTemplateHtml)
+  const shape: Record<string, z.ZodTypeAny> = {}
+  for (const field of validValuesFieldsFor(templateFile)) {
+    shape[field] = requiredSet.has(field) ? z.string().min(1) : z.string().optional()
+  }
+  return z.object(shape)
+}
 
-export type GeneratedCarousel = z.infer<typeof GenerationOutput>
+function slideSchemasFor(valuesSchema: z.ZodObject<Record<string, z.ZodTypeAny>>) {
+  const shape = z.object({ photoBriefs: PhotoBriefs, values: valuesSchema })
+  return {
+    slide: shape.refine(requireRealContent.refine, { message: requireRealContent.message }),
+    cover: shape.extend({ title: z.string().max(60) }).refine(requireRealContent.refine, {
+      message: requireRealContent.message,
+    }),
+  }
+}
+
+export type GeneratedCarousel = {
+  title: string
+  slides: Array<{ photoBriefs: z.infer<typeof PhotoBriefs>; values: Record<string, string | undefined> }>
+}
+
+// Real bug found live (2026-07-22, Bold Hook's real generation, confirmed via the same
+// standalone zodOutputFormat-dump discipline as every other zod-SDK finding this session):
+// z.array(SlideOutput).length(5) never actually constrained anything -- this SDK demotes
+// minItems/maxItems to an inert description string (same bug class as tuple prefixItems/record
+// propertyNames/enum values/union literals found earlier), so nothing ever structurally forced
+// the model to return 5 items; it was pure prose instruction, and it kept returning 1-3 slides
+// instead (confirmed across both Growth and Value angles, ruling out an angle-specific
+// writing-style cause). Two workarounds tried and both hit real, separate ceilings: 5
+// separately-required named fields worked in an isolated reproduction but the real production
+// schema was rejected outright with "Schema is too complex"; patching the array schema to
+// restore real minItems/maxItems hit a hard, documented Anthropic API limit instead --
+// "'minItems' values other than 0 or 1 are not supported." Exact-length array enforcement is
+// genuinely not possible via structured outputs at all, confirmed, not a guess.
+//
+// Real fix (2026-07-22, per Jaylen's direction): stop asking for all 5 slides in one call.
+// Generate each of the 5 slides with its OWN independent call, each with a single-slide schema
+// (no array, nothing to under-count -- a single required object is the one construct this SDK/
+// API reliably enforces, confirmed by `title`/the old `slides` key never once being missing
+// across dozens of real runs tonight). Costs more total tokens (the shared context repeats per
+// call instead of once) but no wall-clock cost -- the 5 calls run in parallel, same as the
+// already-parallelized photo/render work in pipeline.ts.
 
 export async function generateCaptions(input: {
   angle: Angle
@@ -130,8 +196,8 @@ export async function generateCaptions(input: {
   // this being explicit, a Bold Stat carousel could silently come out in plain-caption mode.
   const modeInstruction =
     input.look === 'Bold Stat'
-      ? 'This carousel\'s Look is "Bold Stat" -- every content slide MUST use the template\'s stat-takeover mode (STAT_NUMBER + STAT_LABEL), even though the same file also supports a plain-caption mode. Leave CAPTION_HTML/HEADLINE_HTML/TAGLINE unset on content slides.'
-      : 'This carousel\'s Look is "' + input.look + '" -- do NOT use stat-takeover mode (STAT_NUMBER/STAT_LABEL) on any content slide even if the template file supports it; that mode is reserved for the separate "Bold Stat" Look. Use whichever non-stat mode the template\'s own comments describe (plain caption, or kicker+headline/story if this is a dual-mode template).'
+      ? 'This carousel\'s Look is "Bold Stat" -- this slide MUST use the template\'s stat-takeover mode (STAT_NUMBER + STAT_LABEL), even though the same file also supports a plain-caption mode. Leave CAPTION_HTML/HEADLINE_HTML/TAGLINE unset.'
+      : 'This carousel\'s Look is "' + input.look + '" -- do NOT use stat-takeover mode (STAT_NUMBER/STAT_LABEL) even if the template file supports it; that mode is reserved for the separate "Bold Stat" Look. Use whichever non-stat mode the template\'s own comments describe (plain caption, or kicker+headline/story if this is a dual-mode template) -- and actually write that field. A short tagline/kicker/headline alone with the caption/story field left blank is NOT valid in this mode -- every non-stat slide needs real supporting body text, not just a one-line label.'
 
   // Real research now happens BEFORE this call, via Tavily (plain HTTP, no Anthropic tool) --
   // not by giving the model its own search tool. That was the actual fix for the refusal bug:
@@ -181,40 +247,31 @@ export async function generateCaptions(input: {
     '8-photo-grid.html': 1,
   }
   const coverOnlyInnerCount = COVER_ONLY_MOTIF_INNER_COUNT[templateFile]
-  const photoSlotsInstruction =
-    coverOnlyInnerCount !== undefined
-      ? `Slide 1 (the cover) needs ${photoCount} real photos: fill PHOTO_1${photoCount >= 2 ? ', PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''} in top-to-bottom order (matching the template's real photo placeholder names) with a short scene-level search brief each (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name. Slides 2-4 use a deliberately simplified version of this same template -- so the cover's distinctive multi-photo layout doesn't repeat identically on every slide -- and need only ${coverOnlyInnerCount} real photo${coverOnlyInnerCount === 1 ? '' : 's'}: fill PHOTO_1${coverOnlyInnerCount >= 2 ? ' and PHOTO_2' : ''}, leave the rest unset. The CTA slide (5) never needs photos -- leave all three unset there.`
-      : `Each of the 4 content slides in this template needs ${photoCount} real photo${photoCount === 1 ? '' : 's'}. The template's own HTML above uses real placeholder names for these (in top-to-bottom order) -- but your response uses generic slots instead: fill PHOTO_1${photoCount >= 2 ? ', PHOTO_2' : ''}${photoCount >= 3 ? ', PHOTO_3' : ''} in that same top-to-bottom order with a short scene-level search brief (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name.${photoCount < 3 ? ` Leave ${photoCount === 1 ? 'PHOTO_2 and PHOTO_3' : 'PHOTO_3'} unset on content slides -- this template doesn't use ${photoCount === 1 ? 'them' : 'it'}.` : ''} The CTA slide (5) never needs photos -- leave all three unset there.`
+  // Each of the 5 slides now gets its own independent generation call (see the real-bug comment
+  // above SlideOutput/CoverSlideOutput for why) -- this is the per-slide photo count instead of
+  // one shared instruction describing all 5 at once. Real bug found live (2026-07-22, Bold Hook's
+  // first real generation, fixed here too): a genuinely photo-less template (photoCount 0) needs
+  // its own branch, not a tweaked conditional, or the instruction ends up self-contradictory
+  // ("needs 0 real photos... fill PHOTO_1").
+  function photoCountForSlide(slideNumber: number): number {
+    if (slideNumber === 5) return 0 // CTA never needs photos
+    if (photoCount === 0) return 0 // genuinely photo-less template (Bold Hook, Plain Text)
+    if (slideNumber === 1) return photoCount // cover gets the full count
+    return coverOnlyInnerCount ?? photoCount // inner slides simplify only for cover-only-motif templates
+  }
 
-  const systemPrompt = `You are writing the real content for a 5-slide Instagram/social carousel. You have already been told the content strategy (Angle), visual template, and format -- your job is ONLY the topic, the images each slide needs (as search briefs, not URLs), and the actual caption/headline copy. Do not reconsider or override the Angle/Look/TemplateVariant choices below, even if the brief seems to suggest a different shape -- the explicit picks outrank an inferred vibe from free text.
+  function photoSlotsInstructionFor(count: number): string {
+    if (count === 0) {
+      return `This slide has no photo placeholders -- leave PHOTO_1, PHOTO_2, and PHOTO_3 unset. Do not invent a photo brief.`
+    }
+    return `This slide needs ${count} real photo${count === 1 ? '' : 's'}. The template's own HTML above uses real placeholder names for these (in top-to-bottom order) -- but your response uses generic slots instead: fill PHOTO_1${count >= 2 ? ', PHOTO_2' : ''}${count >= 3 ? ', PHOTO_3' : ''} in that same top-to-bottom order with a short scene-level search brief (e.g. "man applying sunscreen outdoors photo"), NOT a URL and NOT the placeholder's real name.${count < 3 ? ` Leave ${count === 1 ? 'PHOTO_2 and PHOTO_3' : 'PHOTO_3'} unset -- this slide doesn't use ${count === 1 ? 'them' : 'it'}.` : ''}`
+  }
 
-## Format (${input.format})
-
-${formatGuidance[input.format]}
-
-## Content strategy (Angle = ${input.angle})
-
-${contentStrategies}
-
-## Template conventions (this carousel uses ${templateFile} for all 4 content slides, ${CTA_TEMPLATE} for slide 5, always)
-
-${templatesGuide}
-
-## ${modeInstruction}
-
-## The actual template file for slides 1-4 -- read its own top comment block for exact dual/triple-mode field conventions
-
-\`\`\`html
-${templateHtml}
-\`\`\`
-
-## The CTA template for slide 5 -- always this file, never altered/flipped
-
-\`\`\`html
-${ctaHtml}
-\`\`\`
-
-## Generation rules (images, brief-parsing, captions) -- follow these exactly
+  // Shared across all 5 calls -- the parts of the old single big prompt that don't vary by which
+  // slide is being written. Content-strategy/generation-rules/word-budget/voice sections are
+  // identical for every slide; only the template-conventions block, the framing line, and the
+  // photo-slots instruction differ per slide (built in buildSlideSystemPrompt below).
+  const sharedPromptTail = `## Generation rules (images, brief-parsing, captions) -- follow these exactly
 
 ${generationBehavior}
 
@@ -222,87 +279,162 @@ ${generationBehavior}
 
 Value angle: <=15 words/slide. Narrative (growth): no fixed cap, one story beat per slide. Education: <=15 words on hook/payoff slides, 20-25 on mechanism slides. These are word counts for the writing itself; a separate automated check enforces hard character ceilings per template field after you write, so err toward the tighter end rather than the maximum.
 
-${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA specific voice quirk or founder detail belongs in the caption, not flattened into generic copy.\n` : ''}
-## Photo slots
+${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA specific voice quirk or founder detail belongs in the caption, not flattened into generic copy.\n` : ''}`
 
-${photoSlotsInstruction}
-${input.hasReferenceImages ? 'The user has uploaded their own reference photos for some slides -- still write a photo brief for every slot the template needs (used as a fallback description / for any slot their uploads don\'t cover), the caller decides which slots actually use the upload vs. your brief.' : ''}
+  // Real product decision (2026-07-22): the carousel's overall arc (content-strategies.md's
+  // Angle document) still needs to reach every slide even though each is generated independently
+  // -- each call is told the full arc plus exactly where it sits in it, so slide 2 still reads as
+  // "the myth/counter-claim" etc. without needing to see the other 4 slides' actual text.
+  function buildSlideSystemPrompt(slideNumber: number): string {
+    const isCta = slideNumber === 5
+    const isCover = slideNumber === 1
+    const roleFraming = isCta
+      ? `You are writing ONLY the 5th and final slide of a 5-slide Instagram/social carousel -- the closing CTA slide. The other 4 slides (already written separately) cover the hook/claim/proof/resolution arc for this Angle; your job is just the close (follow-for-more / save-this / clear next step), not a recap of the whole arc.`
+      : `You are writing ONLY slide ${slideNumber} of 5 in an Instagram/social carousel (slide 5 is always a separate CTA slide, not your concern). Based on this Angle's arc (below) and this being slide ${slideNumber} of the 4 content slides, ${isCover ? 'this is the COVER/hook slide -- it carries the most design weight and needs to earn the swipe.' : 'determine this slide\'s specific role in that arc yourself and write accordingly -- do not repeat the cover\'s hook, this slide has its own job in the sequence.'}`
+
+    const count = photoCountForSlide(slideNumber)
+    const templateSection = isCta
+      ? `## The CTA template -- always this file, never altered/flipped\n\n\`\`\`html\n${ctaHtml}\n\`\`\``
+      : `## Template conventions (this carousel uses ${templateFile} for every content slide)\n\n${templatesGuide}\n\n## ${modeInstruction}\n\n## The actual template file -- read its own top comment block for exact dual/triple-mode field conventions\n\n\`\`\`html\n${templateHtml}\n\`\`\``
+
+    const validFields = validValuesFieldsFor(isCta ? CTA_TEMPLATE : templateFile)
+    // Real bug found live (2026-07-22, same day, AFTER the wrong-key fix above shipped): "valid"
+    // isn't the same claim as "required" -- 12-hook-block.html's HEADLINE_HTML has no `|default` in
+    // the template (see that file's own top comment), so leaving it blank ships a literal broken
+    // placeholder, but a whitelist that just lists allowed keys reads as "these are your options,"
+    // and the model kept picking KICKER/STORY_HTML instead and leaving HEADLINE_HTML unset. Scans
+    // the template's real HTML (requiredPlaceholderFields) so required-vs-optional can never drift
+    // from a hand-maintained second list.
+    const requiredHtml = isCta ? ctaHtml : templateHtml
+    const requiredSet = requiredPlaceholderFields(requiredHtml)
+    const requiredFields = validFields.filter((f) => requiredSet.has(f))
+    const optionalFields = validFields.filter((f) => !requiredSet.has(f))
+    const fieldWhitelist = `## Valid "values" keys for this exact template -- do not use any other key\n\nThe ONLY keys this template actually renders are: ${validFields.join(', ')}. The general schema exposes other keys (CAPTION_HTML, SUBHEAD, STATEMENT_HTML, TAGLINE, STAT_NUMBER, STAT_LABEL, etc.) that belong to OTHER templates, not this one -- if a key isn't in the list above, it does not apply here and must stay completely unset. Never write a field's own name (e.g. the literal text "HEADLINE_HTML") as if it were a value -- that is not real content.\n\n${requiredFields.length ? `REQUIRED, no exceptions -- these fields have no fallback text in the template at all, so leaving ${requiredFields.length === 1 ? 'it' : 'any of them'} blank or unset ships a literal broken "{{FIELD_NAME}}" placeholder on the real rendered image: ${requiredFields.join(', ')}. Write real content for ${requiredFields.length === 1 ? 'this field' : 'every one of these fields'} even if another field also carries the slide's main message -- filling one required field does not excuse leaving another one empty.` : ''}${optionalFields.length ? ` Optional, use only if this slide's mode calls for it: ${optionalFields.join(', ')}.` : ''}`
+
+    return `${roleFraming} Your job is ONLY the topic, the image(s) this slide needs (as a search brief, not a URL), and the actual caption/headline copy for THIS slide. Do not reconsider or override the Angle/Look/TemplateVariant choices below, even if the brief seems to suggest a different shape -- the explicit picks outrank an inferred vibe from free text.
+
+## Format (${input.format})
+
+${formatGuidance[input.format]}
+
+## Content strategy (Angle = ${input.angle}) -- the full arc across all 5 slides, for context on where slide ${slideNumber} sits
+
+${contentStrategies}
+
+${templateSection}
+
+${fieldWhitelist}
+
+${sharedPromptTail}
+## Photo slot${count === 1 ? '' : 's'}
+
+${photoSlotsInstructionFor(count)}
+${input.hasReferenceImages ? 'The user has uploaded their own reference photos -- still write a photo brief for every slot this slide needs (used as a fallback description / for any slot their upload doesn\'t cover), the caller decides whether the upload or your brief actually gets used.' : ''}
 ${researchSection}
 ${briefInstruction}
-
-Return exactly 5 slides in order (4 content + 1 CTA). Caption color-clause convention is documented above, and photo-slot filling is documented in "Photo slots" above -- follow both exactly.
+${isCover ? '\nAlso write a real, specific carousel `title` (max 60 chars) -- not a generic restatement of the topic.' : ''}
 
 Do all reasoning and any arithmetic (percentages, unit conversions, word/character counting) yourself, directly in plain text. Do not write or execute code for any part of this task -- there is no tool of any kind available in this request.
 
-CRITICAL, checked automatically after you respond: every single slide's "values" object MUST contain real key-value pairs (the actual caption/headline/stat text for that slide) and every content slide MUST have its required PHOTO_ slots filled with a real scene description, exactly as specified in "Photo slots" above (all 4 content slides need the same count for this template, EXCEPT for the cover-only-motif templates named in "Photo slots" above, where only slide 1 needs the full count and slides 2-4 need fewer). Leaving a required slot unset/empty on any slide is an incomplete, failed response, not a valid shortcut -- write the actual content for all 5 slides before returning.`
+CRITICAL, checked automatically after you respond: "values" MUST contain real key-value pairs (the actual caption/headline/stat text for this slide) and, if this slide needs photos, every required PHOTO_ slot MUST be filled with a real scene description exactly as specified in "Photo slot(s)" above. Leaving a required slot unset/empty is an incomplete, failed response, not a valid shortcut.`
+  }
 
-  const format = zodOutputFormat(GenerationOutput)
-
-  // No tools attached, ever, for this call -- this is the real fix for the refusal bug (Opus was
+  // No tools attached, ever, for these calls -- this is the real fix for the refusal bug (Opus was
   // invoking an ungranted code_execution tool whenever web_search was attached, triggering a
   // safety-classifier refusal that cut responses short; see session log 2026-07-20). Research now
   // happens beforehand via Tavily (plain HTTP, above), handed to the model as plain text instead
   // of giving it its own search tool.
-  async function attempt(messages: Anthropic.MessageParam[]): Promise<string> {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      // 16384 (bumped from 8192, which measured too low for a full 5-slide structured payload).
-      max_tokens: 16384,
-      tools: [],
-      system: systemPrompt,
-      messages,
-      output_config: { format },
-    })
+  //
+  // Generic over the schema (CoverSlideOutput for slide 1, SlideOutput for slides 2-5) -- same
+  // 2-tier retry strategy as before (fresh restart on malformed JSON, same-conversation correction
+  // on valid-but-incomplete content), just scoped to one slide's small response instead of a
+  // 5-slide batch. A single slide's response is small; 4096 is generous headroom, not the 16384
+  // the old 5-in-1 call needed.
+  async function generateOneSlide<T extends z.ZodTypeAny>(systemPrompt: string, schema: T): Promise<z.infer<T>> {
+    const format = zodOutputFormat(schema)
 
-    // Still using .create() instead of .parse() and manually selecting the last text block --
-    // harmless now that there's only ever one block (no tools means no preamble text), but no
-    // reason to revert since .parse()'s first-block-wins behavior was a real bug found here.
-    const textBlocks = message.content.filter((block) => block.type === 'text')
-    console.log(
-      `[generation] captions call: stop_reason=${message.stop_reason}, content blocks=[${message.content.map((b) => b.type).join(', ')}], text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}], usage=${JSON.stringify(message.usage)}`
-    )
-    const finalBlock = textBlocks[textBlocks.length - 1]
-    if (!finalBlock) {
-      throw new Error(`Caption generation returned no text content (stop_reason: ${message.stop_reason})`)
+    async function attempt(messages: Anthropic.MessageParam[]): Promise<string> {
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        tools: [],
+        system: systemPrompt,
+        messages,
+        output_config: { format },
+      })
+      const textBlocks = message.content.filter((block) => block.type === 'text')
+      console.log(
+        `[generation] slide call: stop_reason=${message.stop_reason}, text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}], usage=${JSON.stringify(message.usage)}`
+      )
+      const finalBlock = textBlocks[textBlocks.length - 1]
+      if (!finalBlock) {
+        throw new Error(`Slide generation returned no text content (stop_reason: ${message.stop_reason})`)
+      }
+      console.log(`[generation] slide raw output (${finalBlock.text.length} chars): ${finalBlock.text}`)
+      return finalBlock.text
     }
-    console.log(`[generation] full raw output (${finalBlock.text.length} chars): ${finalBlock.text}`)
-    return finalBlock.text
+
+    const openingMessage: Anthropic.MessageParam = { role: 'user', content: 'Write the real content for this slide now.' }
+
+    const firstRawText = await attempt([openingMessage])
+    let firstError: unknown
+    try {
+      return format.parse(firstRawText)
+    } catch (error) {
+      firstError = error
+      console.log(
+        `[generation] slide attempt failed validation, retrying once: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+
+    const firstErrorMessage = firstError instanceof Error ? firstError.message : String(firstError)
+    const wasMalformedJson = firstErrorMessage.includes('as JSON')
+
+    const secondRawText = wasMalformedJson
+      ? await attempt([
+          openingMessage,
+          {
+            role: 'user',
+            content:
+              'Write the real content for this slide now. Valid JSON only -- watch your string escaping carefully (a straight double-quote inside any text value must be escaped as \\", never left bare), and do not truncate mid-object.',
+          },
+        ])
+      : await attempt([
+          openingMessage,
+          { role: 'assistant', content: firstRawText },
+          {
+            role: 'user',
+            content:
+              'That response left "values" and/or "photoBriefs" empty (or near-empty) -- that is an incomplete response, not a valid shortcut. Write the real caption/headline/stat text and real photo scene description(s) for this slide now, following all the same rules as before.',
+          },
+        ])
+
+    try {
+      return format.parse(secondRawText)
+    } catch (error) {
+      console.log(`[generation] slide retry also failed validation (last 300 chars): ...${secondRawText.slice(-300)}`)
+      throw error
+    }
   }
 
-  const openingMessage: Anthropic.MessageParam = {
-    role: 'user',
-    content: 'Write the real content for this carousel now.',
-  }
+  // Built once per real call (not module scope) -- the schema depends on which template THIS
+  // carousel resolved to, per the real-bug comment above buildValuesSchema/slideSchemasFor.
+  const contentSchemas = slideSchemasFor(buildValuesSchema(templateFile, templateHtml))
+  const ctaSchemas = slideSchemasFor(buildValuesSchema(CTA_TEMPLATE, ctaHtml))
 
-  const firstRawText = await attempt([openingMessage])
-  try {
-    return format.parse(firstRawText)
-  } catch (error) {
-    // Measured live (2026-07-20): Opus can satisfy the JSON schema with `{}` for every slide's
-    // values/photoBriefs while doing almost none of the actual writing (one real run: 21k input
-    // tokens, 125 output tokens, real title, five empty slide objects) -- the .refine() above
-    // catches that as a validation failure. One retry, in the SAME conversation so the model sees
-    // its own incomplete answer plus a direct correction -- much stronger than silently re-issuing
-    // the identical prompt from scratch.
-    console.log(
-      `[generation] first attempt failed validation, retrying once with a direct correction: ${error instanceof Error ? error.message : String(error)}`
-    )
-  }
-
-  const secondRawText = await attempt([
-    openingMessage,
-    { role: 'assistant', content: firstRawText },
-    {
-      role: 'user',
-      content:
-        'That response left "values" and/or "photoBriefs" empty (or near-empty) on one or more slides -- that is an incomplete response, not a valid shortcut. Write the real caption/headline/stat text and real photo scene descriptions for every slide now, following all the same rules as before.',
-    },
+  const [cover, slide2, slide3, slide4, cta] = await Promise.all([
+    generateOneSlide(buildSlideSystemPrompt(1), contentSchemas.cover),
+    generateOneSlide(buildSlideSystemPrompt(2), contentSchemas.slide),
+    generateOneSlide(buildSlideSystemPrompt(3), contentSchemas.slide),
+    generateOneSlide(buildSlideSystemPrompt(4), contentSchemas.slide),
+    generateOneSlide(buildSlideSystemPrompt(5), ctaSchemas.slide),
   ])
 
-  try {
-    return format.parse(secondRawText)
-  } catch (error) {
-    console.log(`[generation] retry also failed validation (last 300 chars): ...${secondRawText.slice(-300)}`)
-    throw error
+  return {
+    title: cover.title,
+    slides: [cover, slide2, slide3, slide4, cta].map((s) => ({
+      photoBriefs: s.photoBriefs,
+      values: s.values as Record<string, string | undefined>,
+    })),
   }
 }

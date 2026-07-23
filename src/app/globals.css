@@ -26,7 +26,7 @@ a { color: inherit; }
 .brand svg { width: 64px; height: 64px; }
 .brand span { font-family: var(--font-brand), serif; font-style: italic; font-weight: 600; font-size: 36px; letter-spacing: -0.3px; color: var(--ink); }
 
-.app-shell { display: flex; min-height: 100vh; cursor: default; user-select: none; }
+.app-shell { display: flex; min-height: 100vh; cursor: default; user-select: none; font-family: var(--font-inter-tight), var(--font); }
 .app-shell input, .app-shell textarea { user-select: text; cursor: auto; }
 .app-main {
   flex: 1; min-width: 0; background: var(--surface); border-radius: 28px; margin: 20px;
@@ -177,7 +177,7 @@ a { color: inherit; }
 }
 .dash-card-delete:hover { background: #b83535; transform: scale(1.08); }
 .dash-card-delete.confirming { background: #b83535; padding: 0 12px; }
-.dash-card .thumb { aspect-ratio: 4/5; overflow: hidden; }
+.dash-card .thumb { aspect-ratio: 4/5; overflow: hidden; position: relative; background: #111; }
 .dash-card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .dash-card .meta { padding: 12px 14px 14px; }
 .dash-card .meta .k {
@@ -459,9 +459,26 @@ a { color: inherit; }
   text-shadow: 0 1px 3px rgba(0,0,0,.7);
 }
 .stage { grid-area: stage; position: relative; width: 100%; max-width: 360px; justify-self: center; }
-.stage-frame { width: 100%; border-radius: 16px; overflow: hidden; background: #111; cursor: zoom-in; border: none; padding: 0; }
-.stage-frame img { width: 100%; display: block; aspect-ratio: 4/5; object-fit: cover; }
+.stage-frame { width: 100%; border-radius: 16px; overflow: hidden; background: #111; position: relative; }
+.stage-frame-img-btn { width: 100%; display: block; border: none; padding: 0; cursor: zoom-in; background: none; }
+.stage-frame-img-btn img { width: 100%; display: block; aspect-ratio: 4/5; object-fit: cover; }
 .chat-group { grid-area: chat; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 480px; justify-self: center; }
+
+/* Click-in-place slide editor (2026-07-22) */
+.stage-edit-toggle {
+  position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; align-items: center; gap: 5px;
+  background: rgba(10,10,10,0.72); color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 100px;
+  padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; backdrop-filter: blur(4px);
+}
+.stage-edit-toggle:hover { background: rgba(10,10,10,0.9); }
+.slide-canvas-editor { position: relative; overflow: hidden; background: #111; }
+.slide-canvas-editor iframe { display: block; }
+.slide-canvas-editor-error, .slide-canvas-editor-loading { aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 13px; color: var(--ink); }
+.slide-canvas-editor-saving {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(10,10,10,0.8); color: #fff;
+  font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 100px; z-index: 20;
+}
+.slide-canvas-editor-file-input { display: none; }
 
 
 .lightbox {
@@ -520,7 +537,7 @@ a { color: inherit; }
 .brand-modal-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; }
 
 /* ---------- auth ---------- */
-.auth-wrap { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--hero-gradient); cursor: default; user-select: none; }
+.auth-wrap { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--hero-gradient); cursor: default; user-select: none; font-family: var(--font-inter-tight), var(--font); }
 .auth-wrap input, .auth-wrap textarea { user-select: text; }
 .auth-top-brand {
   position: absolute; top: 28px; left: 28px; z-index: 5; text-decoration: none;

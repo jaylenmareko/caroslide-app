@@ -1,6 +1,6 @@
 export type Angle = 'Value' | 'Growth' | 'Education'
 export type Format = 'Post' | 'Square' | 'Story'
-export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus'
+export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus' | 'Bold Hook'
 
 // Circles + Photo, Bold Stat, and Photo Focus each map to more than one real
 // /carousel skill template (see NewCarouselWizard.tsx's variantsFor()) -- Plain

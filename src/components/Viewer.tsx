@@ -6,10 +6,37 @@ import type { Carousel, Slide } from '@/lib/types'
 import { BRAND_FONTS, DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/lib/types'
 import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSlide } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
+import SlideCanvasEditor from '@/components/SlideCanvasEditor'
 
 export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [current, setCurrent] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  // Click-in-place editor (2026-07-22) -- a separate mode from the default zoomable image, not a
+  // replacement for it, since most viewing doesn't need editing. Reset on slide switch so a stale
+  // iframe from the previous slide never lingers into the newly-selected one.
+  const [editMode, setEditMode] = useState(false)
+  const [stageWidth, setStageWidth] = useState(340)
+  const stageFrameRef = useRef<HTMLDivElement>(null)
+
+  // "Reset state when a prop/other-state changes" is handled during render (comparing against a
+  // ref of the previous value), not via useEffect -- same pattern/reasoning as Sidebar.tsx's
+  // prevPathname handling, avoids a real react-hooks/set-state-in-effect lint error.
+  const [prevCurrent, setPrevCurrent] = useState(current)
+  if (current !== prevCurrent) {
+    setPrevCurrent(current)
+    setEditMode(false)
+  }
+
+  useEffect(() => {
+    const el = stageFrameRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) setStageWidth(width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(carousel.title)
 
@@ -316,10 +343,41 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
         </button>
 
         <div className="stage">
-          <button className="stage-frame" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={slides[current]?.url} alt="Carousel slide" />
-          </button>
+          <div className="stage-frame" ref={stageFrameRef}>
+            {editMode ? (
+              <SlideCanvasEditor
+                carouselId={carousel.id}
+                slideIndex={current}
+                displayWidth={stageWidth}
+                onSlidesUpdated={commitSlides}
+              />
+            ) : (
+              <button className="stage-frame-img-btn" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={slides[current]?.url} alt="Carousel slide" />
+              </button>
+            )}
+            <button
+              className="stage-edit-toggle"
+              onClick={() => setEditMode((v) => !v)}
+              aria-label={editMode ? 'Done editing' : 'Edit this slide'}
+              title={editMode ? 'Done editing' : 'Click text or photos to edit'}
+            >
+              {editMode ? (
+                'Done'
+              ) : (
+                <svg viewBox="0 0 24 24" width={15} height={15} fill="none">
+                  <path
+                    d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
           <button
             className="stage-arrow left"
             aria-label="Previous slide"

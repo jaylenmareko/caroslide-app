@@ -7,6 +7,9 @@ import type { Look, TemplateVariant } from '@/lib/types'
 // the brief; it's a fixed lookup.
 export function templateFileFor(look: Look, variant: TemplateVariant | null): string {
   if (look === 'Plain Text') return '7-keynote.html'
+  // Bold Hook (added 2026-07-22) is a single-file Look, same as Plain Text -- no sub-variant to
+  // pick, see NewCarouselWizard.tsx's hasVariantStep.
+  if (look === 'Bold Hook') return '12-hook-block.html'
 
   const map: Record<string, string> = {
     Classic: '1-cover-circles.html',

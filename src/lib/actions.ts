@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { generateCarousel, renderAndGuard } from '@/lib/generation/pipeline'
 import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/lib/generation/edit'
+import { loadTemplate, fillTemplate, renderSlide } from '@/lib/generation/render'
+import { EDITABLE_FIELDS, type EditableField } from '@/lib/generation/editableFields'
 
 export async function createCarousel(input: {
   angle: Angle
@@ -241,7 +243,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       newValues[field] = newUrl
     }
 
-    const result = await renderAndGuard(slide.template, newValues, idx + 1)
+    const result = await renderAndGuard(slide.template, newValues, idx + 1, brandKit?.voice_description ?? null)
 
     // Fresh filename per edit, not an overwrite at the same path -- a same-path overwrite keeps
     // the exact same public URL, which risks the browser/any CDN serving a stale cached copy of
@@ -262,6 +264,105 @@ export async function editSlide(carouselId: string, message: string, currentSlid
 
     updatedSlides[idx] = { url: pub.publicUrl, template: slide.template, values: result.values }
   }
+
+  return { type: 'updated', slides: updatedSlides }
+}
+
+export type SlideEditorData = { html: string; canvasH: number; fields: EditableField[] }
+
+/**
+ * Click-in-place editor support (2026-07-22): returns the slide's real filled template HTML (not
+ * the PNG) so the client can render it live in an iframe and let the user click directly on the
+ * actual text/photo elements -- see editableFields.ts for the selector map that makes this
+ * possible without hand-annotating every template file.
+ */
+export async function getSlideEditorHtml(
+  carouselId: string,
+  slideIndex: number
+): Promise<SlideEditorData | { error: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: carousel, error } = await supabase
+    .from('carousels')
+    .select('slides, user_id')
+    .eq('id', carouselId)
+    .single()
+  if (error || !carousel) return { error: 'Could not find this carousel.' }
+  if (carousel.user_id !== user!.id) return { error: 'Not authorized to edit this carousel.' }
+
+  const slides = carousel.slides as Slide[]
+  const slide = slides[slideIndex]
+  if (!slide?.template || !slide.values) {
+    return { error: 'This slide was created before editing was supported -- try a new one.' }
+  }
+
+  const templateHtml = await loadTemplate(slide.template)
+  const html = fillTemplate(templateHtml, slide.values)
+  return { html, canvasH: Number(slide.values.CANVAS_H) || 1350, fields: EDITABLE_FIELDS[slide.template] ?? [] }
+}
+
+/**
+ * Click-in-place editor support: saves ONE field's new value (typed text, or a URL from a direct
+ * photo upload) exactly as given. Deliberately does NOT run through renderAndGuard's AI repair
+ * pass (repairOverBudget/repairMissingText) -- that pipeline exists to fix up AI-GENERATED content
+ * that came out wrong; here the user explicitly typed or picked this value themselves, so
+ * silently resizing or rewriting it out from under them would be wrong, not helpful. Reuses the
+ * same fresh-filename-per-edit + old-file-cleanup discipline as editSlide/createCarousel.
+ */
+export async function updateSlideField(
+  carouselId: string,
+  slideIndex: number,
+  field: string,
+  newValue: string
+): Promise<EditSlideResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: carousel, error: fetchError } = await supabase
+    .from('carousels')
+    .select('slides, user_id')
+    .eq('id', carouselId)
+    .single()
+  if (fetchError || !carousel) return { type: 'error', message: 'Could not find this carousel.' }
+  if (carousel.user_id !== user!.id) return { type: 'error', message: 'Not authorized to edit this carousel.' }
+
+  const slides = carousel.slides as Slide[]
+  const slide = slides[slideIndex]
+  if (!slide?.template || !slide.values) {
+    return { type: 'error', message: 'This slide was created before editing was supported -- try a new one.' }
+  }
+
+  const newValues = { ...slide.values, [field]: newValue }
+  const { png, unresolved } = await renderSlide(slide.template, newValues)
+  if (unresolved.length > 0) {
+    return {
+      type: 'error',
+      message: `That left this slide broken (${unresolved.join(', ')} unresolved) -- try a different value.`,
+    }
+  }
+
+  const newPath = `${user!.id}/${carouselId}/slide-${slideIndex + 1}-${Date.now()}.png`
+  const { error: uploadError } = await supabase.storage
+    .from('carousel-slides')
+    .upload(newPath, png, { contentType: 'image/png' })
+  if (uploadError) return { type: 'error', message: `Failed to save: ${uploadError.message}` }
+
+  const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(newPath)
+
+  const oldPath = storagePathFromPublicUrl(slide.url)
+  if (oldPath) {
+    await supabase.storage.from('carousel-slides').remove([oldPath])
+  }
+
+  const updatedSlides = [...slides]
+  updatedSlides[slideIndex] = { url: pub.publicUrl, template: slide.template, values: newValues }
 
   return { type: 'updated', slides: updatedSlides }
 }

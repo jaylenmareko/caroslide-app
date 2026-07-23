@@ -6,8 +6,55 @@ import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPla
 import { renderSlide } from './render'
 import { checkSlide, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
+import { rewriteCopy } from './edit'
 
 const anthropic = new Anthropic()
+
+// Real bug found live (2026-07-22): timing-based fixes (an i*400ms stagger on each slide's first
+// render, then jitter before repair re-renders) both still 429'd -- across repeated real tests,
+// even spaced-out start times weren't enough. That points at a real CONCURRENCY cap on Cloudflare's
+// Browser Rendering API (a fixed number of simultaneous browser sessions), not just a requests-per-
+// time-window limit -- 5 renders starting a few hundred ms apart can still all be genuinely in
+// flight at once if each takes several seconds, which blowing past a concurrency cap doesn't care
+// how spread out the START times were. A real semaphore -- capping how many renderSlide calls are
+// actually in flight at once, queuing the rest -- addresses that directly instead of guessing at
+// more timing tweaks. 2 is a conservative first real value (Cloudflare's docs describe browser
+// concurrency limits in that range for this API); this is the one lever actually worth tuning if a
+// 429 recurs, not another stagger/jitter number.
+function createLimiter(maxConcurrent: number) {
+  let active = 0
+  const queue: Array<() => void> = []
+  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
+    if (active >= maxConcurrent) {
+      await new Promise<void>((resolve) => queue.push(resolve))
+    }
+    active++
+    try {
+      return await fn()
+    } finally {
+      active--
+      const next = queue.shift()
+      if (next) next()
+    }
+  }
+}
+type Limiter = <T>(fn: () => Promise<T>) => Promise<T>
+const NO_LIMIT: Limiter = (fn) => fn()
+
+// Real gap found live (2026-07-22, Jaylen: "what happens if many users use this at once?"): a
+// limiter created fresh per generateCarousel call only bounds ONE carousel's own slides -- 10
+// concurrent users each get their own independent limiter instance, so up to 10x this cap could
+// still hit Cloudflare's real ACCOUNT-WIDE concurrency quota at once (the same account/API token
+// is shared by every user), reproducing the exact 429 this was built to prevent, just triggered by
+// multiple users instead of one carousel's own 5 slides. A single MODULE-level instance is shared
+// by every request this running server process handles, so total concurrent Cloudflare renders
+// across every user generating at once stays capped, not just one carousel's own slides.
+// Real, worth remembering if this ever scales past one server instance/region (not the case yet --
+// a single Next.js process): this only coordinates requests within ONE running process. Multiple
+// instances would each get their own independent cap again, reopening this same gap at a different
+// layer -- a real cross-instance fix then needs a shared EXTERNAL limiter (e.g. a Redis-backed
+// semaphore), not a bigger in-process number.
+const globalRenderLimit = createLimiter(2)
 
 // Exported (2026-07-21, chat-editing build) -- a single-slide edit re-render needs the same real
 // canvas height as initial generation, keyed the same way.
@@ -130,26 +177,45 @@ const DEFAULT_SIZE_PX: Record<string, number> = {
   STATEMENT_SIZE: 84,
 }
 
-async function resolvePhotos(
+// Split into a sync allocation pass + an async search pass (2026-07-22, generation-speed work) --
+// previously one function did both `.shift()` off the shared reference-image pool AND the real
+// (slow) findUsablePhoto search in the same sequential loop, which forced every slide's photo
+// work to run one after another even though slides don't actually depend on each other. `.shift()`
+// on a shared array is a genuine race if two slides' photo work ever ran concurrently, and pool
+// order matters (earlier slides should get first pick of the user's own uploads) -- so allocation
+// stays a single synchronous pass, run once for all slides before any parallel work starts, and
+// only the real network searches (the actually slow part) move to running concurrently.
+function allocateFromPool(
   photoBriefs: Record<string, string>,
   referenceImagePool: string[]
-): Promise<Record<string, string>> {
-  const resolved: Record<string, string> = {}
+): { preAssigned: Record<string, string>; remaining: Record<string, string> } {
+  const preAssigned: Record<string, string> = {}
+  const remaining: Record<string, string> = {}
   for (const [field, brief] of Object.entries(photoBriefs)) {
     const uploaded = referenceImagePool.shift()
     if (uploaded) {
-      resolved[field] = uploaded
-      continue
-    }
-    const photo = await findUsablePhoto(brief)
-    if (photo) {
-      resolved[field] = photo.url
+      preAssigned[field] = uploaded
     } else {
-      // If sourcing fails entirely (real image search AND the page-scrape fallback both came up
-      // empty), leave the field unset -- the solid-color placeholder fallback below covers it.
-      console.warn(`[generation] photo sourcing failed for ${field} ("${brief}") -- image search + page-scrape fallback both failed`)
+      remaining[field] = brief
     }
   }
+  return { preAssigned, remaining }
+}
+
+async function searchPhotos(photoBriefs: Record<string, string>): Promise<Record<string, string>> {
+  const resolved: Record<string, string> = {}
+  await Promise.all(
+    Object.entries(photoBriefs).map(async ([field, brief]) => {
+      const photo = await findUsablePhoto(brief)
+      if (photo) {
+        resolved[field] = photo.url
+      } else {
+        // If sourcing fails entirely (real image search AND the page-scrape fallback both came up
+        // empty), leave the field unset -- the solid-color placeholder fallback below covers it.
+        console.warn(`[generation] photo sourcing failed for ${field} ("${brief}") -- image search + page-scrape fallback both failed`)
+      }
+    })
+  )
   return resolved
 }
 
@@ -170,6 +236,36 @@ function repairOverBudget(
     repaired[sizeField] = `${Math.round(current * shrinkRatio)}px`
   }
   return repaired
+}
+
+/** Real repair (not just a resize) for a `missing_required_text` or `unresolved_placeholders`
+ * violation -- either way a field was left completely blank (silently, or as a literal
+ * `{{FIELD}}` string that survived to the render), so there's nothing to shrink; regenerate it via
+ * the same rewriteCopy path chat-editing uses, given a plain instruction naming exactly what's
+ * missing. Reuses rewriteCopy rather than a second, drifted "write copy" call.
+ *
+ * Real gap found live (2026-07-22, Bold Hook's first real generation): this previously only
+ * handled `missing_required_text` -- a genuinely blank REQUIRED field (one with no `|default` in
+ * the template, so it renders as a literal unresolved placeholder instead of silently empty) was
+ * caught by checkUnresolvedPlaceholders and even flagged again by vision-review, but nothing ever
+ * actually repaired it -- it just shipped broken every time. Handling both violation types here
+ * closes that for every template, not just this one. */
+async function repairMissingText(
+  values: Record<string, string>,
+  violations: GuardrailViolation[],
+  voiceDescription: string | null
+): Promise<Record<string, string>> {
+  const missing = violations.find((v): v is Extract<GuardrailViolation, { type: 'missing_required_text' }> => v.type === 'missing_required_text')
+  const unresolved = violations.find((v): v is Extract<GuardrailViolation, { type: 'unresolved_placeholders' }> => v.type === 'unresolved_placeholders')
+  if (!missing && !unresolved) return values
+
+  const fields = [...(missing?.fields ?? []), ...(unresolved?.placeholders.map((p) => p.replace(/[{}]/g, '')) ?? [])]
+  const changed = await rewriteCopy({
+    message: `This slide was left with ${fields.join(', ')} completely blank -- that's not a valid shortcut, every field this template's current mode uses must have real content. Write real text for ${fields.join(' and ')} now, fitting the rest of this slide's content.`,
+    currentValues: values,
+    voiceDescription,
+  })
+  return { ...values, ...changed }
 }
 
 async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }> {
@@ -194,14 +290,18 @@ async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }>
 }
 
 // Exported (2026-07-21, chat-editing build) so a single-slide edit can reuse the exact same
-// repair/vision-fallback discipline as initial generation instead of a second, drifted copy.
+// repair/vision-fallback discipline as initial generation instead of a second, drifted copy. A
+// single chat-edit re-render is never concurrent with anything else, so `limit` defaults to a
+// pass-through (see NO_LIMIT above) -- only generateCarousel's real 5-way burst needs a real cap.
 export async function renderAndGuard(
   templateFile: string,
   values: Record<string, string>,
-  slideNumber: number
+  slideNumber: number,
+  voiceDescription: string | null = null,
+  limit: Limiter = NO_LIMIT
 ): Promise<{ png: Buffer; values: Record<string, string> }> {
   let current = values
-  let { png, filledHtml } = await renderSlide(templateFile, current)
+  let { png, filledHtml } = await limit(() => renderSlide(templateFile, current))
   let violations = await checkSlide(templateFile, current, filledHtml)
 
   // Silent until now -- no log statement anywhere surfaced these, meaning a partially-broken
@@ -214,7 +314,8 @@ export async function renderAndGuard(
 
   if (violations.length > 0) {
     current = repairOverBudget(current, violations)
-    ;({ png, filledHtml } = await renderSlide(templateFile, current))
+    current = await repairMissingText(current, violations, voiceDescription)
+    ;({ png, filledHtml } = await limit(() => renderSlide(templateFile, current)))
     violations = await checkSlide(templateFile, current, filledHtml)
   }
 
@@ -226,7 +327,8 @@ export async function renderAndGuard(
     if (!review.ok) {
       console.warn(`[generation] slide ${slideNumber} (${templateFile}) shipped with unresolved issues: ${JSON.stringify(violations)}, vision note: ${review.note}`)
       current = repairOverBudget(current, violations)
-      ;({ png } = await renderSlide(templateFile, current))
+      current = await repairMissingText(current, violations, voiceDescription)
+      ;({ png } = await limit(() => renderSlide(templateFile, current)))
     }
   }
 
@@ -269,10 +371,16 @@ export async function generateCarousel(input: {
   const coverOnlyMotif = COVER_ONLY_MOTIF[templateFile]
 
   const referenceImagePool = [...input.referenceImageUrls]
-  const slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> = []
 
-  for (let i = 0; i < generated.slides.length; i++) {
-    const slide = generated.slides[i]
+  // Speed work (2026-07-22, Jaylen: "are we able to speed up generation too?"): slides don't
+  // actually depend on each other's photo search or render/guardrail work -- the only real
+  // cross-slide dependency is the reference-image pool (earlier slides should get first pick of
+  // the user's own uploads, and `.shift()` on a shared array would race if run concurrently).
+  // Splitting into a synchronous planning pass (below, decides pool allocation in slide order)
+  // followed by a `Promise.all` execution pass turns what was ~5 slides' worth of sequential
+  // network calls (photo search + Cloudflare render + guardrail retries) into one wall-clock
+  // wait for the slowest slide instead of the sum of all of them.
+  const plans = generated.slides.map((slide, i) => {
     const isCta = i === generated.slides.length - 1
     const templateForSlide = isCta ? CTA_TEMPLATE : templateFile
     // Real product decision (Jaylen, 2026-07-21): a COVER_ONLY_MOTIF template's strong repeatable
@@ -310,65 +418,90 @@ export async function generateCarousel(input: {
       const brief = genericBriefs[idx]
       if (brief && brief.trim().length > 0) mappedPhotoBriefs[fieldName] = brief
     })
-    const photoValues = needsPhotos ? await resolvePhotos(mappedPhotoBriefs, referenceImagePool) : {}
-    // Real gap found live 2026-07-21: when sourcing genuinely fails for a slot (~50% hit rate
-    // observed), the field was left unset entirely -- fillTemplate leaves the literal
-    // `{{FIELD}}` placeholder in the rendered HTML, shipping a visibly broken circle/panel.
-    // Fill any still-missing slot with a flat brand-color placeholder instead -- a clean, honest
-    // "no photo" panel beats a broken image, and it's what `checkUnresolvedPlaceholders` was
-    // actually meant to prevent from ever reaching a render.
-    if (needsPhotos) {
-      for (const fieldName of photoFieldOrder) {
-        if (!photoValues[fieldName]) {
-          photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+    const { preAssigned, remaining } = needsPhotos
+      ? allocateFromPool(mappedPhotoBriefs, referenceImagePool)
+      : { preAssigned: {}, remaining: {} }
+
+    return { slide, isCta, templateForSlide, isMotifInnerSlide, photoFieldOrder, needsPhotos, preAssigned, remaining }
+  })
+
+  // Real semaphore (createLimiter above), not a timing guess -- see its own comment for why the
+  // i*400ms stagger this replaced wasn't enough (repeated live 429s even with staggered starts and
+  // jittered repair-retries point at a real Cloudflare concurrency cap, not a time-window one).
+  // Uses the module-level globalRenderLimit (see its own comment) rather than a fresh instance per
+  // call -- real gap found live the same night: a per-call limiter only bounds THIS carousel's own
+  // slides, not the real account-wide cap shared across every concurrent user's carousel.
+  const renderLimit = globalRenderLimit
+
+  const slides = await Promise.all(
+    plans.map(async ({ slide, isCta, templateForSlide, isMotifInnerSlide, photoFieldOrder, needsPhotos, preAssigned, remaining }, i) => {
+      const searched = needsPhotos ? await searchPhotos(remaining) : {}
+      const photoValues: Record<string, string> = { ...preAssigned, ...searched }
+      // Real gap found live 2026-07-21: when sourcing genuinely fails for a slot (~50% hit rate
+      // observed), the field was left unset entirely -- fillTemplate leaves the literal
+      // `{{FIELD}}` placeholder in the rendered HTML, shipping a visibly broken circle/panel.
+      // Fill any still-missing slot with a flat brand-color placeholder instead -- a clean, honest
+      // "no photo" panel beats a broken image, and it's what `checkUnresolvedPlaceholders` was
+      // actually meant to prevent from ever reaching a render.
+      if (needsPhotos) {
+        for (const fieldName of photoFieldOrder) {
+          if (!photoValues[fieldName]) {
+            photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+          }
         }
       }
-    }
-    if (coverOnlyMotif && !isCta) {
-      Object.assign(photoValues, isMotifInnerSlide ? coverOnlyMotif.innerExtraValues : coverOnlyMotif.coverExtraValues)
-      // Verified live (standalone fillTemplate test, 2026-07-21, Classic; same reasoning applies
-      // to any COVER_ONLY_MOTIF template): with the extra photo fields hidden via CSS, their
-      // {{FIELD}} placeholders still need SOME value or checkUnresolvedPlaceholders false-
-      // positives on every inner slide -- wasting a vision-review call over something nobody will
-      // ever see. photoFieldOrder is just the inner set on these slides, so the "fill any missing
-      // slot" loop above never touches the hidden fields -- fill them explicitly instead.
-      if (isMotifInnerSlide) {
-        for (const fieldName of coverOnlyMotif.hiddenFields) {
-          photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+      if (coverOnlyMotif && !isCta) {
+        Object.assign(photoValues, isMotifInnerSlide ? coverOnlyMotif.innerExtraValues : coverOnlyMotif.coverExtraValues)
+        // Verified live (standalone fillTemplate test, 2026-07-21, Classic; same reasoning applies
+        // to any COVER_ONLY_MOTIF template): with the extra photo fields hidden via CSS, their
+        // {{FIELD}} placeholders still need SOME value or checkUnresolvedPlaceholders false-
+        // positives on every inner slide -- wasting a vision-review call over something nobody will
+        // ever see. photoFieldOrder is just the inner set on these slides, so the "fill any missing
+        // slot" loop above never touches the hidden fields -- fill them explicitly instead.
+        if (isMotifInnerSlide) {
+          for (const fieldName of coverOnlyMotif.hiddenFields) {
+            photoValues[fieldName] = solidColorPlaceholder(brand.PRIMARY)
+          }
         }
       }
-    }
-    // Alternates a 2-photo-split template's own orientation placeholder per content-slide index
-    // (added 2026-07-21) -- these templates' own top comments already called for this ("mirror it
-    // on alternating slides" / "so the carousel doesn't feel static") but the pipeline never
-    // actually implemented it before now.
-    if (alternatingDirectionField && !isCta) {
-      photoValues[alternatingDirectionField] = i % 2 === 0 ? 'flex-direction:row;' : 'flex-direction:row-reverse;'
-    }
+      // Alternates a 2-photo-split template's own orientation placeholder per content-slide index
+      // (added 2026-07-21) -- these templates' own top comments already called for this ("mirror it
+      // on alternating slides" / "so the carousel doesn't feel static") but the pipeline never
+      // actually implemented it before now.
+      if (alternatingDirectionField && !isCta) {
+        photoValues[alternatingDirectionField] = i % 2 === 0 ? 'flex-direction:row;' : 'flex-direction:row-reverse;'
+      }
 
-    // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
-    // returned in `slide.values` can override them. The model sees the raw template HTML
-    // (including PRIMARY/SECONDARY/LOGO_HTML/CANVAS_H placeholders) as context, so it's fully
-    // capable of echoing one of those keys back in `values` even though it was told not to --
-    // the ordering here is what actually prevents that from mattering, not just the instruction.
-    // `slide.values`' fields are all individually optional now (captions.ts) -- filter out any
-    // unset ones defensively before spreading, so fillTemplate's `key in values` check (which
-    // treats a present-but-undefined key as "resolved") can never render the literal word
-    // "undefined" for a field the model legitimately left blank.
-    const definedSlideValues = Object.fromEntries(
-      Object.entries(slide.values).filter(([, v]) => v !== undefined)
-    )
-    const values: Record<string, string> = {
-      ...definedSlideValues,
-      ...photoValues,
-      ...brand,
-      CANVAS_H: String(canvasH),
-    }
-    if (input.templateVariant === 'Spotlight Left') values.CIRCLE_SIDE = 'left'
+      // Order matters: brand/format fields and resolved photo URLs go LAST so nothing the model
+      // returned in `slide.values` can override them. The model sees the raw template HTML
+      // (including PRIMARY/SECONDARY/LOGO_HTML/CANVAS_H placeholders) as context, so it's fully
+      // capable of echoing one of those keys back in `values` even though it was told not to --
+      // the ordering here is what actually prevents that from mattering, not just the instruction.
+      // `slide.values`' fields are all individually optional now (captions.ts) -- filter out any
+      // unset ones defensively before spreading, so fillTemplate's `key in values` check (which
+      // treats a present-but-undefined key as "resolved") can never render the literal word
+      // "undefined" for a field the model legitimately left blank.
+      const definedSlideValues = Object.fromEntries(
+        Object.entries(slide.values).filter(([, v]) => v !== undefined)
+      )
+      const values: Record<string, string> = {
+        ...definedSlideValues,
+        ...photoValues,
+        ...brand,
+        CANVAS_H: String(canvasH),
+      }
+      if (input.templateVariant === 'Spotlight Left') values.CIRCLE_SIDE = 'left'
 
-    const result = await renderAndGuard(templateForSlide, values, i + 1)
-    slides.push({ png: result.png, template: templateForSlide, values: result.values })
-  }
+      // Real bug found live (2026-07-22, right after this parallelization work shipped): 5 slides
+      // now reach renderAndGuard at roughly the same instant instead of one at a time, bursting
+      // Cloudflare with near-simultaneous screenshot requests and hitting a 429 that exhausted
+      // every retry. renderLimit (a real concurrency cap, not a timing guess -- see its own
+      // comment) is what actually bounds how many of these are in flight on Cloudflare at once;
+      // the SLOW parts above (photo search, guardrail/repair loop) still run fully in parallel.
+      const result = await renderAndGuard(templateForSlide, values, i + 1, input.voiceDescription, renderLimit)
+      return { png: result.png, template: templateForSlide, values: result.values }
+    })
+  )
 
   return { title: generated.title, slides }
 }

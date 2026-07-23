@@ -27,8 +27,8 @@ Primary CTA gradient (buttons, not the hero): `linear-gradient(135deg, var(--gre
 
 Three different font contexts exist — do not mix them up:
 
-1. **App interior** (dashboard, wizard, viewer, settings) — `--font`, the system stack (`-apple-system, 'Segoe UI Variable', 'Segoe UI', system-ui, Arial, sans-serif`). **Not Inter Tight**, despite the landing page using it — a known inconsistency, not yet reconciled. Don't assume the app interior already matches the landing page's type.
-2. **Landing page only** (`.lp` scope) — Inter Tight (`--font-inter-tight`, loaded via `next/font/google`), falling back to `--font`.
+1. **App interior** (dashboard, wizard, viewer, settings) and **auth pages** — Inter Tight (`--font-inter-tight`, loaded via `next/font/google`), falling back to `--font` (the system stack). Fixed 2026-07-22 — previously fell back to the system stack only, unlike the landing page.
+2. **Landing page** (`.lp` scope) — same Inter Tight / `--font` fallback, applied first here originally.
 3. **Brand wordmark** ("Caroslide" logotype, every screen) — Fraunces, italic, weight 600, `--font-brand`. Text-only, no icon mark in the live app (a separate tent-top SVG icon mark exists in `projects/business/caroslide/assets/` but is not wired into the app — legacy/unused).
 
 User-selectable fonts (Brand Kit picker, applies to *generated carousel output only*, never the app UI itself): Poppins (600/700), Montserrat, Archivo Black (400), DM Sans.
@@ -47,7 +47,6 @@ User-selectable fonts (Brand Kit picker, applies to *generated carousel output o
 
 - Do not hardcode any color that already has a CSS var — always use `var(--...)`.
 - Do not add box-shadow or hover-lift to `.dash-card` / content cards.
-- Do not assume the app interior uses Inter Tight — it does not (see Fonts above).
 - Do not rename `--green` to something purple-accurate — it's load-bearing across the codebase as-is.
 
 ## Project folder

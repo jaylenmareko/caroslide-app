@@ -1,6 +1,9 @@
+import Anthropic from '@anthropic-ai/sdk'
 import { imageSize } from 'image-size'
 import type { TemplateVariant } from '@/lib/types'
 import { tavilyCandidateUrls, tavilyImageSearch, pexelsSearch } from './research'
+
+const anthropic = new Anthropic()
 
 const MIN_DIMENSION = 400 // reject tiny icons/thumbnails masquerading as og:image
 
@@ -82,7 +85,7 @@ export const PHOTO_COUNT: Record<TemplateVariant, number> = {
 }
 
 export function photosNeeded(variant: TemplateVariant | null, look: string): number {
-  if (look === 'Plain Text') return 0
+  if (look === 'Plain Text' || look === 'Bold Hook') return 0
   return variant ? PHOTO_COUNT[variant] : 0
 }
 
@@ -106,9 +109,50 @@ export const PHOTO_FIELDS_FOR_TEMPLATE: Record<string, string[]> = {
 
 type UsablePhoto = { url: string; buffer: Buffer; width: number; height: number }
 
-/** Fetches and validates a single image URL directly (dimension check + stock-domain check) --
- * shared by both the direct image-search path and the og:image-scrape fallback below, so the same
- * safety checks apply regardless of which path found the URL. */
+// image-size's `type` field ('jpg'/'png'/'webp'/'gif') doesn't line up 1:1 with Anthropic's
+// media_type strings -- only the 'jpg'->'image/jpeg' name actually differs, everything else is
+// just prefixing. Unrecognized/undetected types skip the vision check (see photoLooksUsable's
+// caller) rather than guessing a media_type that would make the API call fail outright.
+const MEDIA_TYPE_FOR: Record<string, string> = {
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+}
+
+/** Real complaint found live (2026-07-21, Wagyu carousel slide 2): a photo can pass every
+ * mechanical check here (right dimensions, real URL, not a stock marketplace) and still look bad
+ * on the actual slide -- too dark, or the subject too small/cropped-off to read as the photo's
+ * point. No pixel-math heuristic reliably catches that (a legitimately moody product shot and a
+ * genuinely dead/empty photo can have similar average brightness); reusing the same cheap-model
+ * vision-check idiom pipeline.ts's visionReview already uses for a whole rendered slide is more
+ * consistent with how this codebase already handles "does this look right" judgment calls than
+ * inventing a new deterministic formula. Runs once per candidate that already passed the
+ * mechanical checks, not per every URL tried -- cheap tier (Haiku), same as classifyEdit. */
+async function photoLooksUsable(buffer: Buffer, mediaType: string): Promise<boolean> {
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 60,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: buffer.toString('base64') } },
+          {
+            type: 'text',
+            text: 'This photo is meant to be the hero image on a social carousel slide -- the main subject should be clearly visible, reasonably well-lit, and fill a good portion of the frame. Reply with exactly "OK" if it works for that, or a short reason if it does not (too dark, subject too small/cropped, mostly empty background, etc).',
+          },
+        ],
+      },
+    ],
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim() ?? ''
+  return text.toUpperCase().startsWith('OK')
+}
+
+/** Fetches and validates a single image URL directly (dimension check + stock-domain check +
+ * a vision quality check) -- shared by both the direct image-search path and the og:image-scrape
+ * fallback below, so the same safety checks apply regardless of which path found the URL. */
 async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null> {
   if (!isSafeHttpUrl(imgUrl)) return null
   if (isStockPhotoHost(imgUrl)) return null
@@ -126,8 +170,18 @@ async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null
   }
 
   try {
-    const { width, height } = imageSize(buffer)
+    const { width, height, type } = imageSize(buffer)
     if (!width || !height || width < MIN_DIMENSION || height < MIN_DIMENSION) return null
+
+    // Skip the vision check if the format isn't one we can safely hand to the API -- a mechanical
+    // dimension pass without a visual-quality pass beats rejecting a perfectly usable photo over
+    // an unrecognized format string.
+    const mediaType = type ? MEDIA_TYPE_FOR[type] : undefined
+    if (mediaType) {
+      const usable = await photoLooksUsable(buffer, mediaType).catch(() => true) // fail open -- an API hiccup shouldn't sink an otherwise-valid photo
+      if (!usable) return null
+    }
+
     // Return the ORIGINAL image URL, not a re-hosted copy -- the render step (Cloudflare's
     // browser) fetches it live at screenshot time same as any real browser would, no need to
     // download-then-reupload through our own Storage first. `buffer`/dimensions are only needed

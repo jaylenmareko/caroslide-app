@@ -10,15 +10,26 @@ import type { Slide } from '@/lib/types'
 // nodes -- see editableFields.ts for the selector map this depends on. A saved edit re-renders
 // server-side via updateSlideField and this component just reloads the fresh HTML + tells the
 // parent about the new slides array (same commitSlides()/undo-redo path chat-editing already uses).
+//
+// No separate "edit mode" toggle (2026-07-24, Jaylen: cut the friction, no visible mode-switch --
+// just click a thing and it becomes editable) -- this is now the ONLY thing the stage renders, no
+// button gates it. previewUrl (the slide's already-rendered flat image, same one the rest of the
+// app already shows) is what actually appears the instant a slide loads -- getSlideEditorHtml is a
+// real server round-trip (loads the template file, re-fills it), and showing an empty loading box
+// while that resolves would undo the exact "clicking into a project feels slow" fix from earlier
+// today. The live iframe silently replaces it once ready; since it's rendering the same real
+// values, the swap should be visually imperceptible, not a loading-to-content flash.
 export default function SlideCanvasEditor({
   carouselId,
   slideIndex,
   displayWidth,
+  previewUrl,
   onSlidesUpdated,
 }: {
   carouselId: string
   slideIndex: number
   displayWidth: number
+  previewUrl?: string
   onSlidesUpdated: (slides: Slide[]) => void
 }) {
   const [data, setData] = useState<SlideEditorData | null>(null)
@@ -105,15 +116,17 @@ export default function SlideCanvasEditor({
     }
   }
 
-  if (error) {
-    return (
-      <div className="slide-canvas-editor slide-canvas-editor-error" style={{ width: displayWidth }}>
-        <p>{error}</p>
-      </div>
+  // Real fallback, not an empty box: a carousel created before click-in-place editing existed (no
+  // stored template/values) hits this same "error" path on every load, and previously left the
+  // stage permanently blank. Showing the real image everyone already sees elsewhere in the app
+  // means an older carousel just can't be edited in place -- it isn't broken or empty-looking.
+  if (error || !data) {
+    return previewUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img className="slide-canvas-editor slide-canvas-editor-fallback" style={{ width: displayWidth }} src={previewUrl} alt="Carousel slide" />
+    ) : (
+      <div className="slide-canvas-editor slide-canvas-editor-loading" style={{ width: displayWidth, aspectRatio: '4/5' }} />
     )
-  }
-  if (!data) {
-    return <div className="slide-canvas-editor slide-canvas-editor-loading" style={{ width: displayWidth, aspectRatio: '4/5' }} />
   }
 
   const scale = displayWidth / 1080

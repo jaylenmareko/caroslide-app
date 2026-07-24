@@ -11,21 +11,8 @@ import SlideCanvasEditor from '@/components/SlideCanvasEditor'
 export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [current, setCurrent] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  // Click-in-place editor (2026-07-22) -- a separate mode from the default zoomable image, not a
-  // replacement for it, since most viewing doesn't need editing. Reset on slide switch so a stale
-  // iframe from the previous slide never lingers into the newly-selected one.
-  const [editMode, setEditMode] = useState(false)
   const [stageWidth, setStageWidth] = useState(340)
   const stageFrameRef = useRef<HTMLDivElement>(null)
-
-  // "Reset state when a prop/other-state changes" is handled during render (comparing against a
-  // ref of the previous value), not via useEffect -- same pattern/reasoning as Sidebar.tsx's
-  // prevPathname handling, avoids a real react-hooks/set-state-in-effect lint error.
-  const [prevCurrent, setPrevCurrent] = useState(current)
-  if (current !== prevCurrent) {
-    setPrevCurrent(current)
-    setEditMode(false)
-  }
 
   useEffect(() => {
     const el = stageFrameRef.current
@@ -344,38 +331,28 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
 
         <div className="stage">
           <div className="stage-frame" ref={stageFrameRef}>
-            {editMode ? (
-              <SlideCanvasEditor
-                carouselId={carousel.id}
-                slideIndex={current}
-                displayWidth={stageWidth}
-                onSlidesUpdated={commitSlides}
-              />
-            ) : (
-              <button className="stage-frame-img-btn" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slides[current]?.url} alt="Carousel slide" />
-              </button>
-            )}
-            <button
-              className="stage-edit-toggle"
-              onClick={() => setEditMode((v) => !v)}
-              aria-label={editMode ? 'Done editing' : 'Edit this slide'}
-              title={editMode ? 'Done editing' : 'Click text or photos to edit'}
-            >
-              {editMode ? (
-                'Done'
-              ) : (
-                <svg viewBox="0 0 24 24" width={15} height={15} fill="none">
-                  <path
-                    d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
+            <SlideCanvasEditor
+              key={current}
+              carouselId={carousel.id}
+              slideIndex={current}
+              displayWidth={stageWidth}
+              previewUrl={slides[current]?.url}
+              onSlidesUpdated={commitSlides}
+            />
+            {/* No more edit-mode toggle (2026-07-24) -- clicking any field is always live, so a
+                plain click on the stage can't also mean "zoom" anymore. Zoom moves to its own
+                explicit corner button, same slot the old edit-toggle used. */}
+            <button className="stage-zoom-btn" onClick={() => setLightboxOpen(true)} aria-label="Zoom slide">
+              <svg viewBox="0 0 24 24" width={15} height={15} fill="none">
+                <path
+                  d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM21 21l-4.35-4.35"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </button>
           </div>
           <button

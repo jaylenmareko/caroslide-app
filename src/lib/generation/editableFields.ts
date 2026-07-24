@@ -15,7 +15,12 @@
 // (1-cover-circles.html's .photo, 6/11's outer .photo wrapper is itself just a positioning div --
 // only 1-cover-circles.html actually uses the CSS-background-image pattern; the rest use a real
 // <img> even when the field name looks similar).
-export type EditableFieldKind = 'text' | 'photo-img' | 'photo-bg'
+// 'move-only' (2026-07-24, Jaylen) is for elements that are neither text nor a photo swap target
+// at all -- the logo (its image/text content is controlled entirely from Brand Kit settings, not
+// click-in-place) and decorative elements like the divider line (no content, just a position and
+// an on/off state). No click/dblclick handler of any kind attaches to these -- drag-to-move is the
+// only interaction.
+export type EditableFieldKind = 'text' | 'photo-img' | 'photo-bg' | 'move-only'
 
 // movable (2026-07-24, Jaylen): text and circle-photo elements can be dragged to a new position in
 // the click-in-place editor; main/background photos deliberately cannot -- they fill a fixed-size
@@ -28,7 +33,17 @@ export type EditableFieldKind = 'text' | 'photo-img' | 'photo-bg'
 // write to, reusing the SAME key the automatic guardrail-shrink system already uses where one
 // exists (CAPTION_SIZE, HEADLINE_SIZE, STORY_SIZE, STATEMENT_SIZE, STAT_SIZE) so there's one
 // unified size slot per field, not two competing ones -- a new key for fields that never had one.
-export type EditableField = { field: string; selector: string; kind: EditableFieldKind; movable?: boolean; sizeField?: string }
+// `deletable` (2026-07-24) shows a small hover-revealed delete control that sets a `{FIELD}_DISPLAY`
+// placeholder to 'hidden' -- a real, reversible (undo-stack-backed) on/off toggle, not a data
+// change; only decorative elements with no content of their own (the divider) are ever deletable.
+export type EditableField = {
+  field: string
+  selector: string
+  kind: EditableFieldKind
+  movable?: boolean
+  sizeField?: string
+  deletable?: boolean
+}
 
 export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
   '1-cover-circles.html': [
@@ -36,6 +51,8 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'BG_IMG', selector: '.photo', kind: 'photo-bg' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
+    { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '2-split-cover.html': [
     { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
@@ -49,6 +66,8 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'BG_IMG', selector: '.photozone img', kind: 'photo-img' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
+    { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '4-vertical-split.html': [
     { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true },
@@ -103,6 +122,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
     { field: 'BG_IMG', selector: '.photo img', kind: 'photo-img' },
     { field: 'CIRCLE_IMG', selector: '.circle-wrap img', kind: 'photo-img', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
   ],
   '12-hook-block.html': [
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true },

@@ -19,7 +19,8 @@
   .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:cover; background-position:{{BG_POSITION|50% 20%}}; }
   .scrim-bottom { position:absolute; bottom:0; left:0; right:0; height:56.3vh; background:linear-gradient(0deg, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 100%); }
   .scrim-top { position:absolute; top:0; left:0; right:0; height:16.3vh; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%); }
-  .logo { position:absolute; top:3.7vh; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:5; }
+  /* transform: manual move support (2026-07-24) -- same 0px,0px-default convention throughout. */
+  .logo { position:absolute; top:3.7vh; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:5; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; }
   .logo .b { color:#ffffff; }
   .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
@@ -43,8 +44,13 @@
 
   /* Divider hidden alongside the circles on inner slides (2026-07-21, real feedback: a stray line
      with nothing above it looked orphaned once the circles were gone) -- reuses CIRCLES_DISPLAY
-     rather than a separate placeholder since the two are always toggled together. */
-  .divider { position:absolute; top:54.67vh; left:108px; right:108px; height:3px; background:#ffffff; display:{{CIRCLES_DISPLAY|block}}; }
+     rather than a separate placeholder since the two are always toggled together (display:none
+     always wins regardless of visibility, so this still fully hides on inner slides). DIVIDER_DISPLAY
+     is a SEPARATE, independent user-delete toggle (2026-07-24) -- visibility (not display) so it
+     composes with CIRCLES_DISPLAY instead of overriding it; a hidden element still holds its layout
+     space, which is fine for a thin line with nothing depending on its box. transform: manual move,
+     same convention as everywhere else. */
+  .divider { position:absolute; top:54.67vh; left:108px; right:108px; height:3px; background:#ffffff; display:{{CIRCLES_DISPLAY|block}}; visibility:{{DIVIDER_DISPLAY|visible}}; transform:translate({{DIVIDER_POS_X|0px}}, {{DIVIDER_POS_Y|0px}}); }
   /* Caption box now spans the whole zone below where the divider sits (54.67vh to the bottom) and
      vertically centers its content via flex, instead of a fixed top offset -- real feedback
      (2026-07-21): a short caption anchored near the top of a large black zone (now emptier with

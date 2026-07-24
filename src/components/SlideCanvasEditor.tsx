@@ -134,32 +134,57 @@ export default function SlideCanvasEditor({
   // contentDocument) so it runs as the iframe's own inline script the moment the doc parses --
   // no cross-origin/timing issues waiting for a load event to reach in from outside.
   //
-  // Move/resize (2026-07-24, Jaylen): text and circle-photo elements (f.movable) can be dragged to
-  // a new position; text fields with f.sizeField also support shift+drag (vertical) to resize,
-  // bounded to 60%-140% of whatever size the element is ALREADY rendering at (its real computed
-  // font-size, not a guessed baseline) -- matches the same 60% shrink floor the automatic
-  // guardrail system already uses, and avoids the exact "text this big might not even fit" guess
-  // this codebase has repeatedly cautioned against elsewhere (character count alone isn't a
-  // reliable fit proxy -- see templates-guide.md's wide-glyph-stat note). A plain click still
-  // means "edit this text" / "swap this photo" -- a real drag (past a small pixel threshold)
-  // suppresses that so dragging a caption doesn't also open contenteditable underneath the drag.
+  // Move/resize (2026-07-24, Jaylen). Real bug found and fixed the same day, live feedback ("the
+  // movement isn't 100% at the same time as the mouse"): mousemove listeners here are attached
+  // INSIDE the iframe's own document, and the browser already reports event coordinates in the
+  // iframe's native (unscaled, 1080-wide) space for content inside a CSS-`transform:scale()`d
+  // element -- it does the screen-to-local conversion once, automatically. Dividing by SCALE again
+  // here was applying that same conversion a SECOND time, inflating every drag by roughly 1/scale
+  // on top of the correct 1/scale the browser already did -- at this component's typical ~0.3
+  // display scale, that's a real ~3x amplification, not a rounding error. Fixed by using the raw
+  // event delta directly; no SCALE division anywhere in the drag math anymore.
+  //
+  // Text fields with f.sizeField also support shift+drag (vertical) to resize, bounded to 60%-140%
+  // of whatever size the element is ALREADY rendering at (its real computed font-size, not a
+  // guessed baseline) -- matches the same 60% shrink floor the automatic guardrail system already
+  // uses, and avoids the exact "text this big might not even fit" guess this codebase has
+  // repeatedly cautioned against elsewhere.
+  //
+  // Circle click semantics (2026-07-24, real feedback: "I can only update the picture, it's not
+  // letting me move the circle... I didn't realize I could move it until I held down on it").
+  // Movable photo fields (circles) used to have BOTH a drag-to-move handler AND a plain-click-to-
+  // swap handler on the same element -- nothing distinguished "trying to drag" from "trying to
+  // click" except whether the browser's own click event fired, which happens for ANY mousedown+up
+  // pair that doesn't move far enough, drag-in-progress or not. Split the same way Canva does it:
+  // drag moves, a plain click on a movable circle does nothing (no competing action to guess
+  // between), and double-click opens the photo picker. Non-movable photos (the main/background
+  // image) have no move action to conflict with, so a single click still swaps them, unchanged.
+  //
   // Position is a relative translate() offset (continuing from whatever offset a PRIOR drag
   // already saved -- sent down as a real number, f.posX/f.posY, resolved server-side from this
   // slide's own values; a baked-in translate() computes to an opaque matrix() string via
   // getComputedStyle, and the inline style attribute is empty since the offset came from a
   // template placeholder, not a prior JS write, so neither is a reliable source to read a plain
   // number back out of client-side), not an absolute coordinate -- works the same regardless of
-  // the template's own default position for that field. Circle
-  // fields move their `.circle-wrap` ancestor (the real positioned element), not the bare <img> the
-  // selector points at, which is nested two levels inside the circle mask -- see editableFields.ts.
-  // Both X and Y (or a resize) commit as ONE batched message on drag-release, not two -- two
-  // separate saves would race against each other's read of the current values map.
+  // the template's own default position for that field. Circle fields move their `.circle-wrap`
+  // ancestor (the real positioned element), not the bare <img> the selector points at, which is
+  // nested two levels inside the circle mask -- see editableFields.ts. Both X and Y (or a resize)
+  // commit as ONE batched message on drag-release, not two -- two separate saves would race
+  // against each other's read of the current values map.
+  //
+  // 'move-only' fields (logo, divider -- 2026-07-24) get no click/dblclick handler of any kind,
+  // just drag-to-move -- there's no text to edit and no photo to swap (the logo's actual image
+  // comes from Brand Kit settings, not click-in-place). Deletable fields (the divider) also get a
+  // small hover-revealed "x" button, positioned from the element's own offsetTop/Left/Width (both
+  // are elements in the SAME iframe document, so plain offset geometry is enough -- no
+  // getBoundingClientRect/cross-frame math needed) that sets a real `{FIELD}_DISPLAY` value, the
+  // same kind of on/off toggle CIRCLES_DISPLAY already uses -- reversible via the existing
+  // undo-stack, not a special-cased "restore" control.
   const injectedHtml = data.html.replace(
     '</body>',
     `<script>(function(){
   var fields = ${JSON.stringify(data.fields)};
-  var SCALE = ${scale};
-  var THRESH = 4;
+  var THRESH = 8;
   fields.forEach(function(f){
     var el = document.querySelector(f.selector);
     if (!el) return;
@@ -182,9 +207,9 @@ export default function SlideCanvasEditor({
         var liveSize = baseSize, finalX = baseX, finalY = baseY;
 
         function onMove(ev){
-          var dx = (ev.clientX - startX) / SCALE;
-          var dy = (ev.clientY - startY) / SCALE;
-          if (Math.abs(ev.clientX - startX) > THRESH || Math.abs(ev.clientY - startY) > THRESH) moved = true;
+          var dx = ev.clientX - startX;
+          var dy = ev.clientY - startY;
+          if (Math.abs(dx) > THRESH || Math.abs(dy) > THRESH) moved = true;
           if (!moved) return;
           if (resizing) {
             liveSize = Math.max(baseSize * 0.6, Math.min(baseSize * 1.4, baseSize - dy * 0.5));
@@ -228,11 +253,51 @@ export default function SlideCanvasEditor({
         el.style.outline = '';
         parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: el.innerHTML.trim() }, '*');
       });
-    } else {
+    } else if (f.kind === 'photo-img' && f.movable) {
+      // Circles: drag moves (handled above), double-click swaps, plain click does nothing --
+      // no competing action to guess between on a single click.
+      el.addEventListener('dblclick', function(e){
+        e.stopPropagation();
+        if (justDragged) return;
+        parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
+      });
+    } else if (f.kind === 'photo-img' || f.kind === 'photo-bg') {
+      // Main/background photos: no move action exists, so a single click still swaps, unchanged.
       el.addEventListener('click', function(e){
         e.stopPropagation();
         if (justDragged) return;
         parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
+      });
+    }
+    // 'move-only' fields (logo, divider): no click/dblclick handler at all -- drag-to-move above
+    // is the only interaction.
+
+    if (f.deletable) {
+      // A 3px-tall divider is ~1 real screen pixel at this component's typical display scale --
+      // relying on native hover directly over the element itself is nearly impossible to land on
+      // (for a real cursor, not just automation). Widen the effective hover zone with a proximity
+      // check on document-level mousemove instead of native mouseenter/mouseleave on the thin
+      // element itself -- doesn't touch the divider's own rendered size/appearance at all.
+      var MARGIN = 16;
+      var btn = document.createElement('div');
+      btn.textContent = '\\u00d7';
+      btn.style.cssText = 'position:absolute;width:22px;height:22px;line-height:20px;text-align:center;border-radius:50%;background:rgba(10,10,10,0.85);color:#fff;font-size:15px;font-family:sans-serif;cursor:pointer;z-index:50;display:none;';
+      btn.style.top = (el.offsetTop - 26) + 'px';
+      btn.style.left = (el.offsetLeft + el.offsetWidth - 22) + 'px';
+      el.parentNode.appendChild(btn);
+      function showBtn(){ btn.style.display = 'block'; }
+      function hideBtn(){ btn.style.display = 'none'; }
+      document.addEventListener('mousemove', function(ev){
+        if (btn.matches(':hover')) return;
+        var near = ev.clientX >= el.offsetLeft - MARGIN && ev.clientX <= el.offsetLeft + el.offsetWidth + MARGIN
+          && ev.clientY >= el.offsetTop - MARGIN && ev.clientY <= el.offsetTop + el.offsetHeight + MARGIN;
+        if (near) showBtn(); else hideBtn();
+      });
+      btn.addEventListener('mouseleave', hideBtn);
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        hideBtn();
+        parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
       });
     }
   });

@@ -21,7 +21,8 @@
   .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
   .textzone { height:{{TEXTZONE_H|38.52vh}}; background:#0a0a0a; display:flex; align-items:center; justify-content:center; padding:110px 90px 0; }
-  .caption { text-align:center; font-size:{{CAPTION_SIZE|48px}}; font-weight:800; line-height:1.32; }
+  /* transform: manual move support (2026-07-24), same 0px,0px-default convention throughout. */
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|48px}}; font-weight:800; line-height:1.32; transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
   .caption .c1 { color:{{SECONDARY}}; }
   .caption .c2 { color:#ffffff; }
   .caption .c3 { color:{{PRIMARY}}; }
@@ -36,8 +37,8 @@
      circle. left/right recomputed to keep the same proportional margins/gap (150/220/170 ->
      120/180/140) rather than just growing outward into the edges or into each other. */
   .circle-wrap { position:absolute; bottom:160px; width:320px; height:320px; z-index:5; }
-  .circle-wrap.left { left:120px; }
-  .circle-wrap.right { left:620px; }
+  .circle-wrap.left { left:120px; transform:translate({{CIRCLE_L_IMG_POS_X|0px}}, {{CIRCLE_L_IMG_POS_Y|0px}}); }
+  .circle-wrap.right { left:620px; transform:translate({{CIRCLE_R_IMG_POS_X|0px}}, {{CIRCLE_R_IMG_POS_Y|0px}}); }
   .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
   .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 25%}}; }
 </style>

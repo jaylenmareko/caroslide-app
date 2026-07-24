@@ -131,7 +131,16 @@ export async function renderSlide(
           // waitForTimeout after load gives the font time to swap in before the screenshot.
           gotoOptions: { waitUntil: 'load', timeout: 20000 },
           waitForTimeout: 1000,
-          screenshotOptions: { type: 'png' },
+          // Real bug found live (2026-07-24, Jaylen: opening a carousel felt slow): every slide
+          // rendered as an uncompressed PNG -- 1-1.3MB EACH on a real test carousel, ~5-6MB total
+          // per carousel, and the thumbnail rail loads those exact same full-resolution files just
+          // to show tiny previews. Confirmed against Cloudflare's own API docs before changing this
+          // (type accepts 'png'/'jpeg'/'webp' plus an optional quality) -- these slides are opaque
+          // full-bleed photo/color designs with no transparency anywhere, so JPEG has nothing to
+          // lose here. quality:85 is a standard "visually lossless for a photo" starting point, not
+          // separately measured against these specific templates -- worth a real before/after look
+          // if a compression artifact ever shows up on a genuinely low-detail flat-color slide.
+          screenshotOptions: { type: 'jpeg', quality: 85 },
         }),
       }
     )

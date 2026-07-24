@@ -340,7 +340,7 @@ async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }>
       {
         role: 'user',
         content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: png.toString('base64') } },
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: png.toString('base64') } },
           {
             type: 'text',
             text: 'Is this social carousel slide visually clean -- no clipped/overlapping text, no obviously broken image, legible? Reply with exactly "OK" if it is, or a one-sentence description of the specific problem if not.',

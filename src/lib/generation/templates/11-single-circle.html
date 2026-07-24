@@ -38,7 +38,7 @@
      CIRCLE_SIDE mirrors the same left/right pattern as 4-vertical-split.html's CIRCLE_SIDE/LOGO_SIDE
      (the placeholder becomes the actual CSS property name -- left or right) -- one template file
      serves both the right-side "Spotlight" wizard Style and the left-side mirror, not two files. */
-  .circle-wrap { position:absolute; top:{{CIRCLE_TOP|160px}}; {{CIRCLE_SIDE|right}}:{{CIRCLE_OFFSET|120px}}; width:{{CIRCLE_SIZE|410px}}; height:{{CIRCLE_SIZE|410px}}; z-index:5; }
+  .circle-wrap { position:absolute; top:{{CIRCLE_TOP|160px}}; {{CIRCLE_SIDE|right}}:{{CIRCLE_OFFSET|120px}}; width:{{CIRCLE_SIZE|410px}}; height:{{CIRCLE_SIZE|410px}}; z-index:5; transform:translate({{CIRCLE_IMG_POS_X|0px}}, {{CIRCLE_IMG_POS_Y|0px}}); }
   .circle { width:100%; height:100%; border-radius:50%; border:9px solid #ffffff; box-shadow:0 10px 30px rgba(0,0,0,0.45); overflow:hidden; background:#111; }
   .circle img { width:100%; height:100%; object-fit:cover; object-position:{{CIRCLE_POSITION|50% 25%}}; }
 
@@ -52,17 +52,17 @@
   /* text-shadow extended to kicker/headline/story 2026-07-21 (previously only .stat/.statlbl had
      it, a real inconsistency within this same file) -- see 6-minimal-magazine.html's matching
      comment for why this template needs it (photo-scrim background, not solid black). */
-  .kicker { font-size:28px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:{{SECONDARY_LIGHT|#f87171}}; margin-bottom:14px; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .kicker { font-size:28px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:{{SECONDARY_LIGHT|#f87171}}; margin-bottom:14px; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
   .kicker:empty { margin-bottom:0; line-height:0; }
-  .headline { font-size:{{HEADLINE_SIZE|56px}}; font-weight:900; line-height:1.18; color:#ffffff; letter-spacing:-1px; text-wrap:balance; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .headline { font-size:{{HEADLINE_SIZE|56px}}; font-weight:900; line-height:1.18; color:#ffffff; letter-spacing:-1px; text-wrap:balance; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
   .headline .accent { color:{{SECONDARY}}; }
   /* narrative/story slides use a running paragraph instead of kicker+headline */
-  .story { position:absolute; left:70px; right:90px; bottom:130px; font-size:{{STORY_SIZE|42px}}; font-weight:700; line-height:1.4; color:#ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .story { position:absolute; left:70px; right:90px; bottom:130px; font-size:{{STORY_SIZE|42px}}; font-weight:700; line-height:1.4; color:#ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{STORY_HTML_POS_X|0px}}, {{STORY_HTML_POS_Y|0px}}); }
   .story .accent { color:{{PRIMARY}}; }
   .story .muted { color:#9a9a9a; }
 
-  .stat { position:absolute; left:70px; right:70px; bottom:180px; font-size:{{STAT_SIZE|140px}}; font-weight:900; color:#ffffff; letter-spacing:-3px; line-height:1; text-align:center; text-shadow:0 2px 14px rgba(0,0,0,0.6); }
-  .statlbl { position:absolute; left:70px; right:70px; bottom:110px; font-size:28px; font-weight:700; color:#e5e5e5; letter-spacing:1px; text-transform:uppercase; text-align:center; text-shadow:0 2px 8px rgba(0,0,0,0.6); }
+  .stat { position:absolute; left:70px; right:70px; bottom:180px; font-size:{{STAT_SIZE|140px}}; font-weight:900; color:#ffffff; letter-spacing:-3px; line-height:1; text-align:center; text-shadow:0 2px 14px rgba(0,0,0,0.6); transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
+  .statlbl { position:absolute; left:70px; right:70px; bottom:110px; font-size:28px; font-weight:700; color:#e5e5e5; letter-spacing:1px; text-transform:uppercase; text-align:center; text-shadow:0 2px 8px rgba(0,0,0,0.6); transform:translate({{STAT_LABEL_POS_X|0px}}, {{STAT_LABEL_POS_Y|0px}}); }
 </style>
 </head>
 <body>

@@ -76,10 +76,10 @@ export async function createCarousel(input: {
   try {
     for (let i = 0; i < generated.slides.length; i++) {
       const slide = generated.slides[i]
-      const path = `${user!.id}/${carouselId}/slide-${i + 1}.png`
+      const path = `${user!.id}/${carouselId}/slide-${i + 1}.jpg`
       const { error: uploadError } = await supabase.storage
         .from('carousel-slides')
-        .upload(path, slide.png, { contentType: 'image/png' })
+        .upload(path, slide.png, { contentType: 'image/jpeg' })
       if (uploadError) throw new Error(`Slide ${i + 1} upload failed: ${uploadError.message}`)
       uploadedPaths.push(path)
 
@@ -251,10 +251,10 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     // the exact same public URL, which risks the browser/any CDN serving a stale cached copy of
     // the OLD image even though the file itself changed. Old file cleaned up best-effort after,
     // same no-orphaned-storage discipline as createCarousel/deleteCarousel.
-    const newPath = `${user!.id}/${carouselId}/slide-${idx + 1}-${Date.now()}.png`
+    const newPath = `${user!.id}/${carouselId}/slide-${idx + 1}-${Date.now()}.jpg`
     const { error: uploadError } = await supabase.storage
       .from('carousel-slides')
-      .upload(newPath, result.png, { contentType: 'image/png' })
+      .upload(newPath, result.png, { contentType: 'image/jpeg' })
     if (uploadError) return { type: 'error', message: `Failed to save the edited slide: ${uploadError.message}` }
 
     const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(newPath)
@@ -270,7 +270,14 @@ export async function editSlide(carouselId: string, message: string, currentSlid
   return { type: 'updated', slides: updatedSlides }
 }
 
-export type SlideEditorData = { html: string; canvasH: number; fields: EditableField[] }
+// posX/posY resolved server-side from this slide's real values (2026-07-24, move/resize support)
+// -- the client never parses CSS transform back into a number itself (a baked-in translate() in a
+// stylesheet rule computes to an opaque matrix() string via getComputedStyle, and the raw inline
+// style attribute is empty since the offset comes from a `{{FIELD_POS_X|0px}}` placeholder, not
+// JS -- neither is a reliable source to read a plain number back out of). The server already knows
+// the real current offset from `slide.values`, so it just sends the number directly.
+export type SlideEditorField = EditableField & { posX?: number; posY?: number }
+export type SlideEditorData = { html: string; canvasH: number; fields: SlideEditorField[] }
 
 /**
  * Click-in-place editor support (2026-07-22): returns the slide's real filled template HTML (not
@@ -304,22 +311,34 @@ export async function getSlideEditorHtml(
 
   const templateHtml = await loadTemplate(slide.template)
   const html = fillTemplate(templateHtml, slide.values)
-  return { html, canvasH: Number(slide.values.CANVAS_H) || 1350, fields: EDITABLE_FIELDS[slide.template] ?? [] }
+  const values = slide.values
+  const fields: SlideEditorField[] = (EDITABLE_FIELDS[slide.template] ?? []).map((f) =>
+    f.movable
+      ? { ...f, posX: parseInt(values[`${f.field}_POS_X`] ?? '0', 10) || 0, posY: parseInt(values[`${f.field}_POS_Y`] ?? '0', 10) || 0 }
+      : f
+  )
+  return { html, canvasH: Number(slide.values.CANVAS_H) || 1350, fields }
 }
 
 /**
- * Click-in-place editor support: saves ONE field's new value (typed text, or a URL from a direct
- * photo upload) exactly as given. Deliberately does NOT run through renderAndGuard's AI repair
- * pass (repairOverBudget/repairMissingText) -- that pipeline exists to fix up AI-GENERATED content
- * that came out wrong; here the user explicitly typed or picked this value themselves, so
- * silently resizing or rewriting it out from under them would be wrong, not helpful. Reuses the
- * same fresh-filename-per-edit + old-file-cleanup discipline as editSlide/createCarousel.
+ * Click-in-place editor support: saves one or more fields' new values (typed text, a URL from a
+ * direct photo upload, or a position/size override from a drag) exactly as given. Deliberately
+ * does NOT run through renderAndGuard's AI repair pass (repairOverBudget/repairMissingText) --
+ * that pipeline exists to fix up AI-GENERATED content that came out wrong; here the user
+ * explicitly typed, picked, or dragged this value themselves, so silently resizing or rewriting
+ * it out from under them would be wrong, not helpful. Reuses the same fresh-filename-per-edit +
+ * old-file-cleanup discipline as editSlide/createCarousel.
+ *
+ * Accepts a batch (Record<string,string>) as well as a single field/value pair -- a drag commits
+ * an X and a Y offset together, and saving them as two separate calls would race (the second call
+ * would spread from whatever `slide.values` looked like before the first call's write landed,
+ * silently dropping it). One call, one merge, one render.
  */
 export async function updateSlideField(
   carouselId: string,
   slideIndex: number,
-  field: string,
-  newValue: string
+  field: string | Record<string, string>,
+  newValue?: string
 ): Promise<EditSlideResult> {
   const supabase = await createClient()
   const {
@@ -341,7 +360,8 @@ export async function updateSlideField(
     return { type: 'error', message: 'This slide was created before editing was supported -- try a new one.' }
   }
 
-  const newValues = { ...slide.values, [field]: newValue }
+  const updates = typeof field === 'string' ? { [field]: newValue ?? '' } : field
+  const newValues = { ...slide.values, ...updates }
   const { png, unresolved } = await renderSlide(slide.template, newValues)
   if (unresolved.length > 0) {
     return {
@@ -350,10 +370,10 @@ export async function updateSlideField(
     }
   }
 
-  const newPath = `${user!.id}/${carouselId}/slide-${slideIndex + 1}-${Date.now()}.png`
+  const newPath = `${user!.id}/${carouselId}/slide-${slideIndex + 1}-${Date.now()}.jpg`
   const { error: uploadError } = await supabase.storage
     .from('carousel-slides')
-    .upload(newPath, png, { contentType: 'image/png' })
+    .upload(newPath, png, { contentType: 'image/jpeg' })
   if (uploadError) return { type: 'error', message: `Failed to save: ${uploadError.message}` }
 
   const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(newPath)

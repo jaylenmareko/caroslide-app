@@ -2,7 +2,7 @@
 
 Three distinct slide-arc structures — pick one per carousel, independent of which visual template gets used. Default: infer from the topic (see below); the user can always just say which one they want instead.
 
-This is the team's actual working vocabulary (from a 2026-07-06 SwipeMaxx planning call, Erick/Matthew/Jaylen) — **"growth" is the working name for the narrative strategy below**, not a fourth option. When a brand's own team talks about "growth vs. value vs. education" content, this is the mapping.
+This is a real team's actual working vocabulary from an internal content-planning call — **"growth" is the working name for the narrative strategy below**, not a fourth option. When a brand's own team talks about "growth vs. value vs. education" content, this is the mapping.
 
 ## 1. Value post
 
@@ -33,7 +33,7 @@ A real arc — trend/news hook pulls them in, a story builds tension, then it re
 
 Unlike the value post, these slides build on each other in order — don't shuffle them. A mentor-to-mentee framing also counts as narrative: "I helped a guy who was scared to talk to girls... he showed me an app... I tried it myself" — same story-with-a-turn shape, just a different hook than a news item.
 
-**Real reference pattern (2026-07-08)** — `@offdating` (40.7K followers, dating/relationship-psychology niche, directly adjacent to SwipeMaxx's audience). Their whole grid runs the same formula and it's worth copying directly:
+**Real reference pattern (2026-07-08)** — `@offdating` (40.7K followers, dating/relationship-psychology niche). Their whole grid runs the same formula and it's worth copying directly:
 - **Cover gets all the design investment**: bold all-caps headline, one key phrase highlighted in a solid color block (not just colored text — an actual filled rectangle behind it), plus a striking photo — in their case a consistent stylized cutout/rotoscoped image with a white outline stroke, reused across posts as a recognizable motif. Headlines are all the same shape: "Why She [Does X]," "Why [Behavior] Makes Her [Reaction]" — a named psychological pattern, not a generic tip.
 - **Every inner slide after the cover is plain text on a flat background** — no photo, no template flourish, just a short paragraph building the story beat (tension → stakes → resolution). This isn't a shortcut; it's deliberate — once the cover earns the swipe, the reader is already committed, so the inner slides just need to deliver the payoff cleanly without competing for attention.
 - **Takeaway for this skill**: the cover slide is where template/visual effort should concentrate disproportionately. A narrative carousel with a strong cover and plain-text inner slides can outperform one with mediocre effort spread evenly across all 5 slides.

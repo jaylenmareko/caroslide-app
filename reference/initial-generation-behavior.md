@@ -101,7 +101,7 @@ Mirrors skill step 6 exactly:
 - **Some templates reserve their strong multi-photo motif for the cover slide only (real decision,
   Jaylen 2026-07-21, not a bug).** Classic's 2-circle "proof" motif was the first real case — a
   strong, distinctive device meant for a cover slide, repeating it identically on slides 2-4 read
-  as "same slide, new photo" (a real complaint, confirmed against a hand-built RanchPad carousel
+  as "same slide, new photo" (a real complaint, confirmed against a hand-built reference carousel
   whose actual inner slides drop the circles too and keep just the full-bleed photo). Photo Grid's
   fixed asymmetric 3-photo layout is the same category of risk (a distinctive fixed shape, no
   built-in variation mechanism the way the alternating-split templates have) — extended the same

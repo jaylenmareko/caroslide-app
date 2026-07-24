@@ -188,6 +188,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     .maybeSingle()
 
   const classification = await classifyEdit({ message, currentSlideIndex, slides })
+  console.log(`[chat-edit] classification: ${JSON.stringify(classification)}`)
 
   if (classification.editType === 'ambiguous') {
     return {
@@ -225,6 +226,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
         currentValues: slide.values,
         voiceDescription: brandKit?.voice_description ?? null,
       })
+      console.log(`[chat-edit] rewriteCopy changed fields: ${JSON.stringify(changed)}`)
       Object.assign(newValues, changed)
     } else {
       // photo_swap

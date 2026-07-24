@@ -77,7 +77,7 @@ ${slidesSummary}
 
 ## Scope rule (which slide(s) this touches) -- follow exactly, never guess wider
 
-Default to ONLY the slide currently being viewed (slide ${input.currentSlideIndex + 1}) unless the message explicitly names other slide(s) by number ("slide 3", "slides 2 and 4"), a range ("slides 3-5", "the last two"), or everything ("all slides", "the whole carousel", "every slide"). An ambiguous message about scope stays scoped to the current slide -- under-scoping is recoverable (the user just asks again), over-scoping destroys slides they didn't ask to touch.
+The code already knows which slide is currently being viewed (slide ${input.currentSlideIndex + 1} above) and defaults to editing ONLY that slide on its own -- you never need to name it yourself, and you MUST NOT try to. Leave slideIndices as an EMPTY array unless the message explicitly names OTHER slide(s) by number ("slide 3", "slides 2 and 4"), a range ("slides 3-5", "the last two"), or everything ("all slides", "the whole carousel", "every slide") -- only then set slideIndices to the real 0-based index/indices of exactly those named slides (slide 3 = index 2, etc). An ambiguous message about scope stays an EMPTY array, never a guess -- under-scoping is recoverable (the user just asks again), over-scoping (or naming the wrong slide) destroys or changes content they didn't ask to touch.
 
 ## Edit-type rule -- pick exactly one
 
@@ -100,6 +100,7 @@ The user's message: "${input.message}"`
     output_config: { format },
   })
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  console.log(`[chat-edit] classify raw output (${text.length} chars): ${text}`)
   const parsed = format.parse(text)
 
   // editType has no real schema-level constraint (see the comment above EditClassification) --
@@ -156,6 +157,7 @@ Do all reasoning yourself, directly in plain text. Do not write or execute code 
     output_config: { format },
   })
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  console.log(`[chat-edit] rewrite raw output (${text.length} chars): ${text}`)
   const parsed = format.parse(text)
   // ContentValues' fields are all individually optional -- only return the ones the model
   // actually set, so the caller's merge never overwrites an untouched field with `undefined`.

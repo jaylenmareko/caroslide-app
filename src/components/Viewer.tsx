@@ -97,6 +97,19 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [chatMessage, setChatMessage] = useState('')
   const [chatSending, setChatSending] = useState(false)
   const [chatReply, setChatReply] = useState<string | null>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-grow (2026-07-24) -- most edits are one short line, so a permanently tall box would sit
+  // mostly empty; growing with content (capped, then scrolling internally -- see globals.css'
+  // max-height) matches the box to what's actually being typed instead. Resetting height to 'auto'
+  // before reading scrollHeight is required every time -- scrollHeight only shrinks correctly if
+  // the element's own height isn't still holding it open from a longer previous value.
+  useEffect(() => {
+    const el = chatInputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [chatMessage])
 
   async function handleChatSend() {
     const message = chatMessage.trim()
@@ -403,14 +416,18 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
 
         <div className="chat-group">
           <div className="chat-box">
-            <input
-              type="text"
+            <textarea
+              ref={chatInputRef}
+              rows={1}
               placeholder="e.g. slide 3: punchier hook, swap the CTA…"
               value={chatMessage}
               disabled={chatSending}
               onChange={(e) => setChatMessage(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleChatSend()
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleChatSend()
+                }
               }}
             />
             <button className="chat-send-btn" aria-label="Send" onClick={handleChatSend} disabled={chatSending || !chatMessage.trim()}>

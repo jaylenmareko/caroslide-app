@@ -339,14 +339,12 @@ export default function NewCarouselWizard({
           {ANGLES.map((a) => (
             <div
               key={a.title}
-              className={`pick-card pick-card-angle${angleTouched && angle === a.title ? ' selected' : ''}`}
+              className={`pick-card${angleTouched && angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
-              {/* Example caption removed entirely (2026-07-25, Jaylen's explicit call after
-                  reviewing the reorder) -- title/desc are now the card's only content, styled to
-                  carry that on their own instead of reading as a small caption under a bigger
-                  visual. Look/Style steps below are untouched -- their preview IS the actual
-                  template, a genuinely different case. */}
+              {/* Example caption removed entirely (2026-07-25, Jaylen) -- title/desc are the
+                  card's only content now, same plain .pick-card look as every other step, just
+                  without the mockup box that used to sit below them. */}
               <div className="title">{a.title}</div>
               <div className="desc">{a.desc}</div>
             </div>

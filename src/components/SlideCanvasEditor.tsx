@@ -174,29 +174,74 @@ export default function SlideCanvasEditor({
   //
   // 'move-only' fields (logo, divider -- 2026-07-24) get no click/dblclick handler of any kind,
   // just drag-to-move -- there's no text to edit and no photo to swap (the logo's actual image
-  // comes from Brand Kit settings, not click-in-place). Deletable fields (the divider) also get a
-  // small hover-revealed "x" button, positioned from the element's own offsetTop/Left/Width (both
-  // are elements in the SAME iframe document, so plain offset geometry is enough -- no
-  // getBoundingClientRect/cross-frame math needed) that sets a real `{FIELD}_DISPLAY` value, the
-  // same kind of on/off toggle CIRCLES_DISPLAY already uses -- reversible via the existing
-  // undo-stack, not a special-cased "restore" control.
+  // comes from Brand Kit settings, not click-in-place).
+  //
+  // Hit-target widening (2026-07-24, real bug: divider reported "not moveable, deletable, or
+  // touchable"). Root cause -- the divider renders at 3px tall (~1 real screen px at this
+  // component's typical ~0.3 display scale), so EVERY native mouse interaction aimed directly at
+  // the element itself (hover-outline, mousedown-to-drag, the old delete button) was nearly
+  // impossible to land with a real cursor; 1-cover-circles.html additionally stacks `.caption`
+  // (same top offset, no z-index) over the divider's row, blocking it outright regardless of
+  // precision. Fixed generically, not divider-specifically: any field whose rendered box is under
+  // 20px on either axis gets an invisible padded proxy div (`hit`) sized to its real bounds + 14px
+  // margin, given an explicit z-index so it always wins stacking over an unrelated same-position
+  // sibling, and EVERY listener below (hover outline, drag-start, click/dblclick, delete-hover)
+  // attaches to `hit` instead of the tiny real element -- so a normal-sized field (text, circles,
+  // logo) is completely unaffected (`hit` just falls back to `el` itself), while a thin one
+  // becomes as easy to hit as everything else. This replaces the earlier per-feature workarounds
+  // (a one-off document-level mousemove proximity check that only fixed the delete button's hover,
+  // leaving drag-start and the outline itself still broken) with one fix that covers all of it.
   const injectedHtml = data.html.replace(
     '</body>',
     `<script>(function(){
   var fields = ${JSON.stringify(data.fields)};
   var THRESH = 8;
+  var PAD = 14;
+
+  // Selection state (2026-07-24, real feedback: "when I select text it stays selected and I can
+  // do whatever -- other objects don't do anything"). Text already had an obvious selected state
+  // (contenteditable + solid outline, persists until you click away). Circles/logo/divider had NO
+  // click reaction at all -- by design, since a plain click was freed up to do nothing so drag
+  // (move) and dblclick (swap) wouldn't collide -- but that also meant clicking one gave zero
+  // feedback that anything happened. Fixed by giving every non-text editable field the same kind
+  // of persistent "selected" outline text already gets: click selects (solid outline, delete
+  // button shown immediately if the field has one, not just on hover), stays selected until you
+  // click somewhere else -- same object permanence Canva gives any selected element, not just text.
+  var selectedEl = null;
+  var selectedHide = null;
+  function deselect(){
+    if (!selectedEl) return;
+    if (selectedEl.getAttribute('contenteditable') !== 'true') selectedEl.style.outline = '';
+    if (selectedHide) selectedHide();
+    selectedEl = null;
+    selectedHide = null;
+  }
+  document.addEventListener('click', deselect);
+
   fields.forEach(function(f){
     var el = document.querySelector(f.selector);
     if (!el) return;
-    el.style.cursor = 'pointer';
-    el.addEventListener('mouseenter', function(){ if (el.getAttribute('contenteditable') !== 'true') el.style.outline = '3px dashed rgba(124,58,237,0.85)'; });
-    el.addEventListener('mouseleave', function(){ if (el.getAttribute('contenteditable') !== 'true') el.style.outline = ''; });
+
+    var hit = el;
+    if (el.offsetHeight < 20 || el.offsetWidth < 20) {
+      hit = document.createElement('div');
+      hit.style.cssText = 'position:absolute;z-index:40;background:transparent;';
+      hit.style.left = (el.offsetLeft - PAD) + 'px';
+      hit.style.top = (el.offsetTop - PAD) + 'px';
+      hit.style.width = (el.offsetWidth + PAD * 2) + 'px';
+      hit.style.height = (el.offsetHeight + PAD * 2) + 'px';
+      el.parentNode.appendChild(hit);
+    }
+
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('mouseenter', function(){ if (el.getAttribute('contenteditable') !== 'true' && el !== selectedEl) el.style.outline = '3px dashed rgba(124,58,237,0.85)'; });
+    hit.addEventListener('mouseleave', function(){ if (el.getAttribute('contenteditable') !== 'true' && el !== selectedEl) el.style.outline = ''; });
 
     var justDragged = false;
     if (f.movable) {
       var moveTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
-      moveTarget.style.cursor = 'grab';
-      moveTarget.addEventListener('mousedown', function(e){
+      hit.style.cursor = 'grab';
+      hit.addEventListener('mousedown', function(e){
         e.preventDefault();
         e.stopPropagation();
         var startX = e.clientX, startY = e.clientY, moved = false;
@@ -240,10 +285,44 @@ export default function SlideCanvasEditor({
       });
     }
 
+    // Deletable elements' button is built before the click handlers below so selectThis() can
+    // show it immediately on select, not just on hover. Positioned INSIDE hit's own padded bounds
+    // (not floating above it) so moving the cursor from hit onto the button never crosses a gap
+    // outside hit's box -- that gap would fire hit's mouseleave (hiding the button) before the
+    // cursor ever reached it.
+    var showBtn = null, hideBtn = null;
+    if (f.deletable) {
+      var btn = document.createElement('div');
+      btn.textContent = '\\u00d7';
+      btn.style.cssText = 'position:absolute;width:22px;height:22px;line-height:20px;text-align:center;border-radius:50%;background:rgba(10,10,10,0.85);color:#fff;font-size:15px;font-family:sans-serif;cursor:pointer;z-index:50;display:none;';
+      btn.style.top = (el.offsetTop - 10) + 'px';
+      btn.style.left = (el.offsetLeft + el.offsetWidth - 26) + 'px';
+      el.parentNode.appendChild(btn);
+      showBtn = function(){ btn.style.display = 'block'; };
+      hideBtn = function(){ btn.style.display = 'none'; };
+      hit.addEventListener('mouseenter', showBtn);
+      hit.addEventListener('mouseleave', function(){ if (el !== selectedEl) hideBtn(); });
+      btn.addEventListener('mouseleave', function(){ if (el !== selectedEl) hideBtn(); });
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        hideBtn();
+        parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
+      });
+    }
+
+    function selectThis(){
+      deselect();
+      selectedEl = el;
+      selectedHide = hideBtn;
+      el.style.outline = '3px solid #7C3AED';
+      if (showBtn) showBtn();
+    }
+
     if (f.kind === 'text') {
-      el.addEventListener('click', function(e){
+      hit.addEventListener('click', function(e){
         e.stopPropagation();
         if (justDragged) return;
+        deselect();
         el.setAttribute('contenteditable', 'true');
         el.style.outline = '3px solid #7C3AED';
         el.focus();
@@ -254,50 +333,33 @@ export default function SlideCanvasEditor({
         parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: el.innerHTML.trim() }, '*');
       });
     } else if (f.kind === 'photo-img' && f.movable) {
-      // Circles: drag moves (handled above), double-click swaps, plain click does nothing --
-      // no competing action to guess between on a single click.
-      el.addEventListener('dblclick', function(e){
+      // Circles: click selects (same persistent outline as everything else, no competing action
+      // to guess between), drag moves (handled above), double-click swaps.
+      hit.addEventListener('click', function(e){
+        e.stopPropagation();
+        if (justDragged) return;
+        selectThis();
+      });
+      hit.addEventListener('dblclick', function(e){
         e.stopPropagation();
         if (justDragged) return;
         parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
       });
     } else if (f.kind === 'photo-img' || f.kind === 'photo-bg') {
       // Main/background photos: no move action exists, so a single click still swaps, unchanged.
-      el.addEventListener('click', function(e){
+      hit.addEventListener('click', function(e){
         e.stopPropagation();
         if (justDragged) return;
+        deselect();
         parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
       });
-    }
-    // 'move-only' fields (logo, divider): no click/dblclick handler at all -- drag-to-move above
-    // is the only interaction.
-
-    if (f.deletable) {
-      // A 3px-tall divider is ~1 real screen pixel at this component's typical display scale --
-      // relying on native hover directly over the element itself is nearly impossible to land on
-      // (for a real cursor, not just automation). Widen the effective hover zone with a proximity
-      // check on document-level mousemove instead of native mouseenter/mouseleave on the thin
-      // element itself -- doesn't touch the divider's own rendered size/appearance at all.
-      var MARGIN = 16;
-      var btn = document.createElement('div');
-      btn.textContent = '\\u00d7';
-      btn.style.cssText = 'position:absolute;width:22px;height:22px;line-height:20px;text-align:center;border-radius:50%;background:rgba(10,10,10,0.85);color:#fff;font-size:15px;font-family:sans-serif;cursor:pointer;z-index:50;display:none;';
-      btn.style.top = (el.offsetTop - 26) + 'px';
-      btn.style.left = (el.offsetLeft + el.offsetWidth - 22) + 'px';
-      el.parentNode.appendChild(btn);
-      function showBtn(){ btn.style.display = 'block'; }
-      function hideBtn(){ btn.style.display = 'none'; }
-      document.addEventListener('mousemove', function(ev){
-        if (btn.matches(':hover')) return;
-        var near = ev.clientX >= el.offsetLeft - MARGIN && ev.clientX <= el.offsetLeft + el.offsetWidth + MARGIN
-          && ev.clientY >= el.offsetTop - MARGIN && ev.clientY <= el.offsetTop + el.offsetHeight + MARGIN;
-        if (near) showBtn(); else hideBtn();
-      });
-      btn.addEventListener('mouseleave', hideBtn);
-      btn.addEventListener('click', function(e){
+    } else if (f.kind === 'move-only') {
+      // Logo, divider: no text to edit, no photo to swap -- click selects (persistent outline +
+      // delete button if this field has one), drag moves.
+      hit.addEventListener('click', function(e){
         e.stopPropagation();
-        hideBtn();
-        parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
+        if (justDragged) return;
+        selectThis();
       });
     }
   });

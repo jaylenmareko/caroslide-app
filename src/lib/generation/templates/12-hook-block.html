@@ -40,9 +40,16 @@
      the entire bottom two-thirds of the frame as a dead, empty void, same category of complaint
      Jaylen had about Photo Grid's inner slides earlier tonight. A text-length-independent glow
      anchored low in the frame gives the bottom real visual weight regardless of how short the
-     headline ends up being, without touching the safe top-anchored text growth direction at all. */
-  .glow { position:absolute; bottom:-320px; left:-160px; width:900px; height:900px; border-radius:50%; background:radial-gradient({{SECONDARY}} 0%, transparent 70%); opacity:0.28; filter:blur(40px); z-index:1; }
-  .glow2 { position:absolute; bottom:-260px; right:-220px; width:700px; height:700px; border-radius:50%; background:radial-gradient({{PRIMARY}} 0%, transparent 70%); opacity:0.35; filter:blur(40px); z-index:1; }
+     headline ends up being, without touching the safe top-anchored text growth direction at all.
+
+     Real bug found live 2026-07-25 (Jaylen: "looks off" on the wizard's own Look-picker preview):
+     re-rendered this exact template through the real Cloudflare pipeline to confirm before
+     touching anything -- the glow at its original 0.28/0.35 opacity was essentially invisible
+     against the dark base, leaving the same dead empty look this comment says it was built to
+     fix. Bumped opacity substantially (0.28->0.55, 0.35->0.6) and eased the blur back slightly
+     (40px->32px) so more of the actual color survives instead of thinning out into nothing. */
+  .glow { position:absolute; bottom:-320px; left:-160px; width:900px; height:900px; border-radius:50%; background:radial-gradient({{SECONDARY}} 0%, transparent 70%); opacity:0.55; filter:blur(32px); z-index:1; }
+  .glow2 { position:absolute; bottom:-260px; right:-220px; width:700px; height:700px; border-radius:50%; background:radial-gradient({{PRIMARY}} 0%, transparent 70%); opacity:0.6; filter:blur(32px); z-index:1; }
 
   /* Pure-CSS dot-grid accent -- same corner-decoration idea CarouselMaker's templates use (a
      small repeating motif, not a stock photo), done as a radial-gradient tile so it costs no

@@ -14,35 +14,6 @@ const ANGLES: { title: Angle; desc: string }[] = [
   { title: 'Education', desc: 'A real fact, explained.' },
 ]
 
-const ANGLE_MOCK_COPY: Record<Angle, { text: React.ReactNode; size: 'lg' | 'md' | 'sm' }> = {
-  Value: {
-    text: <>Your lotion has <span className="angle-mock-accent">more seed oil</span> than your salad dressing.</>,
-    size: 'lg',
-  },
-  Growth: {
-    text: <>I told my client his <span className="angle-mock-accent">dating apps</span> were the problem.</>,
-    size: 'md',
-  },
-  Education: {
-    text: (
-      <>
-        The class action covered every rancher who sold cattle between 2014 and 2019 — alleging the{' '}
-        <span className="angle-mock-accent">Big 4 packers</span> deliberately limited purchases to suppress the price
-        ranchers were paid.
-      </>
-    ),
-    size: 'sm',
-  },
-}
-
-function AngleMockup({ angle }: { angle: Angle }) {
-  const { text, size } = ANGLE_MOCK_COPY[angle]
-  return (
-    <div className="angle-mock">
-      <div className={`angle-mock-caption angle-mock-caption-${size}`}>{text}</div>
-    </div>
-  )
-}
 
 const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Circles + Photo', desc: 'Real photo proof, two circle insets.' },
@@ -368,22 +339,16 @@ export default function NewCarouselWizard({
           {ANGLES.map((a) => (
             <div
               key={a.title}
-              className={`pick-card${angleTouched && angle === a.title ? ' selected' : ''}`}
+              className={`pick-card pick-card-angle${angleTouched && angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
-              {/* Title/desc moved above the mockup (2026-07-25, real feedback: a tester picked a
-                  card by its example caption alone and never noticed the label explaining what
-                  it actually was). Reading order now hits "what is this" before the illustrative
-                  example, instead of after -- Look/Style steps below are untouched, they don't
-                  have this failure mode since their preview IS the actual template, not a
-                  stand-in example that can be misread as the real output. */}
-              <div className="pick-card-header">
-                <div className="title">{a.title}</div>
-                <div className="desc">{a.desc}</div>
-              </div>
-              <div className="pick-card-preview">
-                <AngleMockup angle={a.title} />
-              </div>
+              {/* Example caption removed entirely (2026-07-25, Jaylen's explicit call after
+                  reviewing the reorder) -- title/desc are now the card's only content, styled to
+                  carry that on their own instead of reading as a small caption under a bigger
+                  visual. Look/Style steps below are untouched -- their preview IS the actual
+                  template, a genuinely different case. */}
+              <div className="title">{a.title}</div>
+              <div className="desc">{a.desc}</div>
             </div>
           ))}
         </div>

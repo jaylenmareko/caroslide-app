@@ -8,6 +8,11 @@ import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSli
 import { createClient } from '@/lib/supabase/client'
 import SlideCanvasEditor from '@/components/SlideCanvasEditor'
 
+// Guards against an accidental giant paste (a whole doc/paragraph) turning into a real, costly
+// editSlide() -> Claude call -- the box itself no longer stops you once it scrolls past 120px
+// (2026-07-24). 500 comfortably covers even a multi-part request ("slide 2: X, also slide 3: Y").
+const CHAT_MESSAGE_MAX_LENGTH = 500
+
 export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [current, setCurrent] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -419,6 +424,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             <textarea
               ref={chatInputRef}
               rows={1}
+              maxLength={CHAT_MESSAGE_MAX_LENGTH}
               placeholder="e.g. slide 3: punchier hook, swap the CTA…"
               value={chatMessage}
               disabled={chatSending}
@@ -436,6 +442,14 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               </svg>
             </button>
           </div>
+          {/* Silent at typical message lengths -- only surfaces once someone's actually
+              approaching the cap, so it reads as a helpful heads-up, not a running counter no one
+              asked for. */}
+          {chatMessage.length > CHAT_MESSAGE_MAX_LENGTH - 60 && (
+            <p className="chat-char-count">
+              {chatMessage.length}/{CHAT_MESSAGE_MAX_LENGTH}
+            </p>
+          )}
           {chatReply ? (
             <p className="chat-reply">{chatReply}</p>
           ) : (

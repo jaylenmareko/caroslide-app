@@ -148,6 +148,15 @@ export default function NewCarouselWizard({
   const [brandColors, setBrandColors] = useState<string[]>(existingBrandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
   const [logoUrl, setLogoUrl] = useState<string | null>(existingBrandKit?.logo_url ?? null)
   const [font, setFont] = useState(existingBrandKit?.font ?? DEFAULT_BRAND_FONT)
+  // Real bug fixed 2026-07-25: brandColors/font above always hold SOME value -- either a real
+  // saved default or a placeholder fallback -- with nothing distinguishing "the user's actual
+  // choice" from "never touched." handleContinueFromBrand used to save whatever was in state
+  // unconditionally, which meant leaving colors alone and only picking a font silently wrote the
+  // hardcoded placeholder green/cream/black into the account's real brand_kits row as if it had
+  // been chosen. logoUrl doesn't need this -- its untouched default (null) IS the correct "no
+  // logo" state, not a fake stand-in value.
+  const [colorsTouched, setColorsTouched] = useState(false)
+  const [fontTouched, setFontTouched] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -184,7 +193,15 @@ export default function NewCarouselWizard({
 
   async function handleContinueFromBrand() {
     setSavingBrand(true)
-    await saveBrandKit({ colors: brandColors, logoUrl, font })
+    // Only persist a field the user actually touched -- an untouched field is either a real saved
+    // default (skip is a no-op, the DB already matches) or this step's placeholder fallback (skip
+    // is required, or the placeholder gets saved as if it were a real choice). logoUrl is always
+    // safe to send: its untouched default (null) is a genuine "no logo," not a stand-in value.
+    await saveBrandKit({
+      ...(colorsTouched ? { colors: brandColors } : {}),
+      logoUrl,
+      ...(fontTouched ? { font } : {}),
+    })
     setSavingBrand(false)
     setStep(composerStep)
   }
@@ -450,6 +467,7 @@ export default function NewCarouselWizard({
                         const next = [...brandColors]
                         next[i] = e.target.value
                         setBrandColors(next)
+                        setColorsTouched(true)
                       }}
                     />
                   </label>
@@ -466,6 +484,7 @@ export default function NewCarouselWizard({
                       const next = [...brandColors]
                       next[i] = v
                       setBrandColors(next)
+                      setColorsTouched(true)
                     }}
                   />
                 </div>
@@ -482,7 +501,10 @@ export default function NewCarouselWizard({
                   key={f.name}
                   className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
                   style={{ fontFamily: f.cssVar }}
-                  onClick={() => setFont(f.name)}
+                  onClick={() => {
+                    setFont(f.name)
+                    setFontTouched(true)
+                  }}
                 >
                   {f.name}
                 </button>

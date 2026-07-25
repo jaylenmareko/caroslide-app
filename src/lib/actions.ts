@@ -426,7 +426,7 @@ export async function deleteCarousel(id: string) {
 }
 
 export async function saveBrandKit(input: {
-  colors: string[]
+  colors?: string[]
   logoUrl?: string | null
   font?: string
   voiceDescription?: string | null
@@ -437,9 +437,16 @@ export async function saveBrandKit(input: {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // colors made optional alongside the others here (2026-07-25) -- a caller that never touched a
+  // field (the wizard's Brand Kit step, when someone only sets a font and clicks Continue) must be
+  // able to leave it out entirely rather than force a value in. Supabase's upsert only writes the
+  // columns actually present in this object: on a brand-new row the table's own column defaults
+  // apply (colors '{}', font 'Inter Tight' -- see schema.sql/003_brand_font.sql), and on an
+  // existing row an omitted column is left untouched, not overwritten with whatever the caller
+  // happened to have in state.
   const { error } = await supabase.from('brand_kits').upsert({
     user_id: user!.id,
-    colors: input.colors,
+    ...(input.colors !== undefined ? { colors: input.colors } : {}),
     ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
     ...(input.font !== undefined ? { font: input.font } : {}),
     ...(input.voiceDescription !== undefined ? { voice_description: input.voiceDescription } : {}),

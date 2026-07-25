@@ -132,7 +132,17 @@ export default function NewCarouselWizard({
   const [look, setLook] = useState<Look>(RECOMMENDED_LOOK)
   const [lookTouched, setLookTouched] = useState(false)
   const [variantTouched, setVariantTouched] = useState(false)
-  const [brief, setBrief] = useState(initialBrief ?? '')
+  // Split into title (primary) + context (optional, secondary) 2026-07-25 -- real user feedback:
+  // a tester who picked an Angle card by look alone said in chat she just wanted to type a title
+  // and have it made. The old single textarea's placeholder ("Give us as much context as
+  // possible: brand colors, photos, links, tone...") oversold the effort actually needed --
+  // generateCarousel already does its own research on a thin/empty brief (see
+  // initial-generation-behavior.md), nothing here ever required more than a title. No backend
+  // change needed, just matching the UI's ask to what the pipeline already handles: title is
+  // real input, context is genuinely optional and visually secondary, not a demand.
+  const [title, setTitle] = useState(initialBrief ?? '')
+  const [context, setContext] = useState('')
+  const brief = context.trim() ? `${title.trim()}\n\nAdditional context: ${context.trim()}` : title.trim()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
@@ -172,7 +182,7 @@ export default function NewCarouselWizard({
     step === 0 ? 'Choose an Angle'
     : step === 1 ? 'Choose a Look'
     : hasVariantStep && step === 2 ? 'Choose a Style for Your Selected Look'
-    : step === composerStep ? 'Tell Us Everything'
+    : step === composerStep ? 'What\'s This About?'
     : 'Add Your Brand Kit'
 
   function pickAngle(a: Angle) {
@@ -525,12 +535,31 @@ export default function NewCarouselWizard({
 
       <div className={`wizard-composer${step >= composerStep ? ' show' : ''}`}>
         <div className="new-composer-box">
-          <textarea
-            rows={3}
-            placeholder="Give us as much context as possible: brand colors, photos, links, tone, what you want the carousel to say…"
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-          />
+          <div className="composer-field">
+            <label className="composer-field-label" htmlFor="wizard-title">Carousel Title</label>
+            <input
+              id="wizard-title"
+              type="text"
+              className="composer-title-input"
+              placeholder="e.g. 5 things nobody tells you about pricing your first product"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div className="composer-field composer-field-context">
+            <label className="composer-field-label" htmlFor="wizard-context">
+              Additional Context <span className="composer-field-optional">(optional)</span>
+            </label>
+            <textarea
+              id="wizard-context"
+              rows={2}
+              className="composer-context-input"
+              placeholder="Any notes — e.g. 'keep tone light', 'focus on actionable tips', 'target audience is startup founders'"
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+            />
+          </div>
 
           {attachments.length > 0 && (
             <div className="attach-strip">

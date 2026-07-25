@@ -342,6 +342,24 @@ a { color: inherit; }
 }
 .new-composer-box textarea::placeholder { color: var(--ink-faint); }
 
+/* Title (primary) / Context (secondary, optional) split (2026-07-25) -- replaces one big
+   "give us everything" textarea. Font-size/weight hierarchy does the work of signaling which
+   field actually matters, rather than two separate bordered cards -- stays inside the one
+   composer box, matching this app's existing minimal-chrome convention. */
+.composer-field-label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.2px; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
+.composer-field-optional { font-weight: 500; text-transform: none; color: var(--ink-faint); letter-spacing: 0; }
+.composer-title-input {
+  width: 100%; border: none; outline: none; background: none;
+  font-family: var(--font); font-size: 16px; font-weight: 700; color: var(--ink); padding: 0; display: block;
+}
+.composer-title-input::placeholder { color: var(--ink-faint); font-weight: 500; }
+.composer-field-context { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.composer-context-input {
+  width: 100%; min-height: 46px; resize: vertical; border: none; outline: none; background: none;
+  font-family: var(--font); font-size: 13.5px; color: var(--ink); line-height: 1.5; display: block;
+}
+.composer-context-input::placeholder { color: var(--ink-faint); }
+
 .attach-strip { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
 .attach-thumb { position: relative; width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: #111; flex-shrink: 0; }
 .attach-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }

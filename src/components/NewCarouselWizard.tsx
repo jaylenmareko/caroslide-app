@@ -339,12 +339,14 @@ export default function NewCarouselWizard({
           {ANGLES.map((a) => (
             <div
               key={a.title}
-              className={`pick-card${angleTouched && angle === a.title ? ' selected' : ''}`}
+              className={`pick-card pick-card-angle${angleTouched && angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
               {/* Example caption removed entirely (2026-07-25, Jaylen) -- title/desc are the
-                  card's only content now, same plain .pick-card look as every other step, just
-                  without the mockup box that used to sit below them. */}
+                  card's only content now. .pick-card-angle only restores the card's original
+                  height/padding (it looked too thin without the mockup box filling it out) --
+                  text stays the same plain left-aligned size/position as every other step, no
+                  centering or font-size changes this time. */}
               <div className="title">{a.title}</div>
               <div className="desc">{a.desc}</div>
             </div>

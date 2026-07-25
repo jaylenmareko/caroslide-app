@@ -229,6 +229,15 @@ a { color: inherit; }
 .pick-card .title { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
 .pick-card.selected .title { color: var(--green); }
 .pick-card .desc { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+/* Angle cards only (2026-07-25) -- aspect-ratio matches the card's exact original proportions
+   from when the example mockup (aspect-ratio 4/5) filled it, scaling with card width the same
+   way rather than a guessed fixed height. Title/desc now fill that same footprint instead of
+   sitting cramped at the top with empty space below. Text sized up from the plain-caption
+   default (14.5px/12px) -- floating at that size in a card this much bigger read as too hard
+   to make out at a glance. */
+.pick-card-angle { aspect-ratio: 4/5; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.pick-card-angle .title { font-size: 19px; margin-bottom: 6px; }
+.pick-card-angle .desc { font-size: 14px; }
 .pick-card-icon {
   width: 38px; height: 38px; border-radius: 10px; background: var(--green-pale); color: var(--green);
   display: flex; align-items: center; justify-content: center; margin-bottom: 10px; transition: background .15s ease, color .15s ease;
@@ -635,6 +644,11 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .new-section h1 { font-size: 21px; }
   .pick-card { flex: 1 1 100%; }
   .pick-row-2col { grid-template-columns: 1fr; }
+  /* Angle cards' 4:5 desktop aspect-ratio stacks 3 tall cards vertically on mobile -- a lot of
+     scrolling for a card that's just two lines of text. Shrink to a fixed shorter height instead
+     of scaling the same ratio down; text stays the same size set above, just less empty space
+     around it. */
+  .pick-card-angle { aspect-ratio: auto; min-height: 90px; }
 
   .viewer-section { border-radius: 14px; margin-top: 4px; }
   /* Back button removed on mobile per Jaylen -- the mobile app-bar's logo (Sidebar.tsx)

@@ -371,11 +371,19 @@ export default function NewCarouselWizard({
               className={`pick-card${angleTouched && angle === a.title ? ' selected' : ''}`}
               onClick={() => pickAngle(a.title)}
             >
+              {/* Title/desc moved above the mockup (2026-07-25, real feedback: a tester picked a
+                  card by its example caption alone and never noticed the label explaining what
+                  it actually was). Reading order now hits "what is this" before the illustrative
+                  example, instead of after -- Look/Style steps below are untouched, they don't
+                  have this failure mode since their preview IS the actual template, not a
+                  stand-in example that can be misread as the real output. */}
+              <div className="pick-card-header">
+                <div className="title">{a.title}</div>
+                <div className="desc">{a.desc}</div>
+              </div>
               <div className="pick-card-preview">
                 <AngleMockup angle={a.title} />
               </div>
-              <div className="title">{a.title}</div>
-              <div className="desc">{a.desc}</div>
             </div>
           ))}
         </div>

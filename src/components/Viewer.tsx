@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/lib/types'
 import { BRAND_FONTS, DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSlide } from '@/lib/actions'
+import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSlide, updateSlideField } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 import SlideCanvasEditor from '@/components/SlideCanvasEditor'
 
@@ -38,11 +38,36 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     updateCarouselSlides(carousel.id, next)
   }
 
+  // Click-in-place selection (2026-07-24). The shared topbar Delete button used to always delete
+  // the whole current slide -- real feedback: after adding click-to-select for objects (same
+  // persistent outline text gets), clicking that same button right after selecting something now
+  // reads as "delete the thing I just selected," not "delete this entire page." selectedField is
+  // null whenever nothing's selected (or the selection isn't deletable, e.g. a circle/logo) --
+  // SlideCanvasEditor only ever reports a name here for fields it already flags `deletable`, so
+  // this component doesn't need its own copy of that rule. Cleared explicitly alongside every
+  // setCurrent call below (not via a useEffect keyed on `current`) so it can never render stale
+  // for even one paint -- a selection from slide 2 must never look active while slide 3 is showing.
+  const [selectedField, setSelectedField] = useState<string | null>(null)
+  function goToSlide(next: number | ((c: number) => number)) {
+    setSelectedField(null)
+    setCurrent(next)
+  }
+
   function deleteSlide(i: number) {
     if (slides.length <= 1) return
     const next = slides.filter((_, idx) => idx !== i)
     commitSlides(next)
-    setCurrent((c) => Math.min(c, next.length - 1))
+    goToSlide((c) => Math.min(c, next.length - 1))
+  }
+
+  async function handleDeleteClick() {
+    if (selectedField) {
+      const result = await updateSlideField(carousel.id, current, `${selectedField}_DISPLAY`, 'hidden')
+      if (result.type === 'updated') commitSlides(result.slides)
+      setSelectedField(null)
+      return
+    }
+    deleteSlide(current)
   }
 
   function undo() {
@@ -52,7 +77,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     setFuture((f) => [slides, ...f])
     setSlides(prev)
     updateCarouselSlides(carousel.id, prev)
-    setCurrent((c) => Math.min(c, prev.length - 1))
+    goToSlide((c) => Math.min(c, prev.length - 1))
   }
 
   function redo() {
@@ -62,7 +87,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     setPast((p) => [...p, slides])
     setSlides(next)
     updateCarouselSlides(carousel.id, next)
-    setCurrent((c) => Math.min(c, next.length - 1))
+    goToSlide((c) => Math.min(c, next.length - 1))
   }
 
   // Real chat-editing build (2026-07-21) -- the box existed visually but had zero wiring behind
@@ -288,15 +313,15 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           </button>
           <button
             className="viewer-icon-btn danger"
-            aria-label="Delete this slide"
-            title="Delete slide"
-            onClick={() => deleteSlide(current)}
-            disabled={slides.length <= 1}
+            aria-label={selectedField ? 'Delete selected object' : 'Delete this slide'}
+            title={selectedField ? 'Delete selected object' : 'Delete slide'}
+            onClick={handleDeleteClick}
+            disabled={!selectedField && slides.length <= 1}
           >
             <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
               <path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m2 0-.8 12.1a2 2 0 0 1-2 1.9H7.8a2 2 0 0 1-2-1.9L5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="lbl">Delete</span>
+            <span className="lbl">{selectedField ? 'Delete object' : 'Delete'}</span>
           </button>
           <button className="download-btn" onClick={handleDownloadAll} disabled={downloading}>
             {downloading ? 'Downloading…' : <>⬇ <span className="lbl">Download</span></>}
@@ -310,7 +335,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             <div
               key={i}
               className={`thumb-item${i === current ? ' active' : ''}`}
-              onClick={() => setCurrent(i)}
+              onClick={() => goToSlide(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={s.url} alt={`Slide ${i + 1}`} />
@@ -338,6 +363,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               displayWidth={stageWidth}
               previewUrl={slides[current]?.url}
               onSlidesUpdated={commitSlides}
+              onSelectionChange={setSelectedField}
             />
             {/* No more edit-mode toggle (2026-07-24) -- clicking any field is always live, so a
                 plain click on the stage can't also mean "zoom" anymore. Zoom moves to its own
@@ -358,7 +384,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           <button
             className="stage-arrow left"
             aria-label="Previous slide"
-            onClick={() => setCurrent((c) => (c - 1 + slides.length) % slides.length)}
+            onClick={() => goToSlide((c) => (c - 1 + slides.length) % slides.length)}
           >
             <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
               <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -367,7 +393,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           <button
             className="stage-arrow right"
             aria-label="Next slide"
-            onClick={() => setCurrent((c) => (c + 1) % slides.length)}
+            onClick={() => goToSlide((c) => (c + 1) % slides.length)}
           >
             <svg viewBox="0 0 24 24" width={20} height={20} fill="none">
               <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />

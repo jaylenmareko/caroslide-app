@@ -25,12 +25,14 @@ export default function SlideCanvasEditor({
   displayWidth,
   previewUrl,
   onSlidesUpdated,
+  onSelectionChange,
 }: {
   carouselId: string
   slideIndex: number
   displayWidth: number
   previewUrl?: string
   onSlidesUpdated: (slides: Slide[]) => void
+  onSelectionChange?: (deletableField: string | null) => void
 }) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +41,11 @@ export default function SlideCanvasEditor({
   const pendingPhotoField = useRef<string | null>(null)
 
   const load = useCallback(async () => {
+    // A fresh document is about to load (first mount, or a save-triggered re-render) -- any
+    // selection from the previous document is about to stop existing, so tell the parent before
+    // it goes stale (its "Delete" button would otherwise keep targeting a field that no longer
+    // has a live selection listener behind it).
+    onSelectionChange?.(null)
     const result = await getSlideEditorHtml(carouselId, slideIndex)
     if ('error' in result) {
       setError(result.error)
@@ -47,13 +54,22 @@ export default function SlideCanvasEditor({
     }
     setError(null)
     setData(result)
-  }, [carouselId, slideIndex])
+  }, [carouselId, slideIndex, onSelectionChange])
 
+  // Real bug found 2026-07-24: this component's own save() -> load() was the ONLY thing that ever
+  // refetched the live editable document. Any edit that reaches the slide through a DIFFERENT
+  // path -- chat-editing's editSlide(), or the topbar Delete button now that it can remove a
+  // single selected object -- updates the slides array and previewUrl correctly, but the already-
+  // mounted iframe here had no idea anything changed and kept showing the old document (a deleted
+  // field's outline stayed visible, stale text stayed editable, etc.) until the user switched
+  // slides and back. previewUrl in the dependency list re-runs load() whenever this slide's
+  // rendered image changes for ANY reason, catching every external path generically without each
+  // of them needing to know this component exists.
   useEffect(() => {
     void (async () => {
       await load()
     })()
-  }, [load])
+  }, [load, previewUrl])
 
   const save = useCallback(
     async (fields: Record<string, string>) => {
@@ -85,11 +101,16 @@ export default function SlideCanvasEditor({
       } else if (msg.type === 'caroslide-photo-click') {
         pendingPhotoField.current = msg.field
         fileInputRef.current?.click()
+      } else if (msg.type === 'caroslide-field-selected') {
+        // Only surface a selection the shared topbar Delete button can actually act on -- a
+        // selected circle/logo (not deletable) reports null here so that button keeps deleting
+        // the whole slide, its original behavior, rather than silently doing nothing.
+        onSelectionChange?.(msg.deletable ? msg.field : null)
       }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [save])
+  }, [save, onSelectionChange])
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -215,6 +236,7 @@ export default function SlideCanvasEditor({
     if (selectedHide) selectedHide();
     selectedEl = null;
     selectedHide = null;
+    parent.postMessage({ type: 'caroslide-field-selected', field: null, deletable: false }, '*');
   }
   document.addEventListener('click', deselect);
 
@@ -316,6 +338,7 @@ export default function SlideCanvasEditor({
       selectedHide = hideBtn;
       el.style.outline = '3px solid #7C3AED';
       if (showBtn) showBtn();
+      parent.postMessage({ type: 'caroslide-field-selected', field: f.field, deletable: !!f.deletable }, '*');
     }
 
     if (f.kind === 'text') {

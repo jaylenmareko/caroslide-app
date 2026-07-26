@@ -38,7 +38,16 @@ export default function SlideCanvasEditor({
   // fell back to deleting the whole slide for any selected object that isn't the divider. Passing
   // deletable as its own argument lets Viewer.tsx tell "selected, nothing to delete about it" (no-
   // op) apart from "nothing selected at all" (slide-delete is the deliberate fallback).
-  onSelectionChange?: (field: string | null, deletable: boolean) => void
+  //
+  // `mode` added same day, second real bug from the same class: text fields never called
+  // selectThis() at all (they go straight to contenteditable), so entering edit mode left
+  // `selectedField` null from the outer page's point of view -- clicking the topbar Delete button
+  // while a caption was mid-edit fell through to whole-SLIDE delete instead of clearing the text.
+  // 'text' tells Viewer.tsx to clear the field to '' (the hover-X button's own save path);
+  // 'display' (move-only fields: divider/logo) tells it to toggle the field's `_DISPLAY` placeholder
+  // instead -- no `_DISPLAY` placeholder exists for text fields, so that toggle would silently do
+  // nothing to a caption.
+  onSelectionChange?: (field: string | null, deletable: boolean, mode?: 'text' | 'display') => void
 }) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -115,11 +124,12 @@ export default function SlideCanvasEditor({
         pendingPhotoField.current = msg.field
         fileInputRef.current?.click()
       } else if (msg.type === 'caroslide-field-selected') {
-        // Pass both through -- Viewer.tsx needs to tell "selected, but this field has no delete
-        // action" (a circle/logo -- no-op) apart from "nothing selected at all" (slide-delete is
-        // the deliberate fallback). Collapsing both into one nullable value was the actual bug:
-        // selecting a circle silently fell back to whole-slide delete either way.
-        onSelectionChange?.(msg.field, !!msg.deletable)
+        // Pass all three through -- Viewer.tsx needs to tell "selected, but this field has no
+        // delete action" (a circle/logo -- no-op) apart from "nothing selected at all" (slide-
+        // delete is the deliberate fallback), and (mode) "clear this text field's value" apart
+        // from "toggle this move-only field's _DISPLAY placeholder" -- conflating either pair was
+        // a real bug that silently fell back to whole-slide delete instead of the intended action.
+        onSelectionChange?.(msg.field, !!msg.deletable, msg.mode)
       }
     }
     window.addEventListener('message', handleMessage)
@@ -398,7 +408,7 @@ export default function SlideCanvasEditor({
       selectedDeleteField = f.deletable ? f.field : null;
       el.style.outline = '3px solid #7C3AED';
       if (showBtn) showBtn();
-      parent.postMessage({ type: 'caroslide-field-selected', field: f.field, deletable: !!f.deletable }, '*');
+      parent.postMessage({ type: 'caroslide-field-selected', field: f.field, deletable: !!f.deletable, mode: 'display' }, '*');
     }
 
     if (f.kind === 'text') {
@@ -410,11 +420,21 @@ export default function SlideCanvasEditor({
         el.setAttribute('contenteditable', 'true');
         el.style.outline = '3px solid #7C3AED';
         el.focus();
+        // Real bug found live 2026-07-26: entering edit mode never told the outer topbar Delete
+        // button anything was selected (text has no selectThis() call, unlike move-only fields) --
+        // so clicking that shared button while a caption was mid-edit silently fell through to
+        // deleting the WHOLE SLIDE instead of the text, since selectedField was still null from the
+        // outer page's point of view. mode:'text' tells Viewer.tsx to clear this field to '' (the
+        // same save path the hover-X button already uses) instead of the '_DISPLAY' toggle move-only
+        // fields use -- no FIELD_DISPLAY placeholder exists for text, so that toggle would silently
+        // do nothing to a caption.
+        parent.postMessage({ type: 'caroslide-field-selected', field: f.field, deletable: true, mode: 'text' }, '*');
       });
       el.addEventListener('blur', function(){
         el.removeAttribute('contenteditable');
         el.style.outline = '';
         parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: el.innerHTML.trim() }, '*');
+        parent.postMessage({ type: 'caroslide-field-selected', field: null, deletable: false }, '*');
       });
     } else if (f.kind === 'photo-img' && f.movable) {
       // Circles: click selects (same persistent outline as everything else, no competing action

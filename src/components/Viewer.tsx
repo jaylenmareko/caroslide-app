@@ -58,6 +58,15 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   // selection from slide 2 must never look active while slide 3 is showing.
   const [selectedField, setSelectedField] = useState<string | null>(null)
   const [selectedDeletable, setSelectedDeletable] = useState(false)
+  // Real bug found live 2026-07-26 (video evidence: clicking into a caption then hitting the
+  // topbar Delete button wiped the whole slide, not just the text): text fields never called
+  // selectThis() at all (they go straight to contenteditable), so selectedField stayed null from
+  // this component's point of view the entire time a caption was being edited -- handleDeleteClick
+  // saw "nothing selected" and fell through to its deliberate slide-delete fallback. mode tracks
+  // HOW to delete once selectedField is real: 'text' clears the field's own value to '' (the same
+  // path the hover-X button already uses -- no `_DISPLAY` placeholder exists for text), 'display'
+  // toggles the move-only field's `_DISPLAY` placeholder (divider/logo).
+  const [selectedMode, setSelectedMode] = useState<'text' | 'display' | null>(null)
   // Real bug found live 2026-07-26: an inline function here (a fresh reference every render,
   // unlike setSelectedField alone, which React guarantees is stable) cascades into a re-render
   // loop -- SlideCanvasEditor's `load` useCallback lists `onSelectionChange` as a dependency, so a
@@ -67,13 +76,15 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   // null, every time, which is why the topbar button never reflected a real selection at all
   // despite the correct field/deletable data actually arriving. useCallback with an empty
   // dependency array restores the same stability setSelectedField always had on its own.
-  const handleSelectionChange = useCallback((field: string | null, deletable: boolean) => {
+  const handleSelectionChange = useCallback((field: string | null, deletable: boolean, mode?: 'text' | 'display') => {
     setSelectedField(field)
     setSelectedDeletable(deletable)
+    setSelectedMode(mode ?? null)
   }, [])
   function goToSlide(next: number | ((c: number) => number)) {
     setSelectedField(null)
     setSelectedDeletable(false)
+    setSelectedMode(null)
     setCurrent(next)
   }
 
@@ -87,10 +98,14 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   async function handleDeleteClick() {
     if (selectedField) {
       if (!selectedDeletable) return
-      const result = await updateSlideField(carousel.id, current, `${selectedField}_DISPLAY`, 'hidden')
+      const result =
+        selectedMode === 'text'
+          ? await updateSlideField(carousel.id, current, selectedField, '')
+          : await updateSlideField(carousel.id, current, `${selectedField}_DISPLAY`, 'hidden')
       if (result.type === 'updated') commitSlides(result.slides)
       setSelectedField(null)
       setSelectedDeletable(false)
+      setSelectedMode(null)
       return
     }
     deleteSlide(current)

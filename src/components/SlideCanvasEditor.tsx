@@ -223,7 +223,18 @@ export default function SlideCanvasEditor({
     '</body>',
     `<script>(function(){
   var fields = ${JSON.stringify(data.fields)};
-  var THRESH = 8;
+  // Real bug found live 2026-07-26 (Jaylen: selecting an object then pressing Delete kept
+  // deleting the whole slide): a fixed 8-native-unit threshold measures a real click's natural
+  // ~2-3px mouse jitter as ~9+ native units at this component's typical ~0.3 display scale (native
+  // deltas are the REAL screen delta divided by scale, same reasoning as the earlier drag-
+  // precision fix) -- meaning most real clicks on a movable field were being misclassified as
+  // drags, silently setting justDragged and skipping selectThis() entirely. Confirmed by
+  // replaying the actual mousedown/mousemove/mouseup/click sequence a real click goes through
+  // (not just a bare click dispatch, which never exercises this path at all -- how this went
+  // uncaught through every earlier test). Expressing the threshold as a real-pixel budget divided
+  // by scale keeps "how far is a click, not a drag" constant in real screen pixels regardless of
+  // how small or large this preview is currently rendered.
+  var THRESH = 6 / ${scale};
   var PAD = 14;
 
   // Selection state (2026-07-24, real feedback: "when I select text it stays selected and I can

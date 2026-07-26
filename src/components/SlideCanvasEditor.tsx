@@ -360,14 +360,27 @@ const SlideCanvasEditor = forwardRef<
     for (var i = 0; i < children.length; i++) stripInnerColors(children[i]);
   }
 
-  function applyColorToSelection(color){
+  // containerEl lets a caller pass the field explicitly instead of relying on document.activeElement
+  // at call time. Swatch clicks call this with no second argument -- activeElement is still
+  // genuinely live and contenteditable then, since preventDefault kept focus on the field. But the
+  // custom color input's restore flow (below) can't rely on that: by the time its 'input' event
+  // fires, the field has already blurred (its own blur handler already stripped its contenteditable
+  // attribute) and activeElement is the color input itself, not the field -- a live activeElement
+  // re-check would reject a legitimate restore every time. So that flow captures the field reference
+  // at mousedown, while it's still genuinely valid, and passes it through here explicitly.
+  function applyColorToSelection(color, containerEl){
     var sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     var range = sel.getRangeAt(0);
-    // Guard against a cross-field drag-select wrapping unrelated sibling DOM -- only apply when
-    // the live selection is actually contained within the field currently in edit mode.
-    var active = document.activeElement;
-    if (!active || active.getAttribute('contenteditable') !== 'true' || !active.contains(range.commonAncestorContainer)) return;
+    // Guard against a cross-field drag-select (or a stale/foreign selection) wrapping unrelated
+    // sibling DOM -- only apply when the selection is actually contained within the field.
+    var container = containerEl;
+    if (!container) {
+      var active = document.activeElement;
+      if (!active || active.getAttribute('contenteditable') !== 'true') return;
+      container = active;
+    }
+    if (!container.contains(range.commonAncestorContainer)) return;
     var span = document.createElement('span');
     span.style.color = color;
     var contents = range.extractContents();
@@ -412,24 +425,34 @@ const SlideCanvasEditor = forwardRef<
   customColorInput.style.cssText = 'width:24px;height:24px;border:none;padding:0;cursor:pointer;background:none;';
   // Focusing the native color input (mousedown on it) fires the contenteditable field's own blur
   // handler and collapses the live selection before the async 'input' event (fired once the user
-  // actually picks a color in the native dialog) ever runs -- save the range on mousedown and
-  // restore it right before applying the color. Not e.preventDefault() here: that would block the
-  // native color-picker dialog from opening at all, same input, different breakage.
+  // actually picks a color in the native dialog) ever runs -- save both the range AND the field
+  // itself on mousedown, while the field is still genuinely contenteditable, and restore/pass both
+  // explicitly on input. The field reference matters as much as the range: by the time 'input'
+  // fires, the field has already blurred and lost its own contenteditable attribute, so re-deriving
+  // the container from document.activeElement at that point would find the color input itself, not
+  // the field -- passing the saved field through to applyColorToSelection sidesteps that entirely.
+  // Not e.preventDefault() on mousedown: that would block the native color-picker dialog from
+  // opening at all, same input, different breakage.
   var savedColorRange = null;
+  var savedColorField = null;
   customColorInput.addEventListener('mousedown', function(e){
     e.stopPropagation();
     var sel = document.getSelection();
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    var activeAtMousedown = document.activeElement;
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && activeAtMousedown && activeAtMousedown.getAttribute('contenteditable') === 'true') {
       savedColorRange = sel.getRangeAt(0).cloneRange();
+      savedColorField = activeAtMousedown;
     }
   });
   customColorInput.addEventListener('input', function(){
-    if (savedColorRange) {
+    if (savedColorRange && savedColorField) {
       var sel = document.getSelection();
       sel.removeAllRanges();
       sel.addRange(savedColorRange);
+      applyColorToSelection(customColorInput.value, savedColorField);
     }
-    applyColorToSelection(customColorInput.value);
+    savedColorRange = null;
+    savedColorField = null;
   });
   colorToolbar.appendChild(customColorInput);
 

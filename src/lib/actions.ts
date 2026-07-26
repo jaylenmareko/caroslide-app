@@ -277,7 +277,16 @@ export async function editSlide(carouselId: string, message: string, currentSlid
 // JS -- neither is a reliable source to read a plain number back out of). The server already knows
 // the real current offset from `slide.values`, so it just sends the number directly.
 export type SlideEditorField = EditableField & { posX?: number; posY?: number }
-export type SlideEditorData = { html: string; canvasH: number; fields: SlideEditorField[] }
+// primaryColor/secondaryColor: this carousel's own brand colors, already baked into slide.values
+// as PRIMARY/SECONDARY by pipeline.ts at generation time -- exposed here so the click-in-place
+// editor's per-word color toolbar can offer them as one-click swatches (2026-07-26).
+export type SlideEditorData = {
+  html: string
+  canvasH: number
+  fields: SlideEditorField[]
+  primaryColor: string
+  secondaryColor: string
+}
 
 /**
  * Click-in-place editor support (2026-07-22): returns the slide's real filled template HTML (not
@@ -317,7 +326,13 @@ export async function getSlideEditorHtml(
       ? { ...f, posX: parseInt(values[`${f.field}_POS_X`] ?? '0', 10) || 0, posY: parseInt(values[`${f.field}_POS_Y`] ?? '0', 10) || 0 }
       : f
   )
-  return { html, canvasH: Number(slide.values.CANVAS_H) || 1350, fields }
+  return {
+    html,
+    canvasH: Number(slide.values.CANVAS_H) || 1350,
+    fields,
+    primaryColor: slide.values.PRIMARY || '#D97757',
+    secondaryColor: slide.values.SECONDARY || '#F4C95D',
+  }
 }
 
 /**

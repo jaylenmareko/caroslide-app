@@ -306,6 +306,17 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             className="viewer-icon-btn danger"
             aria-label={selectedField ? (selectedDeletable ? 'Delete selected object' : 'Nothing to delete for this selection') : 'Delete this slide'}
             title={selectedField ? (selectedDeletable ? 'Delete selected object' : 'Nothing to delete for this selection') : 'Delete slide'}
+            // Real bug found live 2026-07-26, second round (video evidence + traced event order):
+            // clicking this button while a caption was mid-edit shifted focus away from the iframe's
+            // contenteditable, firing its blur handler -- which posts field:null -- BEFORE this
+            // button's own onClick runs (blur-on-focus-shift fires ahead of click, standard browser
+            // event order). That raced selectedField back to null right before handleDeleteClick
+            // read it, so it fell through to whole-slide delete despite the mode:'text' fix already
+            // in place. preventDefault on mousedown stops the browser's default focus-shift-to-this-
+            // button behavior entirely, so the contenteditable never blurs and selectedField survives
+            // intact -- same technique rich-text-editor toolbars use to act on a focused field without
+            // stealing its focus first.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleDeleteClick}
             disabled={selectedField ? !selectedDeletable : slides.length <= 1}
           >

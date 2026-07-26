@@ -45,9 +45,20 @@ export default function SlideCanvasEditor({
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingPhotoField = useRef<string | null>(null)
+  // Real slowness found live 2026-07-26 (Jaylen: editing in a project feels slow): a click-in-place
+  // edit's real cost is a Cloudflare screenshot round-trip (a few real seconds, not something this
+  // app controls) inside updateSlideField -- but on top of that, this component was reloading the
+  // WHOLE iframe from scratch right after, twice (once from save()'s own explicit load() below,
+  // once more from the previewUrl effect once commitSlides propagated the new url back down),
+  // discarding and re-initializing a document that was already showing the edit correctly the
+  // instant the user typed/dragged it. Tracks the url WE just saved so the previewUrl effect can
+  // tell "this change is my own save landing" (skip -- already live, no need to reload) apart from
+  // "something else changed this slide" (chat-editing, the topbar delete button -- a real reload
+  // is still needed since nothing local reflects those).
+  const selfSavedUrl = useRef<string | null>(null)
 
   const load = useCallback(async () => {
-    // A fresh document is about to load (first mount, or a save-triggered re-render) -- any
+    // A fresh document is about to load (first mount, or an externally-triggered re-render) -- any
     // selection from the previous document is about to stop existing, so tell the parent before
     // it goes stale (its "Delete" button would otherwise keep targeting a field that no longer
     // has a live selection listener behind it).
@@ -62,16 +73,12 @@ export default function SlideCanvasEditor({
     setData(result)
   }, [carouselId, slideIndex, onSelectionChange])
 
-  // Real bug found 2026-07-24: this component's own save() -> load() was the ONLY thing that ever
-  // refetched the live editable document. Any edit that reaches the slide through a DIFFERENT
-  // path -- chat-editing's editSlide(), or the topbar Delete button now that it can remove a
-  // single selected object -- updates the slides array and previewUrl correctly, but the already-
-  // mounted iframe here had no idea anything changed and kept showing the old document (a deleted
-  // field's outline stayed visible, stale text stayed editable, etc.) until the user switched
-  // slides and back. previewUrl in the dependency list re-runs load() whenever this slide's
-  // rendered image changes for ANY reason, catching every external path generically without each
-  // of them needing to know this component exists.
+  // previewUrl in the dependency list re-runs load() whenever this slide's rendered image changes
+  // for ANY reason (chat-editing's editSlide(), the topbar Delete button, or this component's own
+  // save() below), catching every external path generically without each of them needing to know
+  // this component exists -- except a self-authored save, which the selfSavedUrl check above skips.
   useEffect(() => {
+    if (previewUrl && previewUrl === selfSavedUrl.current) return
     void (async () => {
       await load()
     })()
@@ -84,8 +91,8 @@ export default function SlideCanvasEditor({
       try {
         const result = await updateSlideField(carouselId, slideIndex, fields)
         if (result.type === 'updated') {
+          selfSavedUrl.current = result.slides[slideIndex]?.url ?? null
           onSlidesUpdated(result.slides)
-          await load()
         } else {
           setError(result.message)
         }
@@ -93,7 +100,7 @@ export default function SlideCanvasEditor({
         setSaving(false)
       }
     },
-    [carouselId, slideIndex, onSlidesUpdated, load]
+    [carouselId, slideIndex, onSlidesUpdated]
   )
 
   useEffect(() => {

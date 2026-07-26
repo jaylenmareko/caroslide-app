@@ -347,13 +347,32 @@ const SlideCanvasEditor = forwardRef<
   // No new save path: this only edits the DOM. Whatever's in the field when its own blur handler
   // fires (already wired up per text field, see the 'text' branch below) is what gets saved --
   // same path a normal typed edit already uses.
+  // A descendant element's own explicit color (an AI-written c1/c2/c3 class, or an earlier manual
+  // color span) always wins over an ancestor's color -- wrapping colored content in a new outer
+  // span does nothing visually unless the inner color/class is stripped first. Also handles
+  // re-coloring text the user already manually colored earlier, not just c1/c2/c3.
+  function stripInnerColors(node){
+    if (node.nodeType === 1) {
+      node.style.color = '';
+      node.classList.remove('c1', 'c2', 'c3');
+    }
+    var children = node.childNodes;
+    for (var i = 0; i < children.length; i++) stripInnerColors(children[i]);
+  }
+
   function applyColorToSelection(color){
     var sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     var range = sel.getRangeAt(0);
+    // Guard against a cross-field drag-select wrapping unrelated sibling DOM -- only apply when
+    // the live selection is actually contained within the field currently in edit mode.
+    var active = document.activeElement;
+    if (!active || active.getAttribute('contenteditable') !== 'true' || !active.contains(range.commonAncestorContainer)) return;
     var span = document.createElement('span');
     span.style.color = color;
-    span.appendChild(range.extractContents());
+    var contents = range.extractContents();
+    stripInnerColors(contents);
+    span.appendChild(contents);
     range.insertNode(span);
     sel.removeAllRanges();
     var after = document.createRange();
@@ -391,8 +410,25 @@ const SlideCanvasEditor = forwardRef<
   var customColorInput = document.createElement('input');
   customColorInput.type = 'color';
   customColorInput.style.cssText = 'width:24px;height:24px;border:none;padding:0;cursor:pointer;background:none;';
-  customColorInput.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+  // Focusing the native color input (mousedown on it) fires the contenteditable field's own blur
+  // handler and collapses the live selection before the async 'input' event (fired once the user
+  // actually picks a color in the native dialog) ever runs -- save the range on mousedown and
+  // restore it right before applying the color. Not e.preventDefault() here: that would block the
+  // native color-picker dialog from opening at all, same input, different breakage.
+  var savedColorRange = null;
+  customColorInput.addEventListener('mousedown', function(e){
+    e.stopPropagation();
+    var sel = document.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      savedColorRange = sel.getRangeAt(0).cloneRange();
+    }
+  });
   customColorInput.addEventListener('input', function(){
+    if (savedColorRange) {
+      var sel = document.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedColorRange);
+    }
     applyColorToSelection(customColorInput.value);
   });
   colorToolbar.appendChild(customColorInput);
@@ -406,8 +442,8 @@ const SlideCanvasEditor = forwardRef<
     }
     var rect = sel.getRangeAt(0).getBoundingClientRect();
     colorToolbar.style.display = 'flex';
-    colorToolbar.style.left = (rect.left + rect.width / 2 - 60) + 'px';
-    colorToolbar.style.top = (rect.top - 40) + 'px';
+    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 60) + 'px';
+    colorToolbar.style.top = Math.max(4, rect.top - 40) + 'px';
   });
 
   fields.forEach(function(f){

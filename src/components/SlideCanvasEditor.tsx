@@ -359,7 +359,13 @@ export default function SlideCanvasEditor({
       btn.style.top = (el.offsetTop - 10) + 'px';
       btn.style.left = (el.offsetLeft + el.offsetWidth - 26) + 'px';
       el.parentNode.appendChild(btn);
-      showBtn = function(){ btn.style.display = 'block'; };
+      showBtn = function(){
+        // Text fields have no separate "selected" state (click goes straight to contenteditable)
+        // -- never reveal the delete button while actively editing, so it can't sit in the way of
+        // a real typing cursor or get clicked by accident mid-edit.
+        if (f.kind === 'text' && el.getAttribute('contenteditable') === 'true') return;
+        btn.style.display = 'block';
+      };
       hideBtn = function(){ btn.style.display = 'none'; };
       hit.addEventListener('mouseenter', showBtn);
       hit.addEventListener('mouseleave', function(){ if (el !== selectedEl) hideBtn(); });
@@ -367,7 +373,14 @@ export default function SlideCanvasEditor({
       btn.addEventListener('click', function(e){
         e.stopPropagation();
         hideBtn();
-        parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
+        // Text fields have no FIELD_DISPLAY placeholder in any template (unlike the divider) --
+        // clearing the field's own value to empty is enough to make the box disappear visually,
+        // via the exact same save path a normal text edit already uses.
+        if (f.kind === 'text') {
+          parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: '' }, '*');
+        } else {
+          parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
+        }
       });
     }
 
@@ -386,6 +399,7 @@ export default function SlideCanvasEditor({
         e.stopPropagation();
         if (justDragged) return;
         deselect();
+        if (hideBtn) hideBtn();
         el.setAttribute('contenteditable', 'true');
         el.style.outline = '3px solid #7C3AED';
         el.focus();

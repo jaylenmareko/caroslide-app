@@ -33,9 +33,19 @@ export type EditableFieldKind = 'text' | 'photo-img' | 'photo-bg' | 'move-only'
 // write to, reusing the SAME key the automatic guardrail-shrink system already uses where one
 // exists (CAPTION_SIZE, HEADLINE_SIZE, STORY_SIZE, STATEMENT_SIZE, STAT_SIZE) so there's one
 // unified size slot per field, not two competing ones -- a new key for fields that never had one.
-// `deletable` (2026-07-24) shows a small hover-revealed delete control that sets a `{FIELD}_DISPLAY`
-// placeholder to 'hidden' -- a real, reversible (undo-stack-backed) on/off toggle, not a data
-// change; only decorative elements with no content of their own (the divider) are ever deletable.
+// `deletable` (2026-07-24, extended to text 2026-07-26 per Jaylen: "users should be able to
+// delete their text box if they want") shows a small hover-revealed delete control. For
+// decorative move-only elements with no content of their own (the divider), it sets a
+// `{FIELD}_DISPLAY` placeholder to 'hidden' -- a real, reversible on/off toggle. For text fields,
+// there's no such placeholder in any template (and adding one to all 13 would be real template-
+// level work, unlike this) -- deleting just clears the field's own value to an empty string via
+// the same save path a normal edit already uses, which is enough to make the box disappear
+// visually without needing any template changes at all, so this rolled out to every template's
+// text fields at once, not gated behind the same per-template wiring move/resize needs (task
+// #32). Deliberately mouse-only (the hover button), not wired to keyboard Delete -- text fields
+// go straight to contenteditable on click rather than a separate "selected" state the way
+// movable/deletable non-text fields do, so a keyboard shortcut here would risk colliding with a
+// real Backspace keystroke while actually editing.
 export type EditableField = {
   field: string
   selector: string
@@ -47,7 +57,7 @@ export type EditableField = {
 
 export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
   '1-cover-circles.html': [
-    { field: 'CAPTION_HTML', selector: '.caption-inner', kind: 'text', movable: true, sizeField: 'CAPTION_SIZE' },
+    { field: 'CAPTION_HTML', selector: '.caption-inner', kind: 'text', movable: true, sizeField: 'CAPTION_SIZE', deletable: true },
     { field: 'BG_IMG', selector: '.photo', kind: 'photo-bg' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
@@ -55,14 +65,14 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '2-split-cover.html': [
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
   ],
   '3-flip.html': [
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photozone img', kind: 'photo-img' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
@@ -70,69 +80,69 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '4-vertical-split.html': [
-    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true },
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true, deletable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photocol img', kind: 'photo-img' },
   ],
   '5-stat-takeover.html': [
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photostrip img', kind: 'photo-img' },
   ],
   '6-minimal-magazine.html': [
-    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true },
-    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true },
-    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
+    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
+    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photo img', kind: 'photo-img' },
   ],
   '7-keynote.html': [
-    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true },
-    { field: 'STATEMENT_HTML', selector: '.statement', kind: 'text', movable: true },
+    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
+    { field: 'STATEMENT_HTML', selector: '.statement', kind: 'text', movable: true, deletable: true },
   ],
   '8-photo-grid.html': [
-    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true },
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true, deletable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_MAIN', selector: '.grid-main img', kind: 'photo-img' },
     { field: 'IMG_TOP', selector: '.grid-side .cell:nth-child(1) img', kind: 'photo-img' },
     { field: 'IMG_BOTTOM', selector: '.grid-side .cell:nth-child(2) img', kind: 'photo-img' },
   ],
   '9-split-flip.html': [
-    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true },
-    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true, deletable: true },
+    { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
   ],
   '10-split-overlay.html': [
-    { field: 'CAPTION_HTML', selector: '.headline', kind: 'text', movable: true },
+    { field: 'CAPTION_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
   ],
   '11-single-circle.html': [
-    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true },
-    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true },
-    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true },
-    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true },
-    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true },
+    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
+    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
+    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
+    { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photo img', kind: 'photo-img' },
     { field: 'CIRCLE_IMG', selector: '.circle-wrap img', kind: 'photo-img', movable: true },
     { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
   ],
   '12-hook-block.html': [
-    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true },
-    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true },
-    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true },
+    { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
+    { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
+    { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true, deletable: true },
   ],
   'cta.html': [
-    { field: 'HEADLINE_HTML', selector: 'h1', kind: 'text', movable: true },
-    { field: 'SUBHEAD', selector: '.sub', kind: 'text', movable: true },
-    { field: 'CTA_TEXT', selector: '.btn', kind: 'text', movable: true },
-    { field: 'MICRO_TEXT', selector: '.micro', kind: 'text', movable: true },
+    { field: 'HEADLINE_HTML', selector: 'h1', kind: 'text', movable: true, deletable: true },
+    { field: 'SUBHEAD', selector: '.sub', kind: 'text', movable: true, deletable: true },
+    { field: 'CTA_TEXT', selector: '.btn', kind: 'text', movable: true, deletable: true },
+    { field: 'MICRO_TEXT', selector: '.micro', kind: 'text', movable: true, deletable: true },
   ],
 }

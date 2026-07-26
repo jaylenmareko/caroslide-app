@@ -276,6 +276,8 @@ const SlideCanvasEditor = forwardRef<
   const injectedHtml = data.html.replace(
     '</body>',
     `<script>(function(){
+  var BRAND_PRIMARY = ${JSON.stringify(data.primaryColor)};
+  var BRAND_SECONDARY = ${JSON.stringify(data.secondaryColor)};
   var fields = ${JSON.stringify(data.fields)};
   // Real bug found live 2026-07-26 (Jaylen: selecting an object then pressing Delete kept
   // deleting the whole slide): a fixed 8-native-unit threshold measures a real click's natural
@@ -336,6 +338,76 @@ const SlideCanvasEditor = forwardRef<
       parent.postMessage({ type: 'caroslide-field-edit', field: selectedDeleteField + '_DISPLAY', value: 'hidden' }, '*');
       deselect();
     }
+  });
+
+  // Per-word text color highlighting (2026-07-26). Wraps the current browser selection in a new
+  // colored span -- Range.extractContents()/insertNode() naturally splits any existing wrapping
+  // span (an AI-written c1/c2/c3 span, or an earlier manual color span) at the selection boundary,
+  // so only the highlighted portion changes and the untouched parts keep their original color.
+  // No new save path: this only edits the DOM. Whatever's in the field when its own blur handler
+  // fires (already wired up per text field, see the 'text' branch below) is what gets saved --
+  // same path a normal typed edit already uses.
+  function applyColorToSelection(color){
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    var span = document.createElement('span');
+    span.style.color = color;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    sel.removeAllRanges();
+    var after = document.createRange();
+    after.setStartAfter(span);
+    after.collapse(true);
+    sel.addRange(after);
+  }
+
+  // One shared floating toolbar, repositioned/reused for whichever field currently has an active
+  // selection -- built once here rather than per-field, since selectionchange is a document-level
+  // event, not a per-element one.
+  var colorToolbar = document.createElement('div');
+  colorToolbar.style.cssText = 'position:absolute;display:none;z-index:60;background:rgba(20,20,20,0.95);border-radius:10px;padding:6px;gap:6px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+  document.body.appendChild(colorToolbar);
+
+  function makeSwatch(color){
+    var s = document.createElement('div');
+    s.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,0.5);background:' + color + ';display:inline-block;margin-right:6px;';
+    // mousedown, not click -- click fires after the field has already blurred/selection may have
+    // collapsed in some browsers; mousedown fires while the selection is still live. Same class of
+    // fix as the topbar Delete button's own e.preventDefault() in Viewer.tsx.
+    s.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      applyColorToSelection(color);
+      colorToolbar.style.display = 'none';
+    });
+    return s;
+  }
+
+  colorToolbar.appendChild(makeSwatch(BRAND_PRIMARY));
+  colorToolbar.appendChild(makeSwatch(BRAND_SECONDARY));
+  colorToolbar.appendChild(makeSwatch('#ffffff'));
+  colorToolbar.appendChild(makeSwatch('#000000'));
+
+  var customColorInput = document.createElement('input');
+  customColorInput.type = 'color';
+  customColorInput.style.cssText = 'width:24px;height:24px;border:none;padding:0;cursor:pointer;background:none;';
+  customColorInput.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+  customColorInput.addEventListener('input', function(){
+    applyColorToSelection(customColorInput.value);
+  });
+  colorToolbar.appendChild(customColorInput);
+
+  document.addEventListener('selectionchange', function(){
+    var active = document.activeElement;
+    var sel = document.getSelection();
+    if (!active || active.getAttribute('contenteditable') !== 'true' || !sel || sel.isCollapsed || sel.rangeCount === 0) {
+      colorToolbar.style.display = 'none';
+      return;
+    }
+    var rect = sel.getRangeAt(0).getBoundingClientRect();
+    colorToolbar.style.display = 'flex';
+    colorToolbar.style.left = (rect.left + rect.width / 2 - 60) + 'px';
+    colorToolbar.style.top = (rect.top - 40) + 'px';
   });
 
   fields.forEach(function(f){

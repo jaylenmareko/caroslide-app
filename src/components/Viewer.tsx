@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, editSlide, updateSlideField } from '@/lib/actions'
-import SlideCanvasEditor from '@/components/SlideCanvasEditor'
+import { updateCarouselTitle, updateCarouselSlides, editSlide } from '@/lib/actions'
+import SlideCanvasEditor, { type SlideCanvasEditorHandle } from '@/components/SlideCanvasEditor'
 
 // Guards against an accidental giant paste (a whole doc/paragraph) turning into a real, costly
 // editSlide() -> Claude call -- the box itself no longer stops you once it scrolls past 120px
@@ -16,6 +16,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [stageWidth, setStageWidth] = useState(340)
   const stageFrameRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<SlideCanvasEditorHandle>(null)
 
   useEffect(() => {
     const el = stageFrameRef.current
@@ -95,14 +96,16 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     goToSlide((c) => Math.min(c, next.length - 1))
   }
 
-  async function handleDeleteClick() {
+  function handleDeleteClick() {
     if (selectedField) {
       if (!selectedDeletable) return
-      const result =
-        selectedMode === 'text'
-          ? await updateSlideField(carousel.id, current, selectedField, '')
-          : await updateSlideField(carousel.id, current, `${selectedField}_DISPLAY`, 'hidden')
-      if (result.type === 'updated') commitSlides(result.slides)
+      // Real latency bug found live 2026-07-26: this used to call updateSlideField directly and
+      // commit the result itself, bypassing SlideCanvasEditor's own save() entirely -- which meant
+      // it paid the full Cloudflare render round-trip AND a forced iframe reload afterward, unlike
+      // every other edit action (typing, dragging, the hover-X button), which only pay the first
+      // cost. Routing through the same setField() the hover-X button uses gets this action the
+      // identical skip-reload + optimistic-local-update treatment, so it feels exactly as fast.
+      editorRef.current?.setField(selectedMode === 'text' ? selectedField : `${selectedField}_DISPLAY`, selectedMode === 'text' ? '' : 'hidden')
       setSelectedField(null)
       setSelectedDeletable(false)
       setSelectedMode(null)
@@ -350,6 +353,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           <div className="stage-frame" ref={stageFrameRef}>
             <SlideCanvasEditor
               key={current}
+              ref={editorRef}
               carouselId={carousel.id}
               slideIndex={current}
               displayWidth={stageWidth}

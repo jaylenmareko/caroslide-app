@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { getSlideEditorHtml, updateSlideField, type SlideEditorData } from '@/lib/actions'
 import { createClient } from '@/lib/supabase/client'
 import type { Slide } from '@/lib/types'
@@ -19,40 +19,49 @@ import type { Slide } from '@/lib/types'
 // while that resolves would undo the exact "clicking into a project feels slow" fix from earlier
 // today. The live iframe silently replaces it once ready; since it's rendering the same real
 // values, the swap should be visually imperceptible, not a loading-to-content flash.
-export default function SlideCanvasEditor({
-  carouselId,
-  slideIndex,
-  displayWidth,
-  previewUrl,
-  onSlidesUpdated,
-  onSelectionChange,
-}: {
-  carouselId: string
-  slideIndex: number
-  displayWidth: number
-  previewUrl?: string
-  onSlidesUpdated: (slides: Slide[]) => void
-  // Real bug found live 2026-07-26 (Jaylen: "still having the same issue" after the divider-
-  // specific fix): this used to collapse "a circle/logo is selected" into the exact same null
-  // signal as "nothing is selected" (deletable-only), so the shared Delete button still silently
-  // fell back to deleting the whole slide for any selected object that isn't the divider. Passing
-  // deletable as its own argument lets Viewer.tsx tell "selected, nothing to delete about it" (no-
-  // op) apart from "nothing selected at all" (slide-delete is the deliberate fallback).
-  //
-  // `mode` added same day, second real bug from the same class: text fields never called
-  // selectThis() at all (they go straight to contenteditable), so entering edit mode left
-  // `selectedField` null from the outer page's point of view -- clicking the topbar Delete button
-  // while a caption was mid-edit fell through to whole-SLIDE delete instead of clearing the text.
-  // 'text' tells Viewer.tsx to clear the field to '' (the hover-X button's own save path);
-  // 'display' (move-only fields: divider/logo) tells it to toggle the field's `_DISPLAY` placeholder
-  // instead -- no `_DISPLAY` placeholder exists for text fields, so that toggle would silently do
-  // nothing to a caption.
-  onSelectionChange?: (field: string | null, deletable: boolean, mode?: 'text' | 'display') => void
-}) {
+// Imperative handle (2026-07-26) -- lets Viewer.tsx's topbar Delete button clear/hide a field
+// through the SAME save() the hover-X button and typed edits already use (skip-reload
+// optimization included), instead of calling updateSlideField directly from the parent and
+// bypassing all of that -- which is exactly what made the topbar-triggered delete feel a couple
+// seconds slower than every other edit action.
+export type SlideCanvasEditorHandle = {
+  setField: (field: string, value: string) => void
+}
+
+const SlideCanvasEditor = forwardRef<
+  SlideCanvasEditorHandle,
+  {
+    carouselId: string
+    slideIndex: number
+    displayWidth: number
+    previewUrl?: string
+    onSlidesUpdated: (slides: Slide[]) => void
+    // Real bug found live 2026-07-26 (Jaylen: "still having the same issue" after the divider-
+    // specific fix): this used to collapse "a circle/logo is selected" into the exact same null
+    // signal as "nothing is selected" (deletable-only), so the shared Delete button still silently
+    // fell back to deleting the whole slide for any selected object that isn't the divider. Passing
+    // deletable as its own argument lets Viewer.tsx tell "selected, nothing to delete about it" (no-
+    // op) apart from "nothing selected at all" (slide-delete is the deliberate fallback).
+    //
+    // `mode` added same day, second real bug from the same class: text fields never called
+    // selectThis() at all (they go straight to contenteditable), so entering edit mode left
+    // `selectedField` null from the outer page's point of view -- clicking the topbar Delete button
+    // while a caption was mid-edit fell through to whole-SLIDE delete instead of clearing the text.
+    // 'text' tells Viewer.tsx to clear the field to '' (the hover-X button's own save path);
+    // 'display' (move-only fields: divider/logo) tells it to toggle the field's `_DISPLAY` placeholder
+    // instead -- no `_DISPLAY` placeholder exists for text fields, so that toggle would silently do
+    // nothing to a caption.
+    onSelectionChange?: (field: string | null, deletable: boolean, mode?: 'text' | 'display') => void
+  }
+>(function SlideCanvasEditor(
+  { carouselId, slideIndex, displayWidth, previewUrl, onSlidesUpdated, onSelectionChange },
+  ref
+) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingPhotoField = useRef<string | null>(null)
   // Real slowness found live 2026-07-26 (Jaylen: editing in a project feels slow): a click-in-place
   // edit's real cost is a Cloudflare screenshot round-trip (a few real seconds, not something this
@@ -62,8 +71,9 @@ export default function SlideCanvasEditor({
   // discarding and re-initializing a document that was already showing the edit correctly the
   // instant the user typed/dragged it. Tracks the url WE just saved so the previewUrl effect can
   // tell "this change is my own save landing" (skip -- already live, no need to reload) apart from
-  // "something else changed this slide" (chat-editing, the topbar delete button -- a real reload
-  // is still needed since nothing local reflects those).
+  // "something else changed this slide" (chat-editing is the remaining real external path -- the
+  // topbar delete button now goes through the same save()/setField as everything else below, via
+  // the imperative handle, so it no longer needs a real reload either).
   const selfSavedUrl = useRef<string | null>(null)
 
   const load = useCallback(async () => {
@@ -111,6 +121,33 @@ export default function SlideCanvasEditor({
     },
     [carouselId, slideIndex, onSlidesUpdated]
   )
+
+  // Lets Viewer.tsx's topbar Delete button clear/hide a field through this SAME save() (skip-
+  // reload included) instead of calling updateSlideField directly and bypassing it -- that
+  // bypass is what made the topbar-triggered delete feel a couple seconds slower than every
+  // other edit action (real feedback, 2026-07-26). Also applies the SAME optimistic local update
+  // the hover-X button and keyboard-delete already do (see those two call sites) -- without it,
+  // the field's OLD value/visibility would keep showing until some unrelated later reload caught
+  // up, since nothing here is the user's own typing the way a normal text edit already is.
+  const setField = useCallback(
+    (field: string, value: string) => {
+      const doc = iframeRef.current?.contentDocument
+      const isDisplay = field.endsWith('_DISPLAY')
+      const baseField = isDisplay ? field.slice(0, -'_DISPLAY'.length) : field
+      const fieldDef = data?.fields.find((f) => f.field === baseField)
+      if (doc && fieldDef) {
+        const el = doc.querySelector(fieldDef.selector) as HTMLElement | null
+        if (el) {
+          if (isDisplay) el.style.visibility = value
+          else el.innerHTML = value
+        }
+      }
+      save({ [field]: value })
+    },
+    [data, save]
+  )
+
+  useImperativeHandle(ref, () => ({ setField }), [setField])
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -291,6 +328,11 @@ export default function SlideCanvasEditor({
   document.addEventListener('keydown', function(e){
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDeleteField) {
       e.preventDefault();
+      // Optimistic local hide (2026-07-26, same latency fix as the hover-X button above) -- without
+      // this, the save-skips-reload optimization means nothing visually reflects the delete until
+      // some unrelated later reload happens to catch up. selectedEl here is always the same element
+      // selectedDeleteField names (selectThis() sets both together), so this is safe.
+      if (selectedEl) selectedEl.style.visibility = 'hidden';
       parent.postMessage({ type: 'caroslide-field-edit', field: selectedDeleteField + '_DISPLAY', value: 'hidden' }, '*');
       deselect();
     }
@@ -393,9 +435,19 @@ export default function SlideCanvasEditor({
         // Text fields have no FIELD_DISPLAY placeholder in any template (unlike the divider) --
         // clearing the field's own value to empty is enough to make the box disappear visually,
         // via the exact same save path a normal text edit already uses.
+        //
+        // Real latency bug found live 2026-07-26: this button-driven delete never updated el
+        // itself, unlike a normal typed edit (where the user's own typing already shows the new
+        // value before any save). The save-skips-reload optimization added earlier today means
+        // nothing ever visually reflected this delete until some UNRELATED later reload happened
+        // to catch up -- clearing el here directly (same as a real edit already does) makes this
+        // delete feel exactly as instant as typing does, instead of paying the full render round-
+        // trip before anything visibly changes.
         if (f.kind === 'text') {
+          el.innerHTML = '';
           parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: '' }, '*');
         } else {
+          el.style.visibility = 'hidden';
           parent.postMessage({ type: 'caroslide-field-edit', field: f.field + '_DISPLAY', value: 'hidden' }, '*');
         }
       });
@@ -474,6 +526,7 @@ export default function SlideCanvasEditor({
     <div className="slide-canvas-editor" style={{ width: displayWidth, height: data.canvasH * scale }}>
       <iframe
         key={slideIndex}
+        ref={iframeRef}
         srcDoc={injectedHtml}
         title="Slide editor"
         style={{ width: 1080, height: data.canvasH, transform: `scale(${scale})`, transformOrigin: 'top left', border: 'none' }}
@@ -482,4 +535,6 @@ export default function SlideCanvasEditor({
       {saving && <div className="slide-canvas-editor-saving">Saving…</div>}
     </div>
   )
-}
+})
+
+export default SlideCanvasEditor

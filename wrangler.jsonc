@@ -2,6 +2,10 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
 	"name": "caroslide-app",
+	"account_id": "4f2787f250e16d9e861d68fd74147cd3",
+	"routes": [
+		{ "pattern": "caroslide.com", "custom_domain": true }
+	],
 	"compatibility_date": "2026-07-26",
 	"compatibility_flags": [
 		"nodejs_compat",

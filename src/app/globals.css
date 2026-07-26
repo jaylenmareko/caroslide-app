@@ -460,18 +460,20 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
 .stage-arrow.left { left: 10px; }
 .stage-arrow.right { right: 10px; }
 
-/* Grid (not flex) so the visual order of thumbs/brand-kit/stage/chat can be
-   reassigned independently per breakpoint via grid-area, without needing the
-   thumb-rail to live nested inside a different parent than the other three --
-   they're all direct grid items now. Desktop keeps the original look (thumb
-   rail as a left column spanning all 3 rows); mobile reorders to
-   brandkit -> stage -> thumbs -> chat (see mobile override). */
+/* Grid (not flex) so the visual order of thumbs/stage/chat can be reassigned
+   independently per breakpoint via grid-area, without needing the thumb-rail
+   to live nested inside a different parent than the others -- they're all
+   direct grid items. Desktop keeps the original look (thumb rail as a left
+   column spanning both rows); mobile reorders to stage -> thumbs -> chat
+   (see mobile override). Brand Kit's own "brandkit" row removed 2026-07-26
+   (Jaylen: remove it from the project page entirely -- it never actually
+   re-rendered any slide, see actions.ts's updateCarouselBrand) -- an empty
+   named grid area still reserves its row-gap even with nothing in it. */
 .viewer-body {
   display: grid; justify-content: center; padding: 40px 40px 60px;
   grid-template-columns: 84px 1fr; column-gap: 40px; row-gap: 20px;
   grid-template-areas:
     "thumbs stage"
-    "thumbs brandkit"
     "thumbs chat";
 }
 .thumb-rail { grid-area: thumbs; display: flex; flex-direction: column; gap: 12px; width: 84px; flex-shrink: 0; padding-top: 6px; }
@@ -522,16 +524,6 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 
-.brand-kit-chip {
-  grid-area: brandkit; display: flex; align-items: center; gap: 7px; justify-self: center;
-  padding: 9px 18px; border-radius: 100px; border: 1.5px solid var(--line-strong); background: var(--surface);
-  color: var(--ink-soft); font-family: var(--font); font-size: 13.5px; font-weight: 600; cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-.brand-kit-chip:hover { background: var(--bg-alt); border-color: var(--green); color: var(--ink); }
-/* Mobile-only duplicate trigger (see Viewer.tsx) -- hidden on desktop by default. */
-.brand-kit-chip-topbar { display: none; }
-
 /* border-radius dropped from a full 100px pill to 24px (2026-07-24) -- a full pill reads fine
    pinned to one line's height, but once the textarea below grows past ~2 lines the same radius
    starts looking like a stretched oval rather than a rounded box. 24px stays fully rounded at the
@@ -566,20 +558,6 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
    instruction) since this is an actual response to what the user just sent (confirmation,
    clarifying question, or error) and needs to read as a real reply, not background copy. */
 .chat-reply { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 10px; max-width: 420px; text-align: center; }
-
-.brand-modal-backdrop {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000;
-  align-items: center; justify-content: center; padding: 24px;
-}
-.brand-modal-backdrop.show { display: flex; }
-.brand-modal {
-  width: 100%; max-width: 440px; max-height: 86vh; overflow-y: auto;
-  background: var(--surface); border-radius: 20px; padding: 30px; box-shadow: var(--shadow-md);
-}
-.brand-modal-head { margin-bottom: 22px; }
-.brand-modal-head h2 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
-.brand-modal-head .sub { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
-.brand-modal-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; }
 
 /* ---------- auth ---------- */
 .auth-wrap { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--hero-gradient); cursor: default; user-select: none; font-family: var(--font-inter-tight), var(--font); }
@@ -667,21 +645,6 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .viewer-title input { width: 130px; font-size: 16px; }
   .viewer-title-wrap { align-items: flex-start; }
 
-  /* Brand Kit moves to the top-right corner (title top-left, same row) instead of sitting
-     as its own centered row below the stage -- Jaylen didn't like it stacked under the
-     file name. The desktop chip lives inside .viewer-body's grid (below the stage) which
-     is a different DOM position pure CSS can't reach from the topbar, so mobile uses a
-     second real button wired to the same modal state (see Viewer.tsx) instead of trying
-     to reposition one element across two unrelated containers. */
-  .brand-kit-chip { display: none; }
-  .brand-kit-chip-topbar {
-    display: flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap;
-    padding: 8px 14px; border-radius: 100px; border: 1px solid var(--line-strong); background: var(--surface);
-    color: var(--ink-soft); font-family: var(--font); font-size: 12.5px; font-weight: 600;
-    cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  }
-  .brand-kit-chip-topbar:hover { background: var(--bg-alt); border-color: var(--green); color: var(--ink); }
-
   /* Undo/redo/delete/download become a fixed bottom action bar (Canva's mobile pattern:
      icon-over-label, no per-button borders, evenly spaced, always reachable regardless
      of scroll position) instead of small circles crammed into the topbar. */
@@ -706,9 +669,10 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .download-btn:disabled { background: none; }
 
   /* Order for mobile: stage first, thumbnails below it, chat box last -- Jaylen's explicit
-     layout call. Brand Kit no longer has its own row here at all -- it moved to the topbar
-     (top-right, next to the title) instead of sitting stacked under the file name. Grid
-     areas (not DOM order) drive this, so desktop's left-rail layout above is untouched. */
+     layout call. Brand Kit had its own row here at one point, then moved to the topbar --
+     removed entirely 2026-07-26 (it never actually re-rendered any slide from the project
+     page; see the desktop grid's comment above). Grid areas (not DOM order) drive this, so
+     desktop's left-rail layout above is untouched. */
   .viewer-body {
     grid-template-columns: 1fr; row-gap: 14px; padding: 14px 12px calc(84px + env(safe-area-inset-bottom));
     grid-template-areas:

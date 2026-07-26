@@ -19,8 +19,11 @@
   .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:cover; background-position:{{BG_POSITION|50% 20%}}; }
   .scrim-bottom { position:absolute; bottom:0; left:0; right:0; height:56.3vh; background:linear-gradient(0deg, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 100%); }
   .scrim-top { position:absolute; top:0; left:0; right:0; height:16.3vh; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%); }
-  /* transform: manual move support (2026-07-24) -- same 0px,0px-default convention throughout. */
-  .logo { position:absolute; top:3.7vh; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:5; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
+  /* transform: manual move support (2026-07-24) -- same 0px,0px-default convention throughout.
+     LOGO_HTML_DISPLAY (2026-07-26): a real, reversible on/off toggle, same visibility (not display)
+     convention as DIVIDER_DISPLAY below -- lets a user delete the logo via the click-in-place
+     editor without needing a template layout change. */
+  .logo { position:absolute; top:3.7vh; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:5; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; }
   .logo .b { color:#ffffff; }
   .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */

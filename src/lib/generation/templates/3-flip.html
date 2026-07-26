@@ -16,8 +16,10 @@
   html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
   .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; display:flex; flex-direction:column; }
 
-  /* transform: manual move support (2026-07-24) -- same 0px,0px-default convention throughout. */
-  .logo { position:absolute; top:50px; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:6; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
+  /* transform: manual move support (2026-07-24) -- same 0px,0px-default convention throughout.
+     LOGO_HTML_DISPLAY (2026-07-26): real, reversible on/off toggle, same visibility (not display)
+     convention as DIVIDER_DISPLAY below. */
+  .logo { position:absolute; top:50px; left:60px; font-size:34px; font-weight:900; letter-spacing:1px; z-index:6; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
   .logo img { height:34px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 

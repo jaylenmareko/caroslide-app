@@ -61,7 +61,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'BG_IMG', selector: '.photo', kind: 'photo-bg' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
-    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
     { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '2-split-cover.html': [
@@ -76,7 +76,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'BG_IMG', selector: '.photozone img', kind: 'photo-img' },
     { field: 'CIRCLE_L_IMG', selector: '.circle-wrap.left img', kind: 'photo-img', movable: true },
     { field: 'CIRCLE_R_IMG', selector: '.circle-wrap.right img', kind: 'photo-img', movable: true },
-    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
     { field: 'DIVIDER', selector: '.divider', kind: 'move-only', movable: true, deletable: true },
   ],
   '4-vertical-split.html': [
@@ -132,7 +132,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photo img', kind: 'photo-img' },
     { field: 'CIRCLE_IMG', selector: '.circle-wrap img', kind: 'photo-img', movable: true },
-    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '12-hook-block.html': [
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },

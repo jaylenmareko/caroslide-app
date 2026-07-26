@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/lib/types'
-import { BRAND_FONTS, DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, updateCarouselBrand, editSlide, updateSlideField } from '@/lib/actions'
-import { createClient } from '@/lib/supabase/client'
+import { updateCarouselTitle, updateCarouselSlides, editSlide, updateSlideField } from '@/lib/actions'
 import SlideCanvasEditor from '@/components/SlideCanvasEditor'
 
 // Guards against an accidental giant paste (a whole doc/paragraph) turning into a real, costly
@@ -163,70 +161,10 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     }
   }
 
-  const [brandModalOpen, setBrandModalOpen] = useState(false)
-  const [brandColors, setBrandColors] = useState<string[]>(
-    carousel.brand_colors ?? ['#5B7A5E', '#F1E6D2', '#16130f']
-  )
-  const [logoUrl, setLogoUrl] = useState<string | null>(carousel.logo_url)
-  const [font, setFont] = useState(carousel.font ?? DEFAULT_BRAND_FONT)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [logoError, setLogoError] = useState<string | null>(null)
-  const [savingBrand, setSavingBrand] = useState(false)
-  const logoInputRef = useRef<HTMLInputElement>(null)
-
-  function handleLogoClick() {
-    logoInputRef.current?.click()
-  }
-
-  async function handleLogoSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-
-    setLogoError(null)
-
-    if (!file.type.startsWith('image/')) {
-      setLogoError('Logo must be an image file.')
-      return
-    }
-    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-      setLogoError(`Logo must be under ${MAX_ATTACHMENT_MB}MB.`)
-      return
-    }
-
-    setUploadingLogo(true)
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const path = `${user?.id}/logo-${crypto.randomUUID()}-${file.name}`
-    const { data, error } = await supabase.storage.from('carousel-uploads').upload(path, file)
-    setUploadingLogo(false)
-
-    if (error || !data) {
-      setLogoError('Upload failed — try again.')
-      return
-    }
-    const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(data.path)
-    setLogoUrl(pub.publicUrl)
-  }
-
-  function handleRemoveLogo() {
-    setLogoUrl(null)
-  }
-
-  async function handleSaveBrand() {
-    setSavingBrand(true)
-    await updateCarouselBrand(carousel.id, { colors: brandColors, logoUrl, font })
-    setSavingBrand(false)
-    setBrandModalOpen(false)
-  }
-
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setLightboxOpen(false)
-        setBrandModalOpen(false)
       }
 
       const target = e.target as HTMLElement
@@ -324,20 +262,6 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             </div>
           )}
         </div>
-        {/* Mobile-only duplicate trigger: title sits top-left, this sits top-right, same
-            row -- the desktop Brand Kit chip (inside .viewer-body, below the stage) is a
-            genuinely different DOM position that pure CSS reordering can't reach from here,
-            so this is a second real button wired to the same modal state, shown only on
-            mobile while the desktop one is hidden there. See globals.css mobile override. */}
-        <button className="brand-kit-chip-topbar" onClick={() => setBrandModalOpen(true)}>
-          <svg viewBox="0 0 24 24" width={16} height={16} fill="none">
-            <path d="M12 21a9 9 0 1 1 0-18c4.97 0 9 3.5 9 7.5 0 2.49-2.01 3.5-3.5 3.5H15a1.5 1.5 0 0 0-1 2.6c.3.28.5.67.5 1.1A2.3 2.3 0 0 1 12 21Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-            <circle cx="7.5" cy="11" r="1.2" fill="currentColor" />
-            <circle cx="10.5" cy="7.2" r="1.2" fill="currentColor" />
-            <circle cx="15" cy="7.5" r="1.2" fill="currentColor" />
-          </svg>
-          Brand Kit
-        </button>
         <div className="viewer-actions">
           <button
             className="viewer-icon-btn"
@@ -395,16 +319,6 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             </div>
           ))}
         </div>
-
-        <button className="brand-kit-chip" onClick={() => setBrandModalOpen(true)}>
-          <svg viewBox="0 0 24 24" width={16} height={16} fill="none">
-            <path d="M12 21a9 9 0 1 1 0-18c4.97 0 9 3.5 9 7.5 0 2.49-2.01 3.5-3.5 3.5H15a1.5 1.5 0 0 0-1 2.6c.3.28.5.67.5 1.1A2.3 2.3 0 0 1 12 21Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-            <circle cx="7.5" cy="11" r="1.2" fill="currentColor" />
-            <circle cx="10.5" cy="7.2" r="1.2" fill="currentColor" />
-            <circle cx="15" cy="7.5" r="1.2" fill="currentColor" />
-          </svg>
-          Brand Kit
-        </button>
 
         <div className="stage">
           <div className="stage-frame" ref={stageFrameRef}>
@@ -491,97 +405,6 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               Be specific about which slide(s) you mean (e.g. &quot;slide 2&quot;) — otherwise only the slide you&apos;re viewing gets updated.
             </p>
           )}
-        </div>
-      </div>
-
-      <div className={`brand-modal-backdrop${brandModalOpen ? ' show' : ''}`} onClick={() => setBrandModalOpen(false)}>
-        <div className="brand-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="brand-modal-head">
-            <h2>Brand Kit</h2>
-            <p className="sub">Colors, font & logo for this carousel only.</p>
-          </div>
-
-          <div className="brand-color-label" style={{ marginBottom: 8 }}>Logo (optional)</div>
-          <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
-          {logoUrl ? (
-            <div className="brand-logo-preview">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="Brand logo" />
-              <div className="brand-logo-preview-actions">
-                <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
-                  Replace
-                </button>
-                <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
-                  Remove
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="brand-logo-upload" onClick={handleLogoClick}>
-              {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
-            </div>
-          )}
-          {logoError && <p className="attach-limit-error">{logoError}</p>}
-
-          <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Colors</div>
-          <div className="brand-color-picker">
-            {brandColors.map((c, i) => (
-              <div key={i} className="brand-color-card">
-                <label className="color-swatch-input" style={{ background: c }}>
-                  <input
-                    type="color"
-                    value={c}
-                    aria-label={`Brand color ${i + 1}`}
-                    onChange={(e) => {
-                      const next = [...brandColors]
-                      next[i] = e.target.value
-                      setBrandColors(next)
-                    }}
-                  />
-                </label>
-                <input
-                  type="text"
-                  className="hex-input"
-                  value={c}
-                  aria-label={`Brand color ${i + 1} hex code`}
-                  maxLength={7}
-                  placeholder="#000000"
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => {
-                    const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
-                    const next = [...brandColors]
-                    next[i] = v
-                    setBrandColors(next)
-                  }}
-                />
-                <div className="brand-color-label">Color {i + 1}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="brand-color-label" style={{ margin: '24px 0 8px' }}>Font</div>
-          <div className="brand-font-row">
-            {BRAND_FONTS.map((f) => (
-              <button
-                type="button"
-                key={f.name}
-                className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
-                style={{ fontFamily: f.cssVar }}
-                onClick={() => setFont(f.name)}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="brand-modal-actions">
-            <button type="button" className="settings-link-btn" onClick={() => setBrandModalOpen(false)}>
-              Cancel
-            </button>
-            <button type="button" className="settings-save" style={{ marginTop: 0 }} onClick={handleSaveBrand} disabled={savingBrand}>
-              {savingBrand ? 'Saving…' : 'Save'}
-            </button>
-          </div>
         </div>
       </div>
 

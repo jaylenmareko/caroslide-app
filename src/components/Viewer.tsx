@@ -217,6 +217,17 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         redo()
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedField) {
+        // Covers focus being on the outer page when Delete/Backspace is pressed -- the more
+        // common case (focus still inside the iframe right after selecting something there) is
+        // handled by SlideCanvasEditor's own keydown listener, since keystrokes while focus is
+        // inside an iframe never reach this outer document's listener at all. Deliberately does
+        // NOT fall back to deleteSlide() when nothing's selected -- Jaylen: "the object should
+        // delete, not the page" -- Backspace is pressed constantly by accident; only ever
+        // deleting a specific selected object (never the whole slide) from a bare keypress is the
+        // safe default. Whole-slide delete stays a deliberate click on the topbar button.
+        e.preventDefault()
+        handleDeleteClick()
       }
     }
     document.addEventListener('keydown', onKey)

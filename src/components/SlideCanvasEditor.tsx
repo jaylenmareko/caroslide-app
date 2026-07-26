@@ -230,15 +230,29 @@ export default function SlideCanvasEditor({
   // click somewhere else -- same object permanence Canva gives any selected element, not just text.
   var selectedEl = null;
   var selectedHide = null;
+  var selectedDeleteField = null;
   function deselect(){
     if (!selectedEl) return;
     if (selectedEl.getAttribute('contenteditable') !== 'true') selectedEl.style.outline = '';
     if (selectedHide) selectedHide();
     selectedEl = null;
     selectedHide = null;
+    selectedDeleteField = null;
     parent.postMessage({ type: 'caroslide-field-selected', field: null, deletable: false }, '*');
   }
   document.addEventListener('click', deselect);
+  // Delete/Backspace on a selected deletable object (2026-07-26, Jaylen: "the object should
+  // delete, not the page"). selectedDeleteField is only ever set for fields selectThis() marks
+  // deletable (the divider) -- never for text (its own contenteditable/blur flow never touches
+  // this), so this can never fire mid-caption-edit and eat a real Backspace keystroke. Same
+  // postMessage the delete button's own click already sends, just triggered by keyboard here.
+  document.addEventListener('keydown', function(e){
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDeleteField) {
+      e.preventDefault();
+      parent.postMessage({ type: 'caroslide-field-edit', field: selectedDeleteField + '_DISPLAY', value: 'hidden' }, '*');
+      deselect();
+    }
+  });
 
   fields.forEach(function(f){
     var el = document.querySelector(f.selector);
@@ -336,6 +350,7 @@ export default function SlideCanvasEditor({
       deselect();
       selectedEl = el;
       selectedHide = hideBtn;
+      selectedDeleteField = f.deletable ? f.field : null;
       el.style.outline = '3px solid #7C3AED';
       if (showBtn) showBtn();
       parent.postMessage({ type: 'caroslide-field-selected', field: f.field, deletable: !!f.deletable }, '*');

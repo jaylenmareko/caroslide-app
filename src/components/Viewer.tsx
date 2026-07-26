@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/lib/types'
 import { BRAND_FONTS, DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/lib/types'
@@ -46,15 +46,36 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   // Click-in-place selection (2026-07-24). The shared topbar Delete button used to always delete
   // the whole current slide -- real feedback: after adding click-to-select for objects (same
   // persistent outline text gets), clicking that same button right after selecting something now
-  // reads as "delete the thing I just selected," not "delete this entire page." selectedField is
-  // null whenever nothing's selected (or the selection isn't deletable, e.g. a circle/logo) --
-  // SlideCanvasEditor only ever reports a name here for fields it already flags `deletable`, so
-  // this component doesn't need its own copy of that rule. Cleared explicitly alongside every
-  // setCurrent call below (not via a useEffect keyed on `current`) so it can never render stale
-  // for even one paint -- a selection from slide 2 must never look active while slide 3 is showing.
+  // reads as "delete the thing I just selected," not "delete this entire page."
+  //
+  // Real bug found live 2026-07-26 ("still having the same issue" after the first fix): this used
+  // to track only a deletable field's name, collapsing "a circle/logo is selected" into the exact
+  // same null signal as "nothing is selected" -- so selecting a circle and hitting Delete still
+  // silently fell back to deleting the whole slide. Now tracks the actual selection (any field,
+  // deletable or not) plus whether THIS field has a delete action at all -- slide-delete is the
+  // fallback ONLY when truly nothing is selected; a selected-but-not-deletable object (no delete
+  // concept exists yet for circles/logo -- deleting one would break the template layout) is a
+  // no-op instead, never the whole page. Cleared explicitly alongside every setCurrent call below
+  // (not via a useEffect keyed on `current`) so it can never render stale for even one paint -- a
+  // selection from slide 2 must never look active while slide 3 is showing.
   const [selectedField, setSelectedField] = useState<string | null>(null)
+  const [selectedDeletable, setSelectedDeletable] = useState(false)
+  // Real bug found live 2026-07-26: an inline function here (a fresh reference every render,
+  // unlike setSelectedField alone, which React guarantees is stable) cascades into a re-render
+  // loop -- SlideCanvasEditor's `load` useCallback lists `onSelectionChange` as a dependency, so a
+  // new reference here gives `load` a new reference too, which re-triggers the effect that calls
+  // `load()`, which resets selection to null at its very start (see that file's own comment).
+  // Console-traced the actual sequence to confirm before guessing: select -> immediately reset to
+  // null, every time, which is why the topbar button never reflected a real selection at all
+  // despite the correct field/deletable data actually arriving. useCallback with an empty
+  // dependency array restores the same stability setSelectedField always had on its own.
+  const handleSelectionChange = useCallback((field: string | null, deletable: boolean) => {
+    setSelectedField(field)
+    setSelectedDeletable(deletable)
+  }, [])
   function goToSlide(next: number | ((c: number) => number)) {
     setSelectedField(null)
+    setSelectedDeletable(false)
     setCurrent(next)
   }
 
@@ -67,9 +88,11 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
 
   async function handleDeleteClick() {
     if (selectedField) {
+      if (!selectedDeletable) return
       const result = await updateSlideField(carousel.id, current, `${selectedField}_DISPLAY`, 'hidden')
       if (result.type === 'updated') commitSlides(result.slides)
       setSelectedField(null)
+      setSelectedDeletable(false)
       return
     }
     deleteSlide(current)
@@ -342,15 +365,15 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           </button>
           <button
             className="viewer-icon-btn danger"
-            aria-label={selectedField ? 'Delete selected object' : 'Delete this slide'}
-            title={selectedField ? 'Delete selected object' : 'Delete slide'}
+            aria-label={selectedField ? (selectedDeletable ? 'Delete selected object' : 'Nothing to delete for this selection') : 'Delete this slide'}
+            title={selectedField ? (selectedDeletable ? 'Delete selected object' : 'Nothing to delete for this selection') : 'Delete slide'}
             onClick={handleDeleteClick}
-            disabled={!selectedField && slides.length <= 1}
+            disabled={selectedField ? !selectedDeletable : slides.length <= 1}
           >
             <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
               <path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m2 0-.8 12.1a2 2 0 0 1-2 1.9H7.8a2 2 0 0 1-2-1.9L5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="lbl">{selectedField ? 'Delete object' : 'Delete'}</span>
+            <span className="lbl">{selectedField && selectedDeletable ? 'Delete object' : 'Delete'}</span>
           </button>
           <button className="download-btn" onClick={handleDownloadAll} disabled={downloading}>
             {downloading ? 'Downloading…' : <>⬇ <span className="lbl">Download</span></>}
@@ -392,7 +415,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               displayWidth={stageWidth}
               previewUrl={slides[current]?.url}
               onSlidesUpdated={commitSlides}
-              onSelectionChange={setSelectedField}
+              onSelectionChange={handleSelectionChange}
             />
             {/* No more edit-mode toggle (2026-07-24) -- clicking any field is always live, so a
                 plain click on the stage can't also mean "zoom" anymore. Zoom moves to its own

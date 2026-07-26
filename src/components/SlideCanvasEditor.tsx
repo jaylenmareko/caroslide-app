@@ -32,7 +32,13 @@ export default function SlideCanvasEditor({
   displayWidth: number
   previewUrl?: string
   onSlidesUpdated: (slides: Slide[]) => void
-  onSelectionChange?: (deletableField: string | null) => void
+  // Real bug found live 2026-07-26 (Jaylen: "still having the same issue" after the divider-
+  // specific fix): this used to collapse "a circle/logo is selected" into the exact same null
+  // signal as "nothing is selected" (deletable-only), so the shared Delete button still silently
+  // fell back to deleting the whole slide for any selected object that isn't the divider. Passing
+  // deletable as its own argument lets Viewer.tsx tell "selected, nothing to delete about it" (no-
+  // op) apart from "nothing selected at all" (slide-delete is the deliberate fallback).
+  onSelectionChange?: (field: string | null, deletable: boolean) => void
 }) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +51,7 @@ export default function SlideCanvasEditor({
     // selection from the previous document is about to stop existing, so tell the parent before
     // it goes stale (its "Delete" button would otherwise keep targeting a field that no longer
     // has a live selection listener behind it).
-    onSelectionChange?.(null)
+    onSelectionChange?.(null, false)
     const result = await getSlideEditorHtml(carouselId, slideIndex)
     if ('error' in result) {
       setError(result.error)
@@ -102,10 +108,11 @@ export default function SlideCanvasEditor({
         pendingPhotoField.current = msg.field
         fileInputRef.current?.click()
       } else if (msg.type === 'caroslide-field-selected') {
-        // Only surface a selection the shared topbar Delete button can actually act on -- a
-        // selected circle/logo (not deletable) reports null here so that button keeps deleting
-        // the whole slide, its original behavior, rather than silently doing nothing.
-        onSelectionChange?.(msg.deletable ? msg.field : null)
+        // Pass both through -- Viewer.tsx needs to tell "selected, but this field has no delete
+        // action" (a circle/logo -- no-op) apart from "nothing selected at all" (slide-delete is
+        // the deliberate fallback). Collapsing both into one nullable value was the actual bug:
+        // selecting a circle silently fell back to whole-slide delete either way.
+        onSelectionChange?.(msg.field, !!msg.deletable)
       }
     }
     window.addEventListener('message', handleMessage)

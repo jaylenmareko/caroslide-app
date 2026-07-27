@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { imageSize } from 'image-size'
-import type { TemplateVariant } from '@/lib/types'
+import type { TemplateVariant } from '@/backend/lib/types'
 import { tavilyCandidateUrls, tavilyImageSearch, pexelsSearch } from './research'
 
 const anthropic = new Anthropic()

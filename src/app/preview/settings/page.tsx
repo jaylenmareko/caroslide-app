@@ -1,5 +1,5 @@
-import Sidebar from '@/components/Sidebar'
-import SettingsForm from '@/components/SettingsForm'
+import Sidebar from '@/frontend/components/Sidebar'
+import SettingsForm from '@/frontend/components/SettingsForm'
 
 export default function PreviewSettingsPage() {
   return (

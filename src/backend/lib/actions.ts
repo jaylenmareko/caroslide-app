@@ -2,12 +2,12 @@
 
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
-import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
-import { generateCarousel, renderAndGuard } from '@/lib/generation/pipeline'
-import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/lib/generation/edit'
-import { loadTemplate, fillTemplate, renderSlide } from '@/lib/generation/render'
-import { EDITABLE_FIELDS, type EditableField } from '@/lib/generation/editableFields'
+import { createClient } from '@/backend/lib/supabase/server'
+import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
+import { generateCarousel, renderAndGuard } from '@/backend/lib/generation/pipeline'
+import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/backend/lib/generation/edit'
+import { loadTemplate, fillTemplate, renderSlide } from '@/backend/lib/generation/render'
+import { EDITABLE_FIELDS, type EditableField } from '@/backend/lib/generation/editableFields'
 import {
   stripe,
   PLAN_PRICE_IDS,
@@ -16,7 +16,7 @@ import {
   PACK_PRICE_IDS,
   type Plan,
   type PackSize,
-} from '@/lib/stripe'
+} from '@/backend/lib/stripe'
 
 /** Every deploy target (localhost, a Cloudflare preview, caroslide.com) reads its own origin
  * straight off the incoming request instead of a hardcoded env var, so Checkout/Portal

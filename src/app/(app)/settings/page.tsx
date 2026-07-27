@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
-import SettingsForm from '@/components/SettingsForm'
-import type { BrandKit } from '@/lib/types'
-import type { Subscription } from '@/lib/stripe'
+import { createClient } from '@/backend/lib/supabase/server'
+import SettingsForm from '@/frontend/components/SettingsForm'
+import type { BrandKit } from '@/backend/lib/types'
+import type { Subscription } from '@/backend/lib/stripe'
 
 export default async function SettingsPage() {
   const supabase = await createClient()

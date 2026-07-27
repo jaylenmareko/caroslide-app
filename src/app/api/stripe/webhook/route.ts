@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
-import { stripe, PLAN_PRICE_IDS, type Plan } from '@/lib/stripe'
-import { createServiceClient } from '@/lib/supabase/service'
+import { stripe, PLAN_PRICE_IDS, type Plan } from '@/backend/lib/stripe'
+import { createServiceClient } from '@/backend/lib/supabase/service'
 
 function planFromPriceId(priceId: string): Plan | null {
   const entry = (Object.entries(PLAN_PRICE_IDS) as [Plan, string][]).find(([, id]) => id === priceId)

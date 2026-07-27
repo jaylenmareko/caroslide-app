@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import NewCarouselWizard from '@/components/NewCarouselWizard'
-import type { BrandKit } from '@/lib/types'
+import { createClient } from '@/backend/lib/supabase/server'
+import NewCarouselWizard from '@/frontend/components/NewCarouselWizard'
+import type { BrandKit } from '@/backend/lib/types'
 
 export default async function NewCarouselPage(props: PageProps<'/new'>) {
   const supabase = await createClient()

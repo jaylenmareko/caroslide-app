@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import Viewer from '@/components/Viewer'
-import type { Carousel } from '@/lib/types'
+import { createClient } from '@/backend/lib/supabase/server'
+import Viewer from '@/frontend/components/Viewer'
+import type { Carousel } from '@/backend/lib/types'
 
 export default async function CarouselPage(props: PageProps<'/carousel/[id]'>) {
   const { id } = await props.params

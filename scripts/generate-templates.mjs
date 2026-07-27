@@ -12,7 +12,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const TEMPLATES_DIR = path.join(__dirname, '..', 'src', 'lib', 'generation', 'templates')
+const TEMPLATES_DIR = path.join(__dirname, '..', 'src', 'backend', 'lib', 'generation', 'templates')
 const OUT_FILE = path.join(TEMPLATES_DIR, 'index.generated.ts')
 
 const files = (await readdir(TEMPLATES_DIR)).filter((f) => f.endsWith('.html')).sort()

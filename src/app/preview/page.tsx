@@ -1,9 +1,9 @@
 // TEMPORARY — visual QA only, no auth/Supabase required. Delete once a real
 // Supabase project is wired up and /dashboard can be checked directly.
 import Link from 'next/link'
-import DashboardGrid from '@/components/DashboardGrid'
-import Sidebar from '@/components/Sidebar'
-import type { Carousel } from '@/lib/types'
+import DashboardGrid from '@/frontend/components/DashboardGrid'
+import Sidebar from '@/frontend/components/Sidebar'
+import type { Carousel } from '@/backend/lib/types'
 
 const now = new Date().toISOString()
 

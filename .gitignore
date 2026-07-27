@@ -56,4 +56,4 @@ next-env.d.ts
 !.dev.vars.example
 
 # generated from the real .html templates by scripts/generate-templates.mjs (runs before dev/build)
-src/lib/generation/templates/index.generated.ts
+src/backend/lib/generation/templates/index.generated.ts

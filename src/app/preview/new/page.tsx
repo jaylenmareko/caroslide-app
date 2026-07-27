@@ -1,5 +1,5 @@
-import Sidebar from '@/components/Sidebar'
-import NewCarouselWizard from '@/components/NewCarouselWizard'
+import Sidebar from '@/frontend/components/Sidebar'
+import NewCarouselWizard from '@/frontend/components/NewCarouselWizard'
 
 export default function PreviewNewPage() {
   return (

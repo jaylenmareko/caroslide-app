@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/Sidebar'
+import { createClient } from '@/backend/lib/supabase/server'
+import Sidebar from '@/frontend/components/Sidebar'
 
 export default async function AppLayout({
   children,

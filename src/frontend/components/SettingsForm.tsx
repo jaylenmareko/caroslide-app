@@ -1,11 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { saveBrandKit, createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/lib/actions'
-import type { BrandKit } from '@/lib/types'
-import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
-import type { Subscription, Plan, PackSize } from '@/lib/stripe'
+import { createClient } from '@/backend/lib/supabase/client'
+import { saveBrandKit, createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/backend/lib/actions'
+import type { BrandKit } from '@/backend/lib/types'
+import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/backend/lib/types'
+import { PLAN_CAROUSEL_LIMITS, PLAN_PRICES, type Subscription, type Plan, type PackSize } from '@/backend/lib/plans'
 
 const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro' }
 const PACK_OPTIONS: { size: PackSize; price: string }[] = [
@@ -315,8 +315,9 @@ export default function SettingsForm({
               <div>
                 <span className="plan-badge">{PLAN_LABELS[subscription.plan!]}</span>
                 <div className="plan-current-desc">
+                  {PLAN_PRICES[subscription.plan!]} — {PLAN_CAROUSEL_LIMITS[subscription.plan!]} carousels/mo
                   {subscription.current_period_end &&
-                    `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`}
+                    ` — renews ${new Date(subscription.current_period_end).toLocaleDateString()}`}
                 </div>
               </div>
               <button className="settings-save" style={{ marginTop: 0 }} onClick={handleManageBilling} disabled={billingLoading !== null}>
@@ -344,7 +345,9 @@ export default function SettingsForm({
                   onClick={() => handleUpgrade(plan)}
                   disabled={billingLoading !== null}
                 >
-                  {billingLoading === plan ? 'Loading…' : `Upgrade to ${PLAN_LABELS[plan]}`}
+                  {billingLoading === plan
+                    ? 'Loading…'
+                    : `Upgrade to ${PLAN_LABELS[plan]} (${PLAN_PRICES[plan]}) — ${PLAN_CAROUSEL_LIMITS[plan]} carousels/mo`}
                 </button>
               ))}
             </div>

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
+import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
 import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPlaceholder } from './images'

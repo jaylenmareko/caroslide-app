@@ -1,6 +1,6 @@
-import Sidebar from '@/components/Sidebar'
-import Viewer from '@/components/Viewer'
-import type { Carousel } from '@/lib/types'
+import Sidebar from '@/frontend/components/Sidebar'
+import Viewer from '@/frontend/components/Viewer'
+import type { Carousel } from '@/backend/lib/types'
 
 const now = new Date().toISOString()
 

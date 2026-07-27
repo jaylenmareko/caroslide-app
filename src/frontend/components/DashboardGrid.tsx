@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import type { Carousel } from '@/lib/types'
-import { timeAgo } from '@/lib/types'
-import { deleteCarousel } from '@/lib/actions'
+import type { Carousel } from '@/backend/lib/types'
+import { timeAgo } from '@/backend/lib/types'
+import { deleteCarousel } from '@/backend/lib/actions'
 
 type DashboardCarousel = Pick<Carousel, 'id' | 'title' | 'angle' | 'format' | 'updated_at' | 'slides'>
 

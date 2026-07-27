@@ -1,9 +1,9 @@
 'use client'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { getSlideEditorHtml, updateSlideField, type SlideEditorData } from '@/lib/actions'
-import { createClient } from '@/lib/supabase/client'
-import type { Slide } from '@/lib/types'
+import { getSlideEditorHtml, updateSlideField, type SlideEditorData } from '@/backend/lib/actions'
+import { createClient } from '@/backend/lib/supabase/client'
+import type { Slide } from '@/backend/lib/types'
 
 // Click-in-place editor (2026-07-22). Renders the slide's REAL filled template HTML live in an
 // iframe (not the flat PNG the rest of the app shows) so individual fields are real, clickable DOM

@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import DashboardGrid from '@/components/DashboardGrid'
-import type { Carousel } from '@/lib/types'
+import { createClient } from '@/backend/lib/supabase/server'
+import DashboardGrid from '@/frontend/components/DashboardGrid'
+import type { Carousel } from '@/backend/lib/types'
 
 export default async function DashboardPage() {
   const supabase = await createClient()

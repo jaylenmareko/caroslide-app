@@ -1,4 +1,4 @@
-import type { Look, TemplateVariant } from '@/lib/types'
+import type { Look, TemplateVariant } from '@/backend/lib/types'
 
 // Mirrors NewCarouselWizard.tsx's variantsFor()/CIRCLES_VARIANTS/PHOTO_VARIANTS/STAT_VARIANTS
 // exactly -- the wizard's Look+TemplateVariant pick already resolves which real

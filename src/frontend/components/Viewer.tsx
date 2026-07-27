@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { Carousel, Slide } from '@/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, editSlide } from '@/lib/actions'
-import SlideCanvasEditor, { type SlideCanvasEditorHandle } from '@/components/SlideCanvasEditor'
+import type { Carousel, Slide } from '@/backend/lib/types'
+import { updateCarouselTitle, updateCarouselSlides, editSlide } from '@/backend/lib/actions'
+import SlideCanvasEditor, { type SlideCanvasEditorHandle } from '@/frontend/components/SlideCanvasEditor'
 
 // Guards against an accidental giant paste (a whole doc/paragraph) turning into a real, costly
 // editSlide() -> Claude call -- the box itself no longer stops you once it scrolls past 120px

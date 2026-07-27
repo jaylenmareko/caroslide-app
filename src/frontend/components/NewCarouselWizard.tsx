@@ -1,10 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import type { Angle, BrandKit, Look, TemplateVariant } from '@/lib/types'
-import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
-import { createCarousel, saveBrandKit } from '@/lib/actions'
-import { createClient } from '@/lib/supabase/client'
+import type { Angle, BrandKit, Look, TemplateVariant } from '@/backend/lib/types'
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/backend/lib/types'
+import { createCarousel, saveBrandKit } from '@/backend/lib/actions'
+import { createClient } from '@/backend/lib/supabase/client'
 
 const RECOMMENDED_LOOK: Look = 'Circles + Photo'
 

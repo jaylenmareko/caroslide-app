@@ -6,7 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
-import type { Slide } from '@/lib/types'
+import type { Slide } from '@/backend/lib/types'
 import { ContentValues } from './captions'
 import { findUsablePhoto } from './images'
 import { sanitizeStrayEscapes } from './render'

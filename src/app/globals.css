@@ -155,6 +155,8 @@ a { color: inherit; }
 .plan-current { display: flex; align-items: center; justify-content: space-between; background: var(--bg-alt); border-radius: 12px; padding: 16px 18px; margin-top: 2px; }
 .plan-current-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 7px; }
 .plan-upsell { font-size: 12.5px; color: var(--ink-faint); margin: 14px 0 0; }
+.plan-upgrade-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.plan-upgrade-row .settings-save { flex: 1 1 auto; white-space: nowrap; }
 
 /* ---------- dashboard ---------- */
 .dash-section { padding: 48px 0 70px; }

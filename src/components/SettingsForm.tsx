@@ -2,19 +2,44 @@
 
 import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { saveBrandKit } from '@/lib/actions'
+import { saveBrandKit, createCheckoutSession, createPortalSession } from '@/lib/actions'
 import type { BrandKit } from '@/lib/types'
 import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
+import type { Subscription, Plan } from '@/lib/stripe'
+
+const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro', unlimited: 'Unlimited' }
 
 export default function SettingsForm({
   name,
   email,
   brandKit,
+  subscription,
 }: {
   name: string
   email: string
   brandKit: BrandKit | null
+  subscription: Subscription | null
 }) {
+  const [billingLoading, setBillingLoading] = useState<Plan | 'portal' | null>(null)
+
+  async function handleUpgrade(plan: Plan) {
+    setBillingLoading(plan)
+    try {
+      await createCheckoutSession(plan)
+    } finally {
+      setBillingLoading(null)
+    }
+  }
+
+  async function handleManageBilling() {
+    setBillingLoading('portal')
+    try {
+      await createPortalSession()
+    } finally {
+      setBillingLoading(null)
+    }
+  }
+
   const [changingPassword, setChangingPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [passwordSaved, setPasswordSaved] = useState(false)
@@ -269,16 +294,48 @@ export default function SettingsForm({
           </div>
         </div>
 
-        <div className="plan-current">
-          <div>
-            <span className="plan-badge">Free</span>
-            <div className="plan-current-desc">1 carousel to start</div>
-          </div>
-          <button className="settings-save" style={{ marginTop: 0 }}>
-            Upgrade
-          </button>
-        </div>
-        <p className="plan-upsell">Upgrade for more carousels a month, priority generation, and a saved Brand Kit.</p>
+        {subscription?.status === 'active' ? (
+          <>
+            <div className="plan-current">
+              <div>
+                <span className="plan-badge">{PLAN_LABELS[subscription.plan!]}</span>
+                <div className="plan-current-desc">
+                  {subscription.current_period_end &&
+                    `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`}
+                </div>
+              </div>
+              <button className="settings-save" style={{ marginTop: 0 }} onClick={handleManageBilling} disabled={billingLoading !== null}>
+                {billingLoading === 'portal' ? 'Loading…' : 'Manage billing'}
+              </button>
+            </div>
+            <p className="plan-upsell">Change plans, update your card, or cancel any time.</p>
+          </>
+        ) : (
+          <>
+            <div className="plan-current">
+              <div>
+                <span className="plan-badge">{subscription?.status === 'past_due' ? 'Past due' : 'Free'}</span>
+                <div className="plan-current-desc">
+                  {subscription?.status === 'past_due' ? 'Update your card to keep generating' : '1 carousel to start'}
+                </div>
+              </div>
+            </div>
+            <div className="plan-upgrade-row">
+              {(['starter', 'pro', 'unlimited'] as Plan[]).map((plan) => (
+                <button
+                  key={plan}
+                  className="settings-save"
+                  style={{ marginTop: 0 }}
+                  onClick={() => handleUpgrade(plan)}
+                  disabled={billingLoading !== null}
+                >
+                  {billingLoading === plan ? 'Loading…' : `Upgrade to ${PLAN_LABELS[plan]}`}
+                </button>
+              ))}
+            </div>
+            <p className="plan-upsell">Upgrade for more carousels a month, priority generation, and a saved Brand Kit.</p>
+          </>
+        )}
       </div>
     </section>
   )

@@ -1,12 +1,79 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/lib/types'
 import { generateCarousel, renderAndGuard } from '@/lib/generation/pipeline'
 import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/lib/generation/edit'
 import { loadTemplate, fillTemplate, renderSlide } from '@/lib/generation/render'
 import { EDITABLE_FIELDS, type EditableField } from '@/lib/generation/editableFields'
+import { stripe, PLAN_PRICE_IDS, PLAN_CAROUSEL_LIMITS, FREE_LIFETIME_CAROUSEL_LIMIT, type Plan } from '@/lib/stripe'
+
+/** Every deploy target (localhost, a Cloudflare preview, caroslide.com) reads its own origin
+ * straight off the incoming request instead of a hardcoded env var, so Checkout/Portal
+ * success/cancel/return URLs always point back at wherever this action was actually called from. */
+async function siteOrigin() {
+  const h = await headers()
+  const proto = h.get('x-forwarded-proto') ?? 'https'
+  const host = h.get('host')
+  return `${proto}://${host}`
+}
+
+export async function createCheckoutSession(plan: Plan) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: existing } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', user!.id)
+    .maybeSingle()
+
+  const origin = await siteOrigin()
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    // Do NOT pass payment_method_types -- Stripe determines eligible methods dynamically.
+    line_items: [{ price: PLAN_PRICE_IDS[plan], quantity: 1 }],
+    ...(existing?.stripe_customer_id
+      ? { customer: existing.stripe_customer_id }
+      : { customer_email: user!.email }),
+    client_reference_id: user!.id,
+    subscription_data: { metadata: { user_id: user!.id } },
+    success_url: `${origin}/settings?checkout=success`,
+    cancel_url: `${origin}/settings`,
+  })
+
+  if (!session.url) throw new Error('Stripe did not return a Checkout URL.')
+  redirect(session.url)
+}
+
+export async function createPortalSession() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: existing } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', user!.id)
+    .maybeSingle()
+  if (!existing?.stripe_customer_id) {
+    throw new Error('No billing account yet -- subscribe to a plan first.')
+  }
+
+  const origin = await siteOrigin()
+  const session = await stripe.billingPortal.sessions.create({
+    customer: existing.stripe_customer_id,
+    return_url: `${origin}/settings`,
+  })
+  redirect(session.url)
+}
 
 export async function createCarousel(input: {
   angle: Angle
@@ -26,22 +93,36 @@ export async function createCarousel(input: {
 
   if (!user) redirect('/login')
 
-  // STOPGAP, not real billing: there is no credits/plan-tier system built yet (Settings' "Free --
-  // 1 carousel to start" and the marketing page's "credits are only spent on new carousels" copy
-  // are both promises with zero enforcement in code right now). Real generation costs real money
-  // per call (Anthropic + Cloudflare), so an account with no cap at all could be called
-  // repeatedly, unbounded, by a bug or a bad actor. This is a blunt safety net -- generous enough
-  // not to block real usage/testing, not the actual quota system. Replace with real Stripe-tied
-  // credit tracking when billing gets built; don't mistake this for that.
-  const MAX_CAROUSELS_PER_ACCOUNT = Number(process.env.MAX_CAROUSELS_PER_ACCOUNT) || 20
-  const { count: existingCount } = await supabase
-    .from('carousels')
-    .select('id', { count: 'exact', head: true })
+  // Real, Stripe-tied plan enforcement (2026-07-26) -- replaces the old flat 20-per-account
+  // stopgap. Free/past_due/no-subscription accounts get a lifetime cap (matches the marketing
+  // page's "1 carousel free when you sign up"); an active paid plan gets a per-billing-period cap
+  // instead, counted from carousels created since current_period_start -- not a stored counter, so
+  // it can't drift out of sync with what Stripe actually reports.
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('plan, status, current_period_start')
     .eq('user_id', user!.id)
-  if ((existingCount ?? 0) >= MAX_CAROUSELS_PER_ACCOUNT) {
-    throw new Error(
-      `You've reached the ${MAX_CAROUSELS_PER_ACCOUNT}-carousel limit for this account. Delete an old one or contact support.`
-    )
+    .maybeSingle()
+
+  const isActivePaid = subscription?.status === 'active' && subscription.plan
+  const limit = isActivePaid ? PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] : FREE_LIFETIME_CAROUSEL_LIMIT
+
+  if (limit !== null) {
+    let countQuery = supabase
+      .from('carousels')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+    if (isActivePaid && subscription!.current_period_start) {
+      countQuery = countQuery.gte('created_at', subscription!.current_period_start)
+    }
+    const { count: existingCount } = await countQuery
+    if ((existingCount ?? 0) >= limit) {
+      throw new Error(
+        isActivePaid
+          ? `You've used all ${limit} carousels for this billing period. It renews automatically, or upgrade for more in Settings.`
+          : `You've used your free carousel. Upgrade in Settings to keep generating.`
+      )
+    }
   }
 
   // voice_description is read live from the account's brand_kits row, not snapshotted onto the

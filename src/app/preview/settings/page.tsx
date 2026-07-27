@@ -17,6 +17,7 @@ export default function PreviewSettingsPage() {
             font: 'Inter Tight',
             updated_at: new Date().toISOString(),
           }}
+          subscription={null}
         />
       </main>
     </div>

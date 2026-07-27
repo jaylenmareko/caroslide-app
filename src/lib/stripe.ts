@@ -1,6 +1,10 @@
 import Stripe from 'stripe'
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+// Cloudflare Workers only supports outbound fetch(), not raw Node sockets -- the SDK's default
+// httpClient uses node:https and hangs indefinitely in this runtime without this override.
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  httpClient: Stripe.createFetchHttpClient(),
+})
 
 export type Plan = 'starter' | 'pro' | 'unlimited'
 

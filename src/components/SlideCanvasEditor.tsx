@@ -403,12 +403,12 @@ const SlideCanvasEditor = forwardRef<
   // selection -- built once here rather than per-field, since selectionchange is a document-level
   // event, not a per-element one.
   var colorToolbar = document.createElement('div');
-  colorToolbar.style.cssText = 'position:absolute;display:none;z-index:60;background:rgba(20,20,20,0.95);border-radius:10px;padding:6px;gap:6px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+  colorToolbar.style.cssText = 'position:absolute;display:none;z-index:60;background:rgba(20,20,20,0.95);border-radius:12px;padding:8px;gap:10px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
   document.body.appendChild(colorToolbar);
 
   function makeSwatch(color){
     var s = document.createElement('div');
-    s.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,0.5);background:' + color + ';display:inline-block;margin-right:6px;';
+    s.style.cssText = 'width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid rgba(255,255,255,0.6);background:' + color + ';display:inline-block;flex-shrink:0;';
     // mousedown, not click -- click fires after the field has already blurred/selection may have
     // collapsed in some browsers; mousedown fires while the selection is still live. Same class of
     // fix as the topbar Delete button's own e.preventDefault() in Viewer.tsx.
@@ -465,7 +465,7 @@ const SlideCanvasEditor = forwardRef<
   }
 
   var pickerTrigger = document.createElement('div');
-  pickerTrigger.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,0.5);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;';
+  pickerTrigger.style.cssText = 'width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;';
 
   var pickerPanel = document.createElement('div');
   pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:10px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:180px;';
@@ -617,8 +617,8 @@ const SlideCanvasEditor = forwardRef<
     }
     var rect = sel.getRangeAt(0).getBoundingClientRect();
     colorToolbar.style.display = 'flex';
-    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 60) + 'px';
-    colorToolbar.style.top = Math.max(4, rect.top - 40) + 'px';
+    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 118) + 'px';
+    colorToolbar.style.top = Math.max(4, rect.top - 56) + 'px';
   });
 
   fields.forEach(function(f){

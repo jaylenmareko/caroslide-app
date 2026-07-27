@@ -312,9 +312,13 @@ const SlideCanvasEditor = forwardRef<
   (function ensureSavedFontsLoaded(){
     var used = document.querySelectorAll('[style*="font-family"]');
     for (var i = 0; i < used.length; i++) {
-      var fam = used[i].style.fontFamily;
+      // Not a strict equality check against FONTS[j].family -- browsers normalize serialized
+      // style values (quotes around a single-word font name like 'Poppins' get silently dropped
+      // on read-back), so the saved HTML's font-family string doesn't byte-for-byte match what was
+      // originally assigned. Stripping quotes and matching by plain name instead is robust to that.
+      var fam = used[i].style.fontFamily.replace(/['"]/g, '').toLowerCase();
       for (var j = 0; j < FONTS.length; j++) {
-        if (FONTS[j].family === fam) { ensureFontLoaded(FONTS[j].param); break; }
+        if (fam.indexOf(FONTS[j].name.toLowerCase()) === 0) { ensureFontLoaded(FONTS[j].param); break; }
       }
     }
   })();

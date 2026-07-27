@@ -351,7 +351,6 @@ export default function SettingsForm({
                 </button>
               ))}
             </div>
-            <p className="plan-upsell">Upgrade for more carousels a month, priority generation, and a saved Brand Kit.</p>
           </>
         )}
 

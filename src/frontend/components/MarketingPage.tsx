@@ -266,7 +266,7 @@ export default function MarketingPage() {
           <Reveal className="lp-pricing-card featured" delay={100}>
             <span className="plan-badge">Pro</span>
             <div className="lp-pricing-amount">$25<span className="lp-pricing-period">/mo</span></div>
-            <p className="lp-pricing-desc">20 carousels a month, priority generation, and a saved Brand Kit.</p>
+            <p className="lp-pricing-desc">20 carousels a month — every angle, format, and look.</p>
             <Link href="/login?mode=signup" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
         </div>

@@ -279,6 +279,28 @@ const SlideCanvasEditor = forwardRef<
   var BRAND_PRIMARY = ${JSON.stringify(data.primaryColor)};
   var BRAND_SECONDARY = ${JSON.stringify(data.secondaryColor)};
   var fields = ${JSON.stringify(data.fields)};
+  // Per-word font (2026-07-27) -- same curated 5-font set Brand Kit already offers
+  // (fonts.ts's FONT_LINKS), hand-duplicated here since this injected script has no
+  // bundler/import system to share that table with directly. Each rendered slide only loads ONE
+  // Google Font up front (the carousel's own chosen brand font) -- picking a DIFFERENT one here
+  // needs its own <link> injected on the spot (see ensureFontLoaded below), or it would silently
+  // fall back to a generic sans-serif instead of visibly changing.
+  var FONTS = [
+    { name: 'Inter Tight', family: "'Inter Tight', sans-serif", param: 'Inter+Tight:wght@400;700;900' },
+    { name: 'Poppins', family: "'Poppins', sans-serif", param: 'Poppins:wght@400;700;900' },
+    { name: 'Montserrat', family: "'Montserrat', sans-serif", param: 'Montserrat:wght@400;700;900' },
+    { name: 'Archivo Black', family: "'Archivo Black', sans-serif", param: 'Archivo+Black' },
+    { name: 'DM Sans', family: "'DM Sans', sans-serif", param: 'DM+Sans:wght@400;700;900' }
+  ];
+  function ensureFontLoaded(param){
+    var existing = document.querySelector('link[data-caroslide-font="' + param + '"]');
+    if (existing) return;
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=' + param + '&display=swap';
+    link.setAttribute('data-caroslide-font', param);
+    document.head.appendChild(link);
+  }
   // Real bug found live 2026-07-26 (Jaylen: selecting an object then pressing Delete kept
   // deleting the whole slide): a fixed 8-native-unit threshold measures a real click's natural
   // mouse jitter as more native units at this component's typical ~0.3 display scale (native
@@ -396,6 +418,41 @@ const SlideCanvasEditor = forwardRef<
     // span directly on every drag step, instead of re-running the whole wrap/extract logic each
     // time -- the selection collapses right above, so a second call here would find nothing to
     // wrap and silently no-op.
+    return span;
+  }
+
+  // Per-word font (2026-07-27) -- same wrap-and-strip mechanism as applyColorToSelection, just for
+  // font-family instead of color. Deliberately independent of stripInnerColors/applyColorToSelection
+  // (clears only font-family, never touches color or the c1/c2/c3 classes) so a font change and a
+  // color change can both apply to the same selection without either one clobbering the other.
+  function stripInnerFonts(node){
+    if (node.nodeType === 1) node.style.fontFamily = '';
+    var children = node.childNodes;
+    for (var i = 0; i < children.length; i++) stripInnerFonts(children[i]);
+  }
+
+  function applyFontToSelection(family, containerEl){
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    var range = sel.getRangeAt(0);
+    var container = containerEl;
+    if (!container) {
+      var active = document.activeElement;
+      if (!active || active.getAttribute('contenteditable') !== 'true') return null;
+      container = active;
+    }
+    if (!container.contains(range.commonAncestorContainer)) return null;
+    var span = document.createElement('span');
+    span.style.fontFamily = family;
+    var contents = range.extractContents();
+    stripInnerFonts(contents);
+    span.appendChild(contents);
+    range.insertNode(span);
+    sel.removeAllRanges();
+    var after = document.createRange();
+    after.setStartAfter(span);
+    after.collapse(true);
+    sel.addRange(after);
     return span;
   }
 
@@ -599,6 +656,7 @@ const SlideCanvasEditor = forwardRef<
     e.stopPropagation();
     var sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    closeFontPanel();
     pickerHue = 0; pickerSat = 0; pickerVal = 1;
     updateSquareHue();
     updatePickerCursors();
@@ -615,7 +673,60 @@ const SlideCanvasEditor = forwardRef<
     }
   });
 
+  // Per-word font trigger + panel (2026-07-27) -- same interaction shape as the color picker
+  // trigger/panel above, but simpler: no live drag-adjust needed, just discrete buttons. fontTrigger
+  // and each row are plain, non-focusable divs with their own preventDefault() on pointerdown, so
+  // (like the SV square/hue slider, and unlike the hex input) focus and the live selection never
+  // leave the text field across opening the panel and picking a font -- no saved-range restore
+  // dance needed here.
+  var fontTrigger = document.createElement('div');
+  fontTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0;touch-action:manipulation;';
+  fontTrigger.textContent = 'Aa';
+
+  var fontPanel = document.createElement('div');
+  fontPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:14px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:340px;';
+  FONTS.forEach(function(f){
+    // Each option previewed in its own real typeface (Canva-style) so picking one shows exactly
+    // what it'll look like before committing, not just a plain text label.
+    var row = document.createElement('div');
+    row.style.cssText = 'padding:16px 18px;border-radius:8px;cursor:pointer;color:#fff;font-size:30px;line-height:1.2;font-family:' + f.family + ';touch-action:manipulation;';
+    row.textContent = f.name;
+    row.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      ensureFontLoaded(f.param);
+      applyFontToSelection(f.family, null);
+      closeFontPanel();
+    });
+    row.addEventListener('mouseenter', function(){ row.style.background = 'rgba(255,255,255,0.1)'; });
+    row.addEventListener('mouseleave', function(){ row.style.background = ''; });
+    fontPanel.appendChild(row);
+  });
+  document.body.appendChild(fontPanel);
+
+  function closeFontPanel(){
+    fontPanel.style.display = 'none';
+  }
+  fontTrigger.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    closePicker();
+    var triggerRect = fontTrigger.getBoundingClientRect();
+    var panelLeft = Math.min(triggerRect.left, document.documentElement.clientWidth - 340 - 8);
+    fontPanel.style.left = Math.max(4, panelLeft) + 'px';
+    fontPanel.style.top = (triggerRect.bottom + 8) + 'px';
+    fontPanel.style.display = 'block';
+  });
+  document.addEventListener('pointerdown', function(e){
+    if (fontPanel.style.display !== 'none' && e.target !== fontTrigger && !fontPanel.contains(e.target)) {
+      closeFontPanel();
+    }
+  });
+
   colorToolbar.appendChild(pickerTrigger);
+  colorToolbar.appendChild(fontTrigger);
 
   document.addEventListener('selectionchange', function(){
     var active = document.activeElement;
@@ -626,7 +737,9 @@ const SlideCanvasEditor = forwardRef<
     }
     var rect = sel.getRangeAt(0).getBoundingClientRect();
     colorToolbar.style.display = 'flex';
-    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 174) + 'px';
+    // Offset widened 174->208 (2026-07-27) -- the toolbar gained a 6th circle (the font trigger),
+    // recompute: padding 10*2 + 6*56 circles + 5*12 gaps = 416px total, half = 208.
+    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 208) + 'px';
     colorToolbar.style.top = Math.max(4, rect.top - 80) + 'px';
   });
 

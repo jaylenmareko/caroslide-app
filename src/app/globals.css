@@ -561,6 +561,11 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
    instruction) since this is an actual response to what the user just sent (confirmation,
    clarifying question, or error) and needs to read as a real reply, not background copy. */
 .chat-reply { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 10px; max-width: 420px; text-align: center; }
+/* A real edit runs 30-90+ seconds (real Anthropic call + Cloudflare render round-trip) -- a
+   pulse, not just static "Thinking…" text, so the screen visibly keeps signaling "still working"
+   over that whole span instead of looking frozen partway through. */
+.chat-reply-pending { animation: chat-pending-pulse 1.4s ease-in-out infinite; }
+@keyframes chat-pending-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 
 /* ---------- auth ---------- */
 .auth-wrap { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--hero-gradient); cursor: default; user-select: none; font-family: var(--font-inter-tight), var(--font); }

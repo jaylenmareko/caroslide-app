@@ -428,7 +428,14 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               {chatMessage.length}/{CHAT_MESSAGE_MAX_LENGTH}
             </p>
           )}
-          {chatReply ? (
+          {chatSending ? (
+            // Real edit takes a real Anthropic call + a Cloudflare render round-trip -- 30-90+
+            // seconds isn't unusual. Before this, chatReply was reset to null right as sending
+            // started (see handleChatSend), so this exact window showed the same static .chat-hint
+            // a first-time user sees before ever sending anything -- nothing on screen changed for
+            // up to a minute and a half, which reads as broken/unresponsive, not "working."
+            <p className="chat-reply chat-reply-pending">Thinking…</p>
+          ) : chatReply ? (
             <p className="chat-reply">{chatReply}</p>
           ) : (
             <p className="chat-hint">

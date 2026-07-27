@@ -15,7 +15,7 @@ export const PLAN_PRICE_IDS: Record<Plan, string> = {
 
 export const PLAN_CAROUSEL_LIMITS: Record<Plan, number> = {
   starter: 10,
-  pro: 30,
+  pro: 20,
 }
 
 export const FREE_LIFETIME_CAROUSEL_LIMIT = 1

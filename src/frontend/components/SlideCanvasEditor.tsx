@@ -408,11 +408,12 @@ const SlideCanvasEditor = forwardRef<
 
   function makeSwatch(color){
     var s = document.createElement('div');
-    s.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:' + color + ';display:inline-block;flex-shrink:0;';
-    // mousedown, not click -- click fires after the field has already blurred/selection may have
-    // collapsed in some browsers; mousedown fires while the selection is still live. Same class of
-    // fix as the topbar Delete button's own e.preventDefault() in Viewer.tsx.
-    s.addEventListener('mousedown', function(e){
+    s.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:' + color + ';display:inline-block;flex-shrink:0;touch-action:manipulation;';
+    // pointerdown, not click -- click fires after the field has already blurred/selection may have
+    // collapsed in some browsers; pointerdown fires while the selection is still live (and covers
+    // touch too, unlike mousedown, which never fires on a real tap). Same class of fix as the
+    // topbar Delete button's own e.preventDefault() in Viewer.tsx.
+    s.addEventListener('pointerdown', function(e){
       e.preventDefault();
       applyColorToSelection(color);
       colorToolbar.style.display = 'none';
@@ -465,19 +466,19 @@ const SlideCanvasEditor = forwardRef<
   }
 
   var pickerTrigger = document.createElement('div');
-  pickerTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;';
+  pickerTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;touch-action:manipulation;';
 
   var pickerPanel = document.createElement('div');
   pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:14px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:340px;';
 
   var svSquare = document.createElement('div');
-  svSquare.style.cssText = 'position:relative;width:340px;height:220px;border-radius:8px;cursor:crosshair;margin-bottom:16px;background-image:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);';
+  svSquare.style.cssText = 'position:relative;width:340px;height:220px;border-radius:8px;cursor:crosshair;margin-bottom:16px;touch-action:none;background-image:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);';
   var svCursor = document.createElement('div');
   svCursor.style.cssText = 'position:absolute;width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.8);transform:translate(-11px,-11px);pointer-events:none;';
   svSquare.appendChild(svCursor);
 
   var hueSlider = document.createElement('div');
-  hueSlider.style.cssText = 'position:relative;width:340px;height:24px;border-radius:12px;cursor:pointer;margin-bottom:16px;background:linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);';
+  hueSlider.style.cssText = 'position:relative;width:340px;height:24px;border-radius:12px;cursor:pointer;margin-bottom:16px;touch-action:none;background:linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);';
   var hueCursor = document.createElement('div');
   hueCursor.style.cssText = 'position:absolute;top:-3px;width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.8);transform:translateX(-15px);';
   hueSlider.appendChild(hueCursor);
@@ -525,8 +526,12 @@ const SlideCanvasEditor = forwardRef<
     pickerTargetSpan = applyColorToSelection(hex, pickerSavedField);
   }
 
-  svSquare.addEventListener('mousedown', function(e){
+  // Pointer Events here too (2026-07-27) -- same mobile gap as the drag-to-move handler above: a
+  // real touch drag across the square/slider never fired mousemove, so the picker was undraggable
+  // on a phone even though tapping the trigger to open it worked fine.
+  svSquare.addEventListener('pointerdown', function(e){
     e.preventDefault();
+    svSquare.setPointerCapture(e.pointerId);
     function fromEvent(ev){
       var rect = svSquare.getBoundingClientRect();
       pickerSat = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
@@ -536,13 +541,15 @@ const SlideCanvasEditor = forwardRef<
     }
     fromEvent(e);
     function onMove(ev){ fromEvent(ev); }
-    function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    function onUp(){ svSquare.removeEventListener('pointermove', onMove); svSquare.removeEventListener('pointerup', onUp); svSquare.removeEventListener('pointercancel', onUp); }
+    svSquare.addEventListener('pointermove', onMove);
+    svSquare.addEventListener('pointerup', onUp);
+    svSquare.addEventListener('pointercancel', onUp);
   });
 
-  hueSlider.addEventListener('mousedown', function(e){
+  hueSlider.addEventListener('pointerdown', function(e){
     e.preventDefault();
+    hueSlider.setPointerCapture(e.pointerId);
     function fromEvent(ev){
       var rect = hueSlider.getBoundingClientRect();
       pickerHue = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)) * 360;
@@ -552,12 +559,13 @@ const SlideCanvasEditor = forwardRef<
     }
     fromEvent(e);
     function onMove(ev){ fromEvent(ev); }
-    function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    function onUp(){ hueSlider.removeEventListener('pointermove', onMove); hueSlider.removeEventListener('pointerup', onUp); hueSlider.removeEventListener('pointercancel', onUp); }
+    hueSlider.addEventListener('pointermove', onMove);
+    hueSlider.addEventListener('pointerup', onUp);
+    hueSlider.addEventListener('pointercancel', onUp);
   });
 
-  hexInput.addEventListener('mousedown', function(e){
+  hexInput.addEventListener('pointerdown', function(e){
     e.stopPropagation();
     // Same capture-before-focus-steals-it pattern the old native color input used -- only matters
     // if no span has been created yet this session (see applyLivePickerColor).
@@ -586,7 +594,7 @@ const SlideCanvasEditor = forwardRef<
     pickerSavedRange = null;
     pickerSavedField = null;
   }
-  pickerTrigger.addEventListener('mousedown', function(e){
+  pickerTrigger.addEventListener('pointerdown', function(e){
     e.preventDefault();
     e.stopPropagation();
     var sel = document.getSelection();
@@ -601,7 +609,7 @@ const SlideCanvasEditor = forwardRef<
     pickerPanel.style.top = (triggerRect.bottom + 8) + 'px';
     pickerPanel.style.display = 'block';
   });
-  document.addEventListener('mousedown', function(e){
+  document.addEventListener('pointerdown', function(e){
     if (pickerPanel.style.display !== 'none' && e.target !== pickerTrigger && !pickerPanel.contains(e.target)) {
       closePicker();
     }
@@ -645,7 +653,24 @@ const SlideCanvasEditor = forwardRef<
     if (f.movable) {
       var moveTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
       hit.style.cursor = 'grab';
-      hit.addEventListener('mousedown', function(e){
+      // touch-action:none (2026-07-27, real bug: "can't highlight text on mobile") -- without this,
+      // a touch-drag on a movable field is ambiguous to the browser (page pan vs. our own drag), and
+      // it can hijack the gesture as a scroll before our pointerdown handler ever sees a pointermove.
+      // Text fields flip this to 'auto' the moment they actually become contenteditable (see the
+      // click handler below) so native touch text-selection isn't blocked once you're editing --
+      // move-dragging and text-selecting are mutually exclusive states for the same field, same as
+      // the existing contenteditable-guard just below already assumes.
+      hit.style.touchAction = 'none';
+      // Pointer Events (2026-07-27), not mouse-only -- unifies mouse/touch/pen so the same drag-to-
+      // move/drag-to-select logic works on a real phone, not just a desktop cursor. Real bug found
+      // live: this whole interaction was wired exclusively to mousedown/mousemove/mouseup, which
+      // never fire during an actual touch drag (only a single synthetic click fires after touchend,
+      // with no intervening move events) -- so touch could tap into a field but never drag it or
+      // select text inside it. setPointerCapture keeps move/up events targeting hit directly even
+      // if the finger/cursor leaves its bounds mid-drag, replacing the old window-listener approach
+      // (which only worked because real mouse input bubbles to window; touch's implicit capture
+      // target is less consistent across browsers without this).
+      hit.addEventListener('pointerdown', function(e){
         // Real bug found live 2026-07-26 (video evidence: dragging across text never produced a
         // selection, so the color-highlighting toolbar never appeared): this handler's own
         // e.preventDefault() unconditionally blocks the browser's native "start a text selection"
@@ -656,6 +681,7 @@ const SlideCanvasEditor = forwardRef<
         if (f.kind === 'text' && el.getAttribute('contenteditable') === 'true') return;
         e.preventDefault();
         e.stopPropagation();
+        hit.setPointerCapture(e.pointerId);
         var startX = e.clientX, startY = e.clientY, moved = false;
         var baseX = f.posX || 0;
         var baseY = f.posY || 0;
@@ -678,8 +704,9 @@ const SlideCanvasEditor = forwardRef<
           }
         }
         function onUp(){
-          window.removeEventListener('mousemove', onMove);
-          window.removeEventListener('mouseup', onUp);
+          hit.removeEventListener('pointermove', onMove);
+          hit.removeEventListener('pointerup', onUp);
+          hit.removeEventListener('pointercancel', onUp);
           if (!moved) return;
           justDragged = true;
           setTimeout(function(){ justDragged = false; }, 0);
@@ -692,8 +719,9 @@ const SlideCanvasEditor = forwardRef<
             parent.postMessage({ type: 'caroslide-fields-edit', fields: payload }, '*');
           }
         }
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+        hit.addEventListener('pointermove', onMove);
+        hit.addEventListener('pointerup', onUp);
+        hit.addEventListener('pointercancel', onUp);
       });
     }
 
@@ -763,6 +791,9 @@ const SlideCanvasEditor = forwardRef<
         if (hideBtn) hideBtn();
         el.setAttribute('contenteditable', 'true');
         el.style.outline = '3px solid #7C3AED';
+        // Let native touch text-selection through now that this field is actually editable -- see
+        // the touch-action:none default set above, next to the pointerdown handler this pairs with.
+        el.style.touchAction = 'auto';
         el.focus();
         // Real bug found live 2026-07-26: entering edit mode never told the outer topbar Delete
         // button anything was selected (text has no selectThis() call, unlike move-only fields) --
@@ -777,6 +808,7 @@ const SlideCanvasEditor = forwardRef<
       el.addEventListener('blur', function(){
         el.removeAttribute('contenteditable');
         el.style.outline = '';
+        el.style.touchAction = 'none';
         parent.postMessage({ type: 'caroslide-field-edit', field: f.field, value: el.innerHTML.trim() }, '*');
         parent.postMessage({ type: 'caroslide-field-selected', field: null, deletable: false }, '*');
       });

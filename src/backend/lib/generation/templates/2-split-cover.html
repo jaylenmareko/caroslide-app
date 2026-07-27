@@ -26,7 +26,7 @@
   .logo img { height:30px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
   .textzone { flex:1; background:#0a0a0a; display:flex; flex-direction:column; align-items:{{TEXT_ALIGN_V|flex-start}}; justify-content:center; padding:70px 70px; }
-  .caption { text-align:center; font-family:'Impact','Arial Narrow',Arial,sans-serif; font-size:{{CAPTION_SIZE|70px}}; line-height:1.16; letter-spacing:0.5px; text-transform:uppercase; }
+  .caption { text-align:center; font-family:'Impact','Arial Narrow',Arial,sans-serif; font-size:{{CAPTION_SIZE|70px}}; line-height:1.16; letter-spacing:0.5px; text-transform:uppercase; transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
   .caption .c1 { color:{{SECONDARY}}; }
   .caption .c2 { color:#ffffff; }
   .caption .c3 { color:{{PRIMARY}}; }
@@ -36,8 +36,8 @@
      — this template previously had no dedicated stat treatment at all, so "stat mode" meant just
      writing the number as the first word of the normal 70px caption, which read as barely-bigger
      than the surrounding text instead of a real stat callout. */
-  .stat { font-size:{{STAT_SIZE|150px}}; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; }
-  .statlbl { font-size:28px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:10px; }
+  .stat { font-size:{{STAT_SIZE|150px}}; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
+  .statlbl { font-size:28px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:10px; transform:translate({{STAT_LABEL_POS_X|0px}}, {{STAT_LABEL_POS_Y|0px}}); }
 </style>
 </head>
 <body>

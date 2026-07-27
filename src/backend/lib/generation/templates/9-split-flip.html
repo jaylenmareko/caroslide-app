@@ -25,14 +25,14 @@
   .logo img { height:30px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
   .textzone { height:{{TEXTZONE_H|36vh}}; background:#0a0a0a; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:100px 80px 0; }
-  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px; text-align:center; }
-  .caption { text-align:center; font-size:{{CAPTION_SIZE|46px}}; font-weight:800; line-height:1.28; }
+  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px; text-align:center; transform:translate({{TAGLINE_POS_X|0px}}, {{TAGLINE_POS_Y|0px}}); }
+  .caption { text-align:center; font-size:{{CAPTION_SIZE|46px}}; font-weight:800; line-height:1.28; transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
   .caption .c1 { color:{{SECONDARY}}; }
   .caption .c2 { color:#ffffff; }
   .caption .c3 { color:{{PRIMARY}}; }
 
-  .stat { font-size:110px; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; }
-  .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; }
+  .stat { font-size:110px; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
+  .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:6px; transform:translate({{STAT_LABEL_POS_X|0px}}, {{STAT_LABEL_POS_Y|0px}}); }
 
   /* SPLIT_DIRECTION added 2026-07-21 -- same mechanism as 2-split-cover.html, alternated per
      content-slide index by pipeline.ts, so this 2-photo split doesn't feel static across 4 slides. */

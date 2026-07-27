@@ -18,10 +18,10 @@
   .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; margin-bottom:70px; }
   .logo span { color:#ffffff; }
   .logo img { height:40px; width:auto; display:block; margin:0 auto; } /* used instead of the text+span when the brand has a real logo image, see LOGO_HTML */
-  h1 { font-size:80px; font-weight:900; color:#ffffff; line-height:1.1; letter-spacing:-2px; margin-bottom:36px; }
-  .sub { font-size:34px; color:#9a9a9a; font-weight:500; margin-bottom:70px; }
-  .btn { background:{{PRIMARY}}; color:#fff; font-size:36px; font-weight:800; padding:30px 60px; border-radius:100px; letter-spacing:-0.5px; }
-  .micro { margin-top:34px; font-size:26px; color:#666; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+  h1 { font-size:80px; font-weight:900; color:#ffffff; line-height:1.1; letter-spacing:-2px; margin-bottom:36px; transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
+  .sub { font-size:34px; color:#9a9a9a; font-weight:500; margin-bottom:70px; transform:translate({{SUBHEAD_POS_X|0px}}, {{SUBHEAD_POS_Y|0px}}); }
+  .btn { background:{{PRIMARY}}; color:#fff; font-size:36px; font-weight:800; padding:30px 60px; border-radius:100px; letter-spacing:-0.5px; transform:translate({{CTA_TEXT_POS_X|0px}}, {{CTA_TEXT_POS_Y|0px}}); }
+  .micro { margin-top:34px; font-size:26px; color:#666; font-weight:600; letter-spacing:1px; text-transform:uppercase; transform:translate({{MICRO_TEXT_POS_X|0px}}, {{MICRO_TEXT_POS_Y|0px}}); }
 </style>
 </head>
 <body>

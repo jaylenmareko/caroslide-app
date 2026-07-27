@@ -46,7 +46,7 @@
      gradient scrim, same real contrast risk as 1-cover-circles.html/6-minimal-magazine.html (a
      brand color can pass the documented luminance check against pure #0a0a0a and still read
      poorly once real photo color bleeds through underneath the scrim). */
-  .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; text-shadow:0 2px 6px rgba(0,0,0,0.55); }
+  .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
   .headline .c1 { color:{{SECONDARY}}; }
   .headline .c2 { color:#ffffff; }
   .headline .c3 { color:{{PRIMARY}}; }

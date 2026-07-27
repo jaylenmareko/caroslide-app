@@ -58,14 +58,14 @@
      regardless of how long the headline/story end up being. */
   .stage { flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding:190px 85px 90px; position:relative; z-index:2; }
 
-  .kicker { font-size:26px; font-weight:800; color:{{SECONDARY}}; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; }
+  .kicker { font-size:26px; font-weight:800; color:{{SECONDARY}}; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
 
-  .headline { font-size:{{HEADLINE_SIZE|78px}}; font-weight:900; line-height:1.08; letter-spacing:-1px; }
+  .headline { font-size:{{HEADLINE_SIZE|78px}}; font-weight:900; line-height:1.08; letter-spacing:-1px; transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
   .headline .c1 { color:{{SECONDARY}}; }
   .headline .c2 { color:#ffffff; }
   .headline .c3 { color:{{PRIMARY}}; -webkit-text-stroke:2px #ffffff; }
 
-  .story { font-size:32px; font-weight:600; line-height:1.45; color:#d8d8d8; margin-top:36px; max-width:880px; }
+  .story { font-size:32px; font-weight:600; line-height:1.45; color:#d8d8d8; margin-top:36px; max-width:880px; transform:translate({{STORY_HTML_POS_X|0px}}, {{STORY_HTML_POS_Y|0px}}); }
 </style>
 </head>
 <body>

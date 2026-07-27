@@ -493,6 +493,14 @@ const SlideCanvasEditor = forwardRef<
       var moveTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
       hit.style.cursor = 'grab';
       hit.addEventListener('mousedown', function(e){
+        // Real bug found live 2026-07-26 (video evidence: dragging across text never produced a
+        // selection, so the color-highlighting toolbar never appeared): this handler's own
+        // e.preventDefault() unconditionally blocks the browser's native "start a text selection"
+        // behavior on mousedown -- including while the field is already being edited, where a
+        // drag is supposed to mean "select this text," not "reposition the box." Move/resize only
+        // makes sense BEFORE you've clicked in to edit -- once contenteditable is on, let the
+        // native default proceed so text selection (and the color toolbar it drives) can work.
+        if (f.kind === 'text' && el.getAttribute('contenteditable') === 'true') return;
         e.preventDefault();
         e.stopPropagation();
         var startX = e.clientX, startY = e.clientY, moved = false;

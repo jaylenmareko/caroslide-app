@@ -468,23 +468,23 @@ const SlideCanvasEditor = forwardRef<
   pickerTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;';
 
   var pickerPanel = document.createElement('div');
-  pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:10px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:180px;';
+  pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:14px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:340px;';
 
   var svSquare = document.createElement('div');
-  svSquare.style.cssText = 'position:relative;width:180px;height:120px;border-radius:6px;cursor:crosshair;margin-bottom:10px;background-image:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);';
+  svSquare.style.cssText = 'position:relative;width:340px;height:220px;border-radius:8px;cursor:crosshair;margin-bottom:16px;background-image:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);';
   var svCursor = document.createElement('div');
-  svCursor.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,0.8);transform:translate(-6px,-6px);pointer-events:none;';
+  svCursor.style.cssText = 'position:absolute;width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.8);transform:translate(-11px,-11px);pointer-events:none;';
   svSquare.appendChild(svCursor);
 
   var hueSlider = document.createElement('div');
-  hueSlider.style.cssText = 'position:relative;width:180px;height:14px;border-radius:7px;cursor:pointer;margin-bottom:10px;background:linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);';
+  hueSlider.style.cssText = 'position:relative;width:340px;height:24px;border-radius:12px;cursor:pointer;margin-bottom:16px;background:linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);';
   var hueCursor = document.createElement('div');
-  hueCursor.style.cssText = 'position:absolute;top:-2px;width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,0.8);transform:translateX(-9px);';
+  hueCursor.style.cssText = 'position:absolute;top:-3px;width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.8);transform:translateX(-15px);';
   hueSlider.appendChild(hueCursor);
 
   var hexInput = document.createElement('input');
   hexInput.type = 'text';
-  hexInput.style.cssText = 'width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#111;color:#fff;font-size:13px;font-family:monospace;';
+  hexInput.style.cssText = 'width:100%;box-sizing:border-box;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#111;color:#fff;font-size:20px;font-family:monospace;';
 
   pickerPanel.appendChild(svSquare);
   pickerPanel.appendChild(hueSlider);
@@ -506,9 +506,9 @@ const SlideCanvasEditor = forwardRef<
 
   function updateSquareHue(){ svSquare.style.backgroundColor = 'hsl(' + pickerHue + ', 100%, 50%)'; }
   function updatePickerCursors(){
-    svCursor.style.left = (pickerSat * 180) + 'px';
-    svCursor.style.top = ((1 - pickerVal) * 120) + 'px';
-    hueCursor.style.left = (pickerHue / 360 * 180 - 9) + 'px';
+    svCursor.style.left = (pickerSat * 340) + 'px';
+    svCursor.style.top = ((1 - pickerVal) * 220) + 'px';
+    hueCursor.style.left = (pickerHue / 360 * 340 - 15) + 'px';
   }
   function applyLivePickerColor(){
     var hex = hsvToHex(pickerHue, pickerSat, pickerVal);
@@ -596,7 +596,8 @@ const SlideCanvasEditor = forwardRef<
     updatePickerCursors();
     hexInput.value = hsvToHex(pickerHue, pickerSat, pickerVal);
     var triggerRect = pickerTrigger.getBoundingClientRect();
-    pickerPanel.style.left = triggerRect.left + 'px';
+    var panelLeft = Math.min(triggerRect.left, document.documentElement.clientWidth - 340 - 8);
+    pickerPanel.style.left = Math.max(4, panelLeft) + 'px';
     pickerPanel.style.top = (triggerRect.bottom + 8) + 'px';
     pickerPanel.style.display = 'block';
   });

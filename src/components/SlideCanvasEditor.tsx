@@ -370,17 +370,17 @@ const SlideCanvasEditor = forwardRef<
   // at mousedown, while it's still genuinely valid, and passes it through here explicitly.
   function applyColorToSelection(color, containerEl){
     var sel = document.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
     var range = sel.getRangeAt(0);
     // Guard against a cross-field drag-select (or a stale/foreign selection) wrapping unrelated
     // sibling DOM -- only apply when the selection is actually contained within the field.
     var container = containerEl;
     if (!container) {
       var active = document.activeElement;
-      if (!active || active.getAttribute('contenteditable') !== 'true') return;
+      if (!active || active.getAttribute('contenteditable') !== 'true') return null;
       container = active;
     }
-    if (!container.contains(range.commonAncestorContainer)) return;
+    if (!container.contains(range.commonAncestorContainer)) return null;
     var span = document.createElement('span');
     span.style.color = color;
     var contents = range.extractContents();
@@ -392,6 +392,11 @@ const SlideCanvasEditor = forwardRef<
     after.setStartAfter(span);
     after.collapse(true);
     sel.addRange(after);
+    // Returned so a live-adjustable picker (the custom color board) can keep recoloring THIS same
+    // span directly on every drag step, instead of re-running the whole wrap/extract logic each
+    // time -- the selection collapses right above, so a second call here would find nothing to
+    // wrap and silently no-op.
+    return span;
   }
 
   // One shared floating toolbar, repositioned/reused for whichever field currently has an active
@@ -420,41 +425,188 @@ const SlideCanvasEditor = forwardRef<
   colorToolbar.appendChild(makeSwatch('#ffffff'));
   colorToolbar.appendChild(makeSwatch('#000000'));
 
-  var customColorInput = document.createElement('input');
-  customColorInput.type = 'color';
-  customColorInput.style.cssText = 'width:24px;height:24px;border:none;padding:0;cursor:pointer;background:none;';
-  // Focusing the native color input (mousedown on it) fires the contenteditable field's own blur
-  // handler and collapses the live selection before the async 'input' event (fired once the user
-  // actually picks a color in the native dialog) ever runs -- save both the range AND the field
-  // itself on mousedown, while the field is still genuinely contenteditable, and restore/pass both
-  // explicitly on input. The field reference matters as much as the range: by the time 'input'
-  // fires, the field has already blurred and lost its own contenteditable attribute, so re-deriving
-  // the container from document.activeElement at that point would find the color input itself, not
-  // the field -- passing the saved field through to applyColorToSelection sidesteps that entirely.
-  // Not e.preventDefault() on mousedown: that would block the native color-picker dialog from
-  // opening at all, same input, different breakage.
-  var savedColorRange = null;
-  var savedColorField = null;
-  customColorInput.addEventListener('mousedown', function(e){
-    e.stopPropagation();
-    var sel = document.getSelection();
-    var activeAtMousedown = document.activeElement;
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && activeAtMousedown && activeAtMousedown.getAttribute('contenteditable') === 'true') {
-      savedColorRange = sel.getRangeAt(0).cloneRange();
-      savedColorField = activeAtMousedown;
+  // Full custom color picker (2026-07-27, Jaylen: "the color picker is way too small and its
+  // limited... it should have the color picker board and the inputs for color numbers") -- the
+  // native <input type="color"> this replaces just opened the OS's own tiny native dialog. Built
+  // entirely by hand (no library -- this injected script has no bundler/import system to pull one
+  // in) as a standard HSV picker: a saturation/value gradient square for the current hue, a hue
+  // slider, and a hex text input, all kept in sync.
+  function hsvToHex(h, s, v){
+    var c = v * s;
+    var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    var m = v - c;
+    var r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    function toHex(n){ var v2 = Math.round((n + m) * 255); return (v2 < 16 ? '0' : '') + v2.toString(16); }
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+  }
+  function hexToHsv(hex){
+    hex = hex.replace('#', '');
+    var r = parseInt(hex.substr(0, 2), 16) / 255;
+    var g = parseInt(hex.substr(2, 2), 16) / 255;
+    var b = parseInt(hex.substr(4, 2), 16) / 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var d = max - min;
+    var h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
     }
-  });
-  customColorInput.addEventListener('input', function(){
-    if (savedColorRange && savedColorField) {
+    var s = max === 0 ? 0 : d / max;
+    return { h: h, s: s, v: max };
+  }
+
+  var pickerTrigger = document.createElement('div');
+  pickerTrigger.style.cssText = 'width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,0.5);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;';
+
+  var pickerPanel = document.createElement('div');
+  pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:10px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:180px;';
+
+  var svSquare = document.createElement('div');
+  svSquare.style.cssText = 'position:relative;width:180px;height:120px;border-radius:6px;cursor:crosshair;margin-bottom:10px;background-image:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);';
+  var svCursor = document.createElement('div');
+  svCursor.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,0.8);transform:translate(-6px,-6px);pointer-events:none;';
+  svSquare.appendChild(svCursor);
+
+  var hueSlider = document.createElement('div');
+  hueSlider.style.cssText = 'position:relative;width:180px;height:14px;border-radius:7px;cursor:pointer;margin-bottom:10px;background:linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);';
+  var hueCursor = document.createElement('div');
+  hueCursor.style.cssText = 'position:absolute;top:-2px;width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,0.8);transform:translateX(-9px);';
+  hueSlider.appendChild(hueCursor);
+
+  var hexInput = document.createElement('input');
+  hexInput.type = 'text';
+  hexInput.style.cssText = 'width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#111;color:#fff;font-size:13px;font-family:monospace;';
+
+  pickerPanel.appendChild(svSquare);
+  pickerPanel.appendChild(hueSlider);
+  pickerPanel.appendChild(hexInput);
+  document.body.appendChild(pickerPanel);
+
+  var pickerHue = 0, pickerSat = 1, pickerVal = 1;
+  // The span currently being live-recolored this picker session -- null until the first color
+  // actually gets applied (via a drag on the square/slider, or typing a valid hex), then reused
+  // directly for every subsequent adjustment in the SAME session so dragging around doesn't
+  // re-wrap the text in a fresh nested span on every single mousemove.
+  var pickerTargetSpan = null;
+  // Only the hex input needs a saved range to restore -- it's a real <input>, so clicking/typing
+  // into it steals focus and collapses the live selection before its 'input' event fires (same
+  // class of problem the old native color input had). The square/slider are plain, non-focusable
+  // divs with their own e.preventDefault() on mousedown, so focus (and the live selection) never
+  // leaves the text field for those two -- no restore dance needed there.
+  var pickerSavedRange = null, pickerSavedField = null;
+
+  function updateSquareHue(){ svSquare.style.backgroundColor = 'hsl(' + pickerHue + ', 100%, 50%)'; }
+  function updatePickerCursors(){
+    svCursor.style.left = (pickerSat * 180) + 'px';
+    svCursor.style.top = ((1 - pickerVal) * 120) + 'px';
+    hueCursor.style.left = (pickerHue / 360 * 180 - 9) + 'px';
+  }
+  function applyLivePickerColor(){
+    var hex = hsvToHex(pickerHue, pickerSat, pickerVal);
+    hexInput.value = hex;
+    if (pickerTargetSpan) {
+      pickerTargetSpan.style.color = hex;
+      return;
+    }
+    if (pickerSavedRange && pickerSavedField) {
       var sel = document.getSelection();
       sel.removeAllRanges();
-      sel.addRange(savedColorRange);
-      applyColorToSelection(customColorInput.value, savedColorField);
+      sel.addRange(pickerSavedRange);
     }
-    savedColorRange = null;
-    savedColorField = null;
+    pickerTargetSpan = applyColorToSelection(hex, pickerSavedField);
+  }
+
+  svSquare.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    function fromEvent(ev){
+      var rect = svSquare.getBoundingClientRect();
+      pickerSat = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      pickerVal = 1 - Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+      updatePickerCursors();
+      applyLivePickerColor();
+    }
+    fromEvent(e);
+    function onMove(ev){ fromEvent(ev); }
+    function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   });
-  colorToolbar.appendChild(customColorInput);
+
+  hueSlider.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    function fromEvent(ev){
+      var rect = hueSlider.getBoundingClientRect();
+      pickerHue = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)) * 360;
+      updateSquareHue();
+      updatePickerCursors();
+      applyLivePickerColor();
+    }
+    fromEvent(e);
+    function onMove(ev){ fromEvent(ev); }
+    function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  hexInput.addEventListener('mousedown', function(e){
+    e.stopPropagation();
+    // Same capture-before-focus-steals-it pattern the old native color input used -- only matters
+    // if no span has been created yet this session (see applyLivePickerColor).
+    var sel = document.getSelection();
+    var activeAtMousedown = document.activeElement;
+    if (!pickerTargetSpan && sel && sel.rangeCount > 0 && !sel.isCollapsed && activeAtMousedown && activeAtMousedown.getAttribute('contenteditable') === 'true') {
+      pickerSavedRange = sel.getRangeAt(0).cloneRange();
+      pickerSavedField = activeAtMousedown;
+    }
+  });
+  hexInput.addEventListener('input', function(){
+    var v = hexInput.value.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+      if (v.charAt(0) !== '#') v = '#' + v;
+      var hsv = hexToHsv(v);
+      pickerHue = hsv.h; pickerSat = hsv.s; pickerVal = hsv.v;
+      updateSquareHue();
+      updatePickerCursors();
+      applyLivePickerColor();
+    }
+  });
+
+  function closePicker(){
+    pickerPanel.style.display = 'none';
+    pickerTargetSpan = null;
+    pickerSavedRange = null;
+    pickerSavedField = null;
+  }
+  pickerTrigger.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    pickerHue = 0; pickerSat = 0; pickerVal = 1;
+    updateSquareHue();
+    updatePickerCursors();
+    hexInput.value = hsvToHex(pickerHue, pickerSat, pickerVal);
+    var triggerRect = pickerTrigger.getBoundingClientRect();
+    pickerPanel.style.left = triggerRect.left + 'px';
+    pickerPanel.style.top = (triggerRect.bottom + 8) + 'px';
+    pickerPanel.style.display = 'block';
+  });
+  document.addEventListener('mousedown', function(e){
+    if (pickerPanel.style.display !== 'none' && e.target !== pickerTrigger && !pickerPanel.contains(e.target)) {
+      closePicker();
+    }
+  });
+
+  colorToolbar.appendChild(pickerTrigger);
 
   document.addEventListener('selectionchange', function(){
     var active = document.activeElement;

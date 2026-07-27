@@ -301,6 +301,23 @@ const SlideCanvasEditor = forwardRef<
     link.setAttribute('data-caroslide-font', param);
     document.head.appendChild(link);
   }
+  // Real bug found live 2026-07-27, caught during this feature's own first deploy verification: a
+  // previously-applied per-word font persists fine in the saved HTML (it's just an inline
+  // font-family style), but only the ACT of picking a font calls ensureFontLoaded -- a fresh page
+  // load never re-scans for fonts already baked into the saved content, so a carousel reopened
+  // later would silently render that span in the browser's fallback font until someone reopened
+  // the picker and re-picked the same font. Scans every element with an inline font-family the
+  // instant this script runs (the DOM already has the saved spans parsed in by this point) and
+  // re-requests each one actually used, not just the one the carousel's own Brand Kit chose.
+  (function ensureSavedFontsLoaded(){
+    var used = document.querySelectorAll('[style*="font-family"]');
+    for (var i = 0; i < used.length; i++) {
+      var fam = used[i].style.fontFamily;
+      for (var j = 0; j < FONTS.length; j++) {
+        if (FONTS[j].family === fam) { ensureFontLoaded(FONTS[j].param); break; }
+      }
+    }
+  })();
   // Real bug found live 2026-07-26 (Jaylen: selecting an object then pressing Delete kept
   // deleting the whole slide): a fixed 8-native-unit threshold measures a real click's natural
   // mouse jitter as more native units at this component's typical ~0.3 display scale (native

@@ -34,6 +34,29 @@ async function upsertFromSubscription(subscription: Stripe.Subscription) {
   if (error) console.error(`[stripe-webhook] upsert failed for user ${userId}: ${error.message}`)
 }
 
+/** Credits a one-time carousel-pack purchase. `stripe_checkout_session_id` has a unique constraint
+ * (migration 009), so a webhook retry for the same session is a harmless no-op, not a double-credit. */
+async function creditPackPurchase(session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.user_id ?? session.client_reference_id
+  const quantity = Number(session.metadata?.credit_quantity)
+  if (!userId || !quantity) {
+    console.error(`[stripe-webhook] pack session ${session.id} missing user_id/credit_quantity metadata`)
+    return
+  }
+
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('credit_ledger').insert({
+    user_id: userId,
+    delta: quantity,
+    reason: 'purchase',
+    stripe_checkout_session_id: session.id,
+  })
+  // A unique-violation here just means this session was already credited (retry) -- not a real error.
+  if (error && error.code !== '23505') {
+    console.error(`[stripe-webhook] pack credit failed for user ${userId}: ${error.message}`)
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
@@ -59,6 +82,8 @@ export async function POST(request: NextRequest) {
           subscription.metadata.user_id = session.client_reference_id
         }
         await upsertFromSubscription(subscription)
+      } else if (session.mode === 'payment') {
+        await creditPackPurchase(session)
       }
       break
     }

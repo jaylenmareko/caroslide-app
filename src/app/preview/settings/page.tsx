@@ -18,6 +18,7 @@ export default function PreviewSettingsPage() {
             updated_at: new Date().toISOString(),
           }}
           subscription={null}
+          creditBalance={0}
         />
       </main>
     </div>

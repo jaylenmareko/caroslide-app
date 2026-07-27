@@ -269,14 +269,8 @@ export default function MarketingPage() {
             <p className="lp-pricing-desc">30 carousels a month, priority generation, and a saved Brand Kit.</p>
             <Link href="/login?mode=signup" className="lp-btn-solid" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
           </Reveal>
-          <Reveal className="lp-pricing-card" delay={200}>
-            <span className="plan-badge">Unlimited</span>
-            <div className="lp-pricing-amount">$79<span className="lp-pricing-period">/mo</span></div>
-            <p className="lp-pricing-desc">Unlimited carousels, top priority generation, and a saved Brand Kit.</p>
-            <Link href="/login?mode=signup" className="lp-btn-ghost" style={{ display: 'block', textAlign: 'center' }}>Get Started</Link>
-          </Reveal>
         </div>
-        <p className="lp-pricing-footnote">Chat edits and iterations are always free — credits are only spent on new carousels.</p>
+        <p className="lp-pricing-footnote">Chat edits and iterations are always free — credits are only spent on new carousels. Need more in a given month? Buy a carousel pack any time, no upgrade required.</p>
       </section>
 
       <section className="lp-position">

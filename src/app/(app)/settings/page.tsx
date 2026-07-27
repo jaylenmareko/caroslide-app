@@ -21,6 +21,10 @@ export default async function SettingsPage() {
     .eq('user_id', user!.id)
     .maybeSingle()
 
+  // Balance is always sum(delta), never a stored counter -- see migration 009.
+  const { data: ledgerRows } = await supabase.from('credit_ledger').select('delta').eq('user_id', user!.id)
+  const creditBalance = (ledgerRows ?? []).reduce((sum, row) => sum + row.delta, 0)
+
   const name = (user!.user_metadata?.name as string | undefined) || user!.email!.split('@')[0]
 
   return (
@@ -29,6 +33,7 @@ export default async function SettingsPage() {
       email={user!.email!}
       brandKit={brandKit as BrandKit | null}
       subscription={subscription as Subscription | null}
+      creditBalance={creditBalance}
     />
   )
 }

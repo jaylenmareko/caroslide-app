@@ -2,30 +2,45 @@
 
 import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { saveBrandKit, createCheckoutSession, createPortalSession } from '@/lib/actions'
+import { saveBrandKit, createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/lib/actions'
 import type { BrandKit } from '@/lib/types'
 import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/lib/types'
-import type { Subscription, Plan } from '@/lib/stripe'
+import type { Subscription, Plan, PackSize } from '@/lib/stripe'
 
-const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro', unlimited: 'Unlimited' }
+const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro' }
+const PACK_OPTIONS: { size: PackSize; price: string }[] = [
+  { size: 5, price: '$10' },
+  { size: 15, price: '$25' },
+]
 
 export default function SettingsForm({
   name,
   email,
   brandKit,
   subscription,
+  creditBalance,
 }: {
   name: string
   email: string
   brandKit: BrandKit | null
   subscription: Subscription | null
+  creditBalance: number
 }) {
-  const [billingLoading, setBillingLoading] = useState<Plan | 'portal' | null>(null)
+  const [billingLoading, setBillingLoading] = useState<Plan | PackSize | 'portal' | null>(null)
 
   async function handleUpgrade(plan: Plan) {
     setBillingLoading(plan)
     try {
       await createCheckoutSession(plan)
+    } finally {
+      setBillingLoading(null)
+    }
+  }
+
+  async function handleBuyPack(size: PackSize) {
+    setBillingLoading(size)
+    try {
+      await createPackCheckoutSession(size)
     } finally {
       setBillingLoading(null)
     }
@@ -321,7 +336,7 @@ export default function SettingsForm({
               </div>
             </div>
             <div className="plan-upgrade-row">
-              {(['starter', 'pro', 'unlimited'] as Plan[]).map((plan) => (
+              {(['starter', 'pro'] as Plan[]).map((plan) => (
                 <button
                   key={plan}
                   className="settings-save"
@@ -336,6 +351,26 @@ export default function SettingsForm({
             <p className="plan-upsell">Upgrade for more carousels a month, priority generation, and a saved Brand Kit.</p>
           </>
         )}
+
+        <div className="plan-packs">
+          <div className="plan-current-desc" style={{ marginTop: 0 }}>
+            Carousel packs -- {creditBalance} credit{creditBalance === 1 ? '' : 's'} available
+          </div>
+          <div className="plan-upgrade-row">
+            {PACK_OPTIONS.map(({ size, price }) => (
+              <button
+                key={size}
+                className="settings-save"
+                style={{ marginTop: 0 }}
+                onClick={() => handleBuyPack(size)}
+                disabled={billingLoading !== null}
+              >
+                {billingLoading === size ? 'Loading…' : `${size} carousels -- ${price}`}
+              </button>
+            ))}
+          </div>
+          <p className="plan-upsell">Went over your monthly limit? Buy a pack instead of waiting for renewal.</p>
+        </div>
       </div>
     </section>
   )

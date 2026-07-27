@@ -8,7 +8,15 @@ import { generateCarousel, renderAndGuard } from '@/lib/generation/pipeline'
 import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/lib/generation/edit'
 import { loadTemplate, fillTemplate, renderSlide } from '@/lib/generation/render'
 import { EDITABLE_FIELDS, type EditableField } from '@/lib/generation/editableFields'
-import { stripe, PLAN_PRICE_IDS, PLAN_CAROUSEL_LIMITS, FREE_LIFETIME_CAROUSEL_LIMIT, type Plan } from '@/lib/stripe'
+import {
+  stripe,
+  PLAN_PRICE_IDS,
+  PLAN_CAROUSEL_LIMITS,
+  FREE_LIFETIME_CAROUSEL_LIMIT,
+  PACK_PRICE_IDS,
+  type Plan,
+  type PackSize,
+} from '@/lib/stripe'
 
 /** Every deploy target (localhost, a Cloudflare preview, caroslide.com) reads its own origin
  * straight off the incoming request instead of a hardcoded env var, so Checkout/Portal
@@ -43,6 +51,40 @@ export async function createCheckoutSession(plan: Plan) {
       : { customer_email: user!.email }),
     client_reference_id: user!.id,
     subscription_data: { metadata: { user_id: user!.id } },
+    success_url: `${origin}/settings?checkout=success`,
+    cancel_url: `${origin}/settings`,
+  })
+
+  if (!session.url) throw new Error('Stripe did not return a Checkout URL.')
+  redirect(session.url)
+}
+
+/** One-time purchase, not a subscription -- extra carousel generations for whenever someone goes
+ * over their plan's monthly cap. Replaces the old flat-rate Unlimited plan (unbounded cost exposure
+ * for a fixed subscription price); credited via the same webhook, tracked in a real ledger (see
+ * migration 009) so a webhook retry can't double-credit the same purchase. */
+export async function createPackCheckoutSession(size: PackSize) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: existing } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', user!.id)
+    .maybeSingle()
+
+  const origin = await siteOrigin()
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    line_items: [{ price: PACK_PRICE_IDS[size], quantity: 1 }],
+    ...(existing?.stripe_customer_id
+      ? { customer: existing.stripe_customer_id }
+      : { customer_email: user!.email }),
+    client_reference_id: user!.id,
+    metadata: { user_id: user!.id, credit_quantity: String(size) },
     success_url: `${origin}/settings?checkout=success`,
     cancel_url: `${origin}/settings`,
   })
@@ -107,22 +149,33 @@ export async function createCarousel(input: {
   const isActivePaid = subscription?.status === 'active' && subscription.plan
   const limit = isActivePaid ? PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] : FREE_LIFETIME_CAROUSEL_LIMIT
 
-  if (limit !== null) {
-    let countQuery = supabase
-      .from('carousels')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user!.id)
-    if (isActivePaid && subscription!.current_period_start) {
-      countQuery = countQuery.gte('created_at', subscription!.current_period_start)
-    }
-    const { count: existingCount } = await countQuery
-    if ((existingCount ?? 0) >= limit) {
+  let countQuery = supabase
+    .from('carousels')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user!.id)
+  if (isActivePaid && subscription!.current_period_start) {
+    countQuery = countQuery.gte('created_at', subscription!.current_period_start)
+  }
+  const { count: existingCount } = await countQuery
+
+  if ((existingCount ?? 0) >= limit) {
+    // Over the plan's cap (or never subscribed) -- fall back to purchased carousel-pack credits
+    // (see migration 009) before blocking. Balance is always sum(delta), never a stored counter.
+    const { data: ledgerRows } = await supabase.from('credit_ledger').select('delta').eq('user_id', user!.id)
+    const creditBalance = (ledgerRows ?? []).reduce((sum, row) => sum + row.delta, 0)
+
+    if (creditBalance <= 0) {
       throw new Error(
         isActivePaid
-          ? `You've used all ${limit} carousels for this billing period. It renews automatically, or upgrade for more in Settings.`
-          : `You've used your free carousel. Upgrade in Settings to keep generating.`
+          ? `You've used all ${limit} carousels for this billing period. It renews automatically, or buy a carousel pack in Settings.`
+          : `You've used your free carousel. Upgrade or buy a carousel pack in Settings.`
       )
     }
+
+    const { error: consumeError } = await supabase
+      .from('credit_ledger')
+      .insert({ user_id: user!.id, delta: -1, reason: 'consumption' })
+    if (consumeError) throw new Error(`Failed to use a carousel-pack credit: ${consumeError.message}`)
   }
 
   // voice_description is read live from the account's brand_kits row, not snapshotted onto the

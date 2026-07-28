@@ -522,12 +522,12 @@ const SlideCanvasEditor = forwardRef<
   // selection -- built once here rather than per-field, since selectionchange is a document-level
   // event, not a per-element one.
   var colorToolbar = document.createElement('div');
-  colorToolbar.style.cssText = 'position:absolute;display:none;z-index:60;background:rgba(20,20,20,0.95);border-radius:14px;padding:10px;gap:12px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+  colorToolbar.style.cssText = 'position:absolute;display:none;z-index:60;background:rgba(20,20,20,0.95);border-radius:18px;padding:14px;gap:16px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
   document.body.appendChild(colorToolbar);
 
   function makeSwatch(color){
     var s = document.createElement('div');
-    s.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:' + color + ';display:inline-block;flex-shrink:0;touch-action:manipulation;';
+    s.style.cssText = 'width:80px;height:80px;border-radius:50%;cursor:pointer;border:5px solid rgba(255,255,255,0.6);background:' + color + ';display:inline-block;flex-shrink:0;touch-action:manipulation;';
     // pointerdown, not click -- click fires after the field has already blurred/selection may have
     // collapsed in some browsers; pointerdown fires while the selection is still live (and covers
     // touch too, unlike mousedown, which never fires on a real tap). Same class of fix as the
@@ -585,7 +585,7 @@ const SlideCanvasEditor = forwardRef<
   }
 
   var pickerTrigger = document.createElement('div');
-  pickerTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;touch-action:manipulation;';
+  pickerTrigger.style.cssText = 'width:80px;height:80px;border-radius:50%;cursor:pointer;border:5px solid rgba(255,255,255,0.6);background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:inline-block;flex-shrink:0;touch-action:manipulation;';
 
   var pickerPanel = document.createElement('div');
   pickerPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:14px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:340px;';
@@ -742,7 +742,7 @@ const SlideCanvasEditor = forwardRef<
   // leave the text field across opening the panel and picking a font -- no saved-range restore
   // dance needed here.
   var fontTrigger = document.createElement('div');
-  fontTrigger.style.cssText = 'width:56px;height:56px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,0.6);background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0;touch-action:manipulation;';
+  fontTrigger.style.cssText = 'width:80px;height:80px;border-radius:50%;cursor:pointer;border:5px solid rgba(255,255,255,0.6);background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;flex-shrink:0;touch-action:manipulation;';
   fontTrigger.textContent = 'Aa';
 
   var fontPanel = document.createElement('div');
@@ -805,8 +805,10 @@ const SlideCanvasEditor = forwardRef<
     colorToolbar.style.display = 'flex';
     // Offset widened 174->208 (2026-07-27) -- the toolbar gained a 6th circle (the font trigger),
     // recompute: padding 10*2 + 6*56 circles + 5*12 gaps = 416px total, half = 208.
-    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 208) + 'px';
-    colorToolbar.style.top = Math.max(4, rect.top - 80) + 'px';
+    // Offset widened again 208->294 (2026-07-28, Jaylen: circles "really small" on both phone and
+    // desktop) -- recompute: padding 14*2 + 6*80 circles + 5*16 gaps = 588px total, half = 294.
+    colorToolbar.style.left = Math.max(4, rect.left + rect.width / 2 - 294) + 'px';
+    colorToolbar.style.top = Math.max(4, rect.top - 112) + 'px';
   });
 
   fields.forEach(function(f){

@@ -308,6 +308,47 @@ function storagePathFromPublicUrl(url: string): string | null {
   return idx === -1 ? null : url.slice(idx + marker.length)
 }
 
+// Chat-edit abuse guard (2026-07-28, migration 010_chat_edit_rate_limit.sql) -- editSlide is the
+// only chat-edit surface that spends real AI tokens per request (at minimum one Haiku classification
+// call, up to Opus for copy_rewrite); the click-in-place editor never calls an LLM at all, so it
+// isn't covered here. This is a bot/abuse backstop, not a plan-tier feature limit -- Jaylen: real
+// per-edit cost is sub-cent to a few cents, a normal user iterating a lot costs a couple dollars over
+// a plan's whole lifetime, not worth capping. The threshold below is set high enough that no human
+// hand-typing a message and waiting ~5-20s for each reply could ever hit it -- only a script
+// hammering the endpoint could.
+const CHAT_EDIT_RATE_LIMIT_WINDOW_SECONDS = 60
+const CHAT_EDIT_RATE_LIMIT_MAX_REQUESTS = 20
+
+/** Returns false if this user has already made CHAT_EDIT_RATE_LIMIT_MAX_REQUESTS chat-edit requests
+ * in the last CHAT_EDIT_RATE_LIMIT_WINDOW_SECONDS (and logs nothing new -- a rejected request never
+ * reached classifyEdit, so it never actually cost anything, and shouldn't count against the next
+ * check either). Otherwise logs this request and returns true. One row per REQUEST, not per
+ * successful edit -- an 'ambiguous'/'clarify' outcome still paid for the classification call. */
+async function checkChatEditRateLimit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const windowStart = new Date(Date.now() - CHAT_EDIT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString()
+  const { count } = await supabase
+    .from('chat_edit_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', windowStart)
+  if ((count ?? 0) >= CHAT_EDIT_RATE_LIMIT_MAX_REQUESTS) return false
+
+  await supabase.from('chat_edit_events').insert({ user_id: userId })
+  // Opportunistic cleanup (~1% of requests) instead of a cron job -- this table only needs to stay
+  // roughly bounded over time, not exactly pruned the instant a row ages out of the rate window.
+  if (Math.random() < 0.01) {
+    await supabase
+      .from('chat_edit_events')
+      .delete()
+      .eq('user_id', userId)
+      .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+  }
+  return true
+}
+
 /**
  * Real chat-editing entrypoint (2026-07-21) -- governed by chat-editing-behavior.md (scope) and
  * chat-editing-execution.md (what an edit actually changes). Classifies the message, executes a
@@ -321,6 +362,11 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const withinRateLimit = await checkChatEditRateLimit(supabase, user!.id)
+  if (!withinRateLimit) {
+    return { type: 'error', message: "You're editing quite fast -- wait about a minute and try again." }
+  }
 
   const { data: carousel, error: fetchError } = await supabase
     .from('carousels')

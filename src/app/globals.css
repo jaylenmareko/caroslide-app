@@ -453,6 +453,23 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
 .viewer-icon-btn.danger { color: #d64545; border-color: rgba(214,69,69,0.35); }
 .viewer-icon-btn.danger:hover:not(:disabled) { background: #d64545; color: #fff; border-color: #d64545; }
 
+/* Explicit-Save build (2026-07-28) -- .dirty (unsaved changes exist) reads as a real accent-
+   colored call to action, same visual weight as .download-btn; the disabled "Saved" state (no
+   dirty slides) drops to the same muted look .viewer-icon-btn:disabled already uses, so it reads
+   as "nothing to do" rather than a broken/greyed-out button. */
+.save-btn {
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; height: 40px;
+  border-radius: 100px; font-weight: 600; font-size: 15px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink-faint); cursor: not-allowed; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
+}
+.save-btn.dirty {
+  color: #fff; border-color: transparent; cursor: pointer;
+  background: linear-gradient(135deg, var(--green-bright), var(--green)); box-shadow: var(--cta-glow);
+}
+.save-btn.dirty:hover:not(:disabled) { transform: translateY(-1px); }
+.save-btn:disabled:not(.dirty) { opacity: 0.6; }
+.save-error { text-align: center; color: #d64545; font-size: 13px; margin: 8px 0 0; }
+
 .stage-arrow {
   position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
   display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;
@@ -662,7 +679,7 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
     padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
     justify-content: space-around; gap: 0;
   }
-  .viewer-icon-btn, .download-btn {
+  .viewer-icon-btn, .download-btn, .save-btn {
     flex-direction: column; gap: 3px; width: auto; height: auto; min-width: 60px;
     border: none; border-radius: 10px; background: none; padding: 6px 4px;
     box-shadow: none; color: var(--ink-soft);
@@ -670,11 +687,14 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .viewer-icon-btn:not(.danger):not(:disabled) { color: var(--ink-soft); }
   .viewer-icon-btn:hover:not(:disabled), .download-btn:hover { background: var(--bg-alt); transform: none; }
   .viewer-icon-btn.danger { color: #d64545; }
-  .viewer-icon-btn .lbl, .download-btn .lbl {
+  .viewer-icon-btn .lbl, .download-btn .lbl, .save-btn .lbl {
     display: block; font-size: 10.5px; font-weight: 600; color: inherit; letter-spacing: 0.2px;
   }
   .download-btn { background: none; box-shadow: none; color: var(--green); }
   .download-btn:disabled { background: none; }
+  .save-btn { background: none; box-shadow: none; color: var(--ink-faint); }
+  .save-btn.dirty { background: none; color: var(--green); }
+  .save-btn.dirty:hover:not(:disabled) { background: var(--bg-alt); transform: none; }
 
   /* Order for mobile: stage first, thumbnails below it, chat box last -- Jaylen's explicit
      layout call. Brand Kit had its own row here at one point, then moved to the topbar --

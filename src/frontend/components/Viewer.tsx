@@ -3,8 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Carousel, Slide } from '@/backend/lib/types'
-import { updateCarouselTitle, updateCarouselSlides, editSlide } from '@/backend/lib/actions'
+import { updateCarouselTitle, updateCarouselSlides, updateSlideField, editSlide } from '@/backend/lib/actions'
 import SlideCanvasEditor, { type SlideCanvasEditorHandle } from '@/frontend/components/SlideCanvasEditor'
+
+// Reference-equality diff between two Slide[] snapshots -- safe because every local edit
+// (handleFieldsChanged) and every undo/redo step builds its array via immutable spread, so an
+// unchanged slide always keeps its exact old object reference and a changed one always gets a
+// brand new one. Used to figure out which slide indices an undo/redo step just touched, so they
+// can be marked dirty again (Save re-covers them) without needing a separate value-by-value diff.
+function changedIndices(a: Slide[], b: Slide[]): number[] {
+  const out: number[] = []
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] !== b[i]) out.push(i)
+  }
+  return out
+}
 
 // Guards against an accidental giant paste (a whole doc/paragraph) turning into a real, costly
 // editSlide() -> Claude call -- the box itself no longer stops you once it scrolls past 120px
@@ -34,13 +47,123 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [slides, setSlides] = useState<Slide[]>(carousel.slides)
   const [past, setPast] = useState<Slide[][]>([])
   const [future, setFuture] = useState<Slide[][]>([])
+  // Read after an await instead of the `slides` closed over before it -- a function that awaits
+  // ensureSaved()/saveAll() before touching `slides` needs the LATEST state, which a variable
+  // captured pre-await can't give it (React doesn't retroactively update already-destructured
+  // closures). Synced via an effect, not a direct render-time assignment -- react-hooks/refs flags
+  // mutating a ref's .current while rendering, even for this keep-it-in-sync pattern.
+  const slidesRef = useRef(slides)
+  useEffect(() => {
+    slidesRef.current = slides
+  }, [slides])
 
+  // Explicit-Save build (2026-07-28, Jaylen: "remove instant updating... makes it feel like a lag
+  // when there isn't"). Real, avoidable inefficiency found while investigating: every single field
+  // edit used to trigger TWO separate network round trips -- SlideCanvasEditor's own save() called
+  // updateSlideField (the real cost: a Cloudflare render + Storage upload), then handed the result
+  // to this commitSlides(), which ALWAYS called updateCarouselSlides() again right after -- a fully
+  // redundant second DB write of the exact same result. Click-in-place field edits (text, color,
+  // font, drag-move/resize, delete, photo swap) no longer touch the network at all until the user
+  // hits the new topbar Save button -- see SlideCanvasEditor.tsx's own top-of-file comment for the
+  // client side of this. dirtySlideIndices tracks which slides have unsaved local edits since the
+  // last successful save, so Save only re-renders the ones that actually changed, not every slide.
+  const [dirtySlideIndices, setDirtySlideIndices] = useState<Set<number>>(new Set())
+  const [savingAll, setSavingAll] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Chat-editing and whole-slide deletion still persist immediately (Jaylen: keep those auto-
+  // saving -- both are already deliberate, single, already-slow actions, not the rapid-fire
+  // clicking/dragging this whole change is about). commitSlides is now ONLY used by those two
+  // paths, always after ensureSaved() has flushed any pending local edits first -- see both call
+  // sites below for why: editSlide/deleteSlide re-fetch or restructure from a server-side view
+  // that has no idea about unsaved local edits, so skipping the flush first would silently
+  // overwrite whatever hadn't been saved yet.
   function commitSlides(next: Slide[]) {
-    setPast((p) => [...p, slides])
+    setPast((p) => [...p, slidesRef.current])
     setFuture([])
     setSlides(next)
     updateCarouselSlides(carousel.id, next)
   }
+
+  // Local-only commit for click-in-place field edits -- merges the changed field(s) into the
+  // CURRENT slide's values, pushes undo history, marks that slide dirty. No network call at all;
+  // Save (below) is what actually persists.
+  const handleFieldsChanged = useCallback(
+    (fields: Record<string, string>) => {
+      setPast((p) => [...p, slidesRef.current])
+      setFuture([])
+      setSlides((prev) => {
+        const next = [...prev]
+        next[current] = { ...next[current], values: { ...next[current].values, ...fields } }
+        return next
+      })
+      setDirtySlideIndices((prev) => new Set(prev).add(current))
+    },
+    [current]
+  )
+
+  // Renders + uploads exactly one fresh PNG per dirty slide (unavoidable -- each one genuinely
+  // changed), then exactly ONE final DB write for the whole carousel, replacing what used to be a
+  // separate render+upload+DB-write round trip PER EDIT. Returns false (and leaves whatever's still
+  // unsaved marked dirty, for a retry) on any failure -- callers that need to guarantee a clean
+  // slate first (chat-editing, slide deletion) check this before proceeding.
+  async function saveAll(): Promise<boolean> {
+    if (dirtySlideIndices.size === 0) return true
+    setSavingAll(true)
+    setSaveError(null)
+    try {
+      let working = slidesRef.current
+      const remaining = new Set(dirtySlideIndices)
+      for (const idx of dirtySlideIndices) {
+        const values = working[idx]?.values
+        // Only ever reached if editing this slide is what marked it dirty in the first place
+        // (handleFieldsChanged/undo/redo), which requires .values to already exist -- this guard
+        // is for TypeScript, not a real runtime case, but fails safely rather than crashing if it
+        // somehow were.
+        if (!values) {
+          setSaveError(`Slide ${idx + 1} can't be saved -- try a new carousel.`)
+          setDirtySlideIndices(remaining)
+          return false
+        }
+        const result = await updateSlideField(carousel.id, idx, values)
+        if (result.type !== 'updated') {
+          setSaveError(result.message)
+          setDirtySlideIndices(remaining)
+          return false
+        }
+        working = working.map((s, i) => (i === idx ? result.slides[idx] : s))
+        remaining.delete(idx)
+      }
+      await updateCarouselSlides(carousel.id, working)
+      setSlides(working)
+      setDirtySlideIndices(new Set())
+      return true
+    } catch {
+      setSaveError('Something went wrong saving -- try again.')
+      return false
+    } finally {
+      setSavingAll(false)
+    }
+  }
+
+  // Chat-editing and slide-deletion both read/restructure from a view that has no idea about
+  // unsaved local field edits (editSlide re-fetches straight from the DB; deleteSlide's own commit
+  // would otherwise persist a slides array whose dirty slides still have their OLD, pre-edit PNG
+  // despite already-changed values) -- flushing first keeps both paths correct.
+  async function ensureSaved(): Promise<boolean> {
+    if (dirtySlideIndices.size === 0) return true
+    return saveAll()
+  }
+
+  useEffect(() => {
+    if (dirtySlideIndices.size === 0) return
+    function handler(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirtySlideIndices])
 
   // Click-in-place selection (2026-07-24). The shared topbar Delete button used to always delete
   // the whole current slide -- real feedback: after adding click-to-select for objects (same
@@ -89,9 +212,16 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     setCurrent(next)
   }
 
-  function deleteSlide(i: number) {
-    if (slides.length <= 1) return
-    const next = slides.filter((_, idx) => idx !== i)
+  // Async now (2026-07-28) -- flushes any pending local field edits first, since removing a slide
+  // restructures the whole array from the CURRENT client-side state (unlike editSlide, this one
+  // doesn't re-fetch from the DB), but a still-dirty slide's `.values` and `.url` would be out of
+  // sync (values reflect the local edit, url is still the old PNG) if persisted as-is.
+  async function deleteSlide(i: number) {
+    const ok = await ensureSaved()
+    if (!ok) return
+    const latest = slidesRef.current
+    if (latest.length <= 1) return
+    const next = latest.filter((_, idx) => idx !== i)
     commitSlides(next)
     goToSlide((c) => Math.min(c, next.length - 1))
   }
@@ -105,6 +235,8 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
       // every other edit action (typing, dragging, the hover-X button), which only pay the first
       // cost. Routing through the same setField() the hover-X button uses gets this action the
       // identical skip-reload + optimistic-local-update treatment, so it feels exactly as fast.
+      // As of the explicit-Save build, setField() no longer triggers ANY network call at all --
+      // this is now a purely local edit like every other field-level action, deferred to Save.
       editorRef.current?.setField(selectedMode === 'text' ? selectedField : `${selectedField}_DISPLAY`, selectedMode === 'text' ? '' : 'hidden')
       setSelectedField(null)
       setSelectedDeletable(false)
@@ -114,23 +246,40 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     deleteSlide(current)
   }
 
+  // Local-only now (2026-07-28) -- undoing/redoing a NOT-yet-saved edit used to still trigger a
+  // real updateCarouselSlides() write, which would have reintroduced exactly the per-action network
+  // lag this whole change removes. Just walks the past/future stacks and marks whichever slides the
+  // step actually touched dirty again (via reference-equality diffing, see changedIndices above) --
+  // Save is what persists it, same as every other local edit.
   function undo() {
     if (past.length === 0) return
     const prev = past[past.length - 1]
+    const before = slidesRef.current
+    const touched = changedIndices(before, prev)
     setPast((p) => p.slice(0, -1))
-    setFuture((f) => [slides, ...f])
+    setFuture((f) => [before, ...f])
     setSlides(prev)
-    updateCarouselSlides(carousel.id, prev)
+    setDirtySlideIndices((prevSet) => {
+      const next = new Set(prevSet)
+      touched.forEach((idx) => next.add(idx))
+      return next
+    })
     goToSlide((c) => Math.min(c, prev.length - 1))
   }
 
   function redo() {
     if (future.length === 0) return
     const next = future[0]
+    const before = slidesRef.current
+    const touched = changedIndices(before, next)
     setFuture((f) => f.slice(1))
-    setPast((p) => [...p, slides])
+    setPast((p) => [...p, before])
     setSlides(next)
-    updateCarouselSlides(carousel.id, next)
+    setDirtySlideIndices((prevSet) => {
+      const nextSet = new Set(prevSet)
+      touched.forEach((idx) => nextSet.add(idx))
+      return nextSet
+    })
     goToSlide((c) => Math.min(c, next.length - 1))
   }
 
@@ -161,6 +310,15 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     setChatSending(true)
     setChatReply(null)
     try {
+      // Flush any pending local field edits first -- editSlide re-fetches slide.values straight
+      // from the DB, which has no idea about anything edited locally since the last Save. Skipping
+      // this would let a chat-edit's own result silently overwrite unsaved click-in-place edits
+      // the moment its result gets committed below.
+      const flushed = await ensureSaved()
+      if (!flushed) {
+        setChatReply('Could not save your pending edits first -- try Save, then send this again.')
+        return
+      }
       const result = await editSlide(carousel.id, message, current)
       if (result.type === 'updated') {
         commitSlides(result.slides)
@@ -286,7 +444,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             aria-label="Undo"
             title="Undo (Ctrl+Z)"
             onClick={undo}
-            disabled={past.length === 0}
+            disabled={past.length === 0 || savingAll}
           >
             <svg viewBox="0 0 24 24" width={18} height={18} fill="none">
               <path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -298,12 +456,21 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             aria-label="Redo"
             title="Redo (Ctrl+Shift+Z)"
             onClick={redo}
-            disabled={future.length === 0}
+            disabled={future.length === 0 || savingAll}
           >
             <svg viewBox="0 0 24 24" width={18} height={18} fill="none">
               <path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="lbl">Redo</span>
+          </button>
+          <button
+            className={`save-btn${dirtySlideIndices.size > 0 ? ' dirty' : ''}`}
+            aria-label="Save changes"
+            title="Save changes"
+            onClick={() => void saveAll()}
+            disabled={dirtySlideIndices.size === 0 || savingAll}
+          >
+            <span className="lbl">{savingAll ? 'Saving…' : dirtySlideIndices.size > 0 ? 'Save' : 'Saved'}</span>
           </button>
           <button
             className="viewer-icon-btn danger"
@@ -333,6 +500,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
           </button>
         </div>
       </div>
+      {saveError && <p className="save-error">{saveError}</p>}
 
       <div className="viewer-body">
         <div className="thumb-rail">
@@ -358,7 +526,8 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               slideIndex={current}
               displayWidth={stageWidth}
               previewUrl={slides[current]?.url}
-              onSlidesUpdated={commitSlides}
+              currentValues={slides[current]?.values ?? {}}
+              onFieldsChanged={handleFieldsChanged}
               onSelectionChange={handleSelectionChange}
             />
             {/* No more edit-mode toggle (2026-07-24) -- clicking any field is always live, so a

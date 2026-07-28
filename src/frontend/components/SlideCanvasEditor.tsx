@@ -1,15 +1,23 @@
 'use client'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { getSlideEditorHtml, updateSlideField, type SlideEditorData } from '@/backend/lib/actions'
+import { getSlideEditorHtml, type SlideEditorData } from '@/backend/lib/actions'
 import { createClient } from '@/backend/lib/supabase/client'
-import type { Slide } from '@/backend/lib/types'
 
 // Click-in-place editor (2026-07-22). Renders the slide's REAL filled template HTML live in an
 // iframe (not the flat PNG the rest of the app shows) so individual fields are real, clickable DOM
-// nodes -- see editableFields.ts for the selector map this depends on. A saved edit re-renders
-// server-side via updateSlideField and this component just reloads the fresh HTML + tells the
-// parent about the new slides array (same commitSlides()/undo-redo path chat-editing already uses).
+// nodes -- see editableFields.ts for the selector map this depends on.
+//
+// Explicit-Save build (2026-07-28, Jaylen: "remove instant updating... makes it feel like a lag
+// when there isn't"). Every field edit used to call updateSlideField() immediately -- a real
+// Cloudflare render + Storage upload round trip, a few real seconds every single time, PLUS a
+// fully separate, redundant updateCarouselSlides() DB write on top of that (found while
+// investigating this: Viewer.tsx's commitSlides() always re-persisted the same result a second
+// time). Field edits no longer touch the network at all here -- they update the live DOM directly
+// (already how every edit worked, that part isn't new) and report the changed fields up to
+// Viewer.tsx via onFieldsChanged, which just merges them into local React state (no
+// render/upload/DB-write) until the user hits the new topbar Save button, which does exactly ONE
+// render+upload per touched slide and exactly ONE final DB write for the whole carousel.
 //
 // No separate "edit mode" toggle (2026-07-24, Jaylen: cut the friction, no visible mode-switch --
 // just click a thing and it becomes editable) -- this is now the ONLY thing the stage renders, no
@@ -18,12 +26,9 @@ import type { Slide } from '@/backend/lib/types'
 // real server round-trip (loads the template file, re-fills it), and showing an empty loading box
 // while that resolves would undo the exact "clicking into a project feels slow" fix from earlier
 // today. The live iframe silently replaces it once ready; since it's rendering the same real
-// values, the swap should be visually imperceptible, not a loading-to-content flash.
-// Imperative handle (2026-07-26) -- lets Viewer.tsx's topbar Delete button clear/hide a field
-// through the SAME save() the hover-X button and typed edits already use (skip-reload
-// optimization included), instead of calling updateSlideField directly from the parent and
-// bypassing all of that -- which is exactly what made the topbar-triggered delete feel a couple
-// seconds slower than every other edit action.
+// values, the swap should be visually imperceptible, not a loading-to-content flash. previewUrl now
+// only ever changes from a real external event (chat-editing, or the Save button finishing) --
+// never from a field edit made in THIS component, since those no longer touch the server at all.
 export type SlideCanvasEditorHandle = {
   setField: (field: string, value: string) => void
 }
@@ -35,7 +40,16 @@ const SlideCanvasEditor = forwardRef<
     slideIndex: number
     displayWidth: number
     previewUrl?: string
-    onSlidesUpdated: (slides: Slide[]) => void
+    // The CURRENT local values for this slide, as Viewer.tsx's in-memory state sees them right
+    // now -- may already include unsaved edits from earlier in this session. Only read at load
+    // time (mount, or a real previewUrl change), not on every keystroke -- see the load() callback
+    // below for why this is captured via a ref instead of a dependency.
+    currentValues: Record<string, string>
+    // Replaces the old onSlidesUpdated -- fires on every local field edit (typed text, a color/
+    // font pick, a drag-move/resize commit, a delete, a photo swap) with just the field(s) that
+    // changed. Viewer.tsx merges these into its own local state; nothing here waits on or knows
+    // about the network.
+    onFieldsChanged: (fields: Record<string, string>) => void
     // Real bug found live 2026-07-26 (Jaylen: "still having the same issue" after the divider-
     // specific fix): this used to collapse "a circle/logo is selected" into the exact same null
     // signal as "nothing is selected" (deletable-only), so the shared Delete button still silently
@@ -54,27 +68,28 @@ const SlideCanvasEditor = forwardRef<
     onSelectionChange?: (field: string | null, deletable: boolean, mode?: 'text' | 'display') => void
   }
 >(function SlideCanvasEditor(
-  { carouselId, slideIndex, displayWidth, previewUrl, onSlidesUpdated, onSelectionChange },
+  { carouselId, slideIndex, displayWidth, previewUrl, currentValues, onFieldsChanged, onSelectionChange },
   ref
 ) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  // Only ever true during a photo upload now -- the one remaining action here that genuinely still
+  // needs a network call (getting a Storage URL for the picked file) before it can even apply
+  // locally. Every other edit is instant, no network, no loading state.
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingPhotoField = useRef<string | null>(null)
-  // Real slowness found live 2026-07-26 (Jaylen: editing in a project feels slow): a click-in-place
-  // edit's real cost is a Cloudflare screenshot round-trip (a few real seconds, not something this
-  // app controls) inside updateSlideField -- but on top of that, this component was reloading the
-  // WHOLE iframe from scratch right after, twice (once from save()'s own explicit load() below,
-  // once more from the previewUrl effect once commitSlides propagated the new url back down),
-  // discarding and re-initializing a document that was already showing the edit correctly the
-  // instant the user typed/dragged it. Tracks the url WE just saved so the previewUrl effect can
-  // tell "this change is my own save landing" (skip -- already live, no need to reload) apart from
-  // "something else changed this slide" (chat-editing is the remaining real external path -- the
-  // topbar delete button now goes through the same save()/setField as everything else below, via
-  // the imperative handle, so it no longer needs a real reload either).
-  const selfSavedUrl = useRef<string | null>(null)
+  // Read inside load() via .current, deliberately NOT a dependency of that useCallback -- Viewer.tsx
+  // passes a new currentValues object on every single local edit (its own state just changed), and
+  // if load() depended on it directly, the effect below (keyed on [load, previewUrl]) would fire
+  // load() again -- a full iframe reload -- on every keystroke/drag/color pick. currentValues only
+  // needs to be correct at the moment of an actual (re)load: first mount, or switching back to a
+  // slide that already has unsaved local edits from earlier in this session.
+  const currentValuesRef = useRef(currentValues)
+  useEffect(() => {
+    currentValuesRef.current = currentValues
+  }, [currentValues])
 
   const load = useCallback(async () => {
     // A fresh document is about to load (first mount, or an externally-triggered re-render) -- any
@@ -82,7 +97,7 @@ const SlideCanvasEditor = forwardRef<
     // it goes stale (its "Delete" button would otherwise keep targeting a field that no longer
     // has a live selection listener behind it).
     onSelectionChange?.(null, false)
-    const result = await getSlideEditorHtml(carouselId, slideIndex)
+    const result = await getSlideEditorHtml(carouselId, slideIndex, currentValuesRef.current)
     if ('error' in result) {
       setError(result.error)
       setData(null)
@@ -93,42 +108,32 @@ const SlideCanvasEditor = forwardRef<
   }, [carouselId, slideIndex, onSelectionChange])
 
   // previewUrl in the dependency list re-runs load() whenever this slide's rendered image changes
-  // for ANY reason (chat-editing's editSlide(), the topbar Delete button, or this component's own
-  // save() below), catching every external path generically without each of them needing to know
-  // this component exists -- except a self-authored save, which the selfSavedUrl check above skips.
+  // for a REAL external reason -- chat-editing's editSlide(), or the Save button finishing a
+  // render. A field edit made in THIS component never changes previewUrl at all anymore (see the
+  // top-of-file comment), so this effect no longer fires on every keystroke/drag/color pick the
+  // way it briefly needed a self-save skip-check to avoid -- that check is gone; there's nothing
+  // self-authored left to skip.
   useEffect(() => {
-    if (previewUrl && previewUrl === selfSavedUrl.current) return
     void (async () => {
       await load()
     })()
   }, [load, previewUrl])
 
-  const save = useCallback(
-    async (fields: Record<string, string>) => {
-      setSaving(true)
-      setError(null)
-      try {
-        const result = await updateSlideField(carouselId, slideIndex, fields)
-        if (result.type === 'updated') {
-          selfSavedUrl.current = result.slides[slideIndex]?.url ?? null
-          onSlidesUpdated(result.slides)
-        } else {
-          setError(result.message)
-        }
-      } finally {
-        setSaving(false)
-      }
+  // Local-only field edit (2026-07-28) -- no network call, just tells Viewer.tsx what changed so
+  // it can merge it into local state (for undo/redo + the eventual Save). The actual DOM update for
+  // the edit already happened at each call site before this fires (typing, a color/font pick, a
+  // drag commit) -- this function's only job is reporting it upward.
+  const applyFields = useCallback(
+    (fields: Record<string, string>) => {
+      onFieldsChanged(fields)
     },
-    [carouselId, slideIndex, onSlidesUpdated]
+    [onFieldsChanged]
   )
 
-  // Lets Viewer.tsx's topbar Delete button clear/hide a field through this SAME save() (skip-
-  // reload included) instead of calling updateSlideField directly and bypassing it -- that
-  // bypass is what made the topbar-triggered delete feel a couple seconds slower than every
-  // other edit action (real feedback, 2026-07-26). Also applies the SAME optimistic local update
-  // the hover-X button and keyboard-delete already do (see those two call sites) -- without it,
-  // the field's OLD value/visibility would keep showing until some unrelated later reload caught
-  // up, since nothing here is the user's own typing the way a normal text edit already is.
+  // Lets Viewer.tsx's topbar Delete button clear/hide a field the same way the hover-X button and
+  // keyboard Delete already do -- applies the optimistic local DOM update itself (this field's
+  // value/visibility wouldn't otherwise reflect the delete until some later reload), then reports
+  // it up through the same applyFields every other edit uses.
   const setField = useCallback(
     (field: string, value: string) => {
       const doc = iframeRef.current?.contentDocument
@@ -142,9 +147,9 @@ const SlideCanvasEditor = forwardRef<
           else el.innerHTML = value
         }
       }
-      save({ [field]: value })
+      applyFields({ [field]: value })
     },
-    [data, save]
+    [data, applyFields]
   )
 
   useImperativeHandle(ref, () => ({ setField }), [setField])
@@ -154,9 +159,9 @@ const SlideCanvasEditor = forwardRef<
       const msg = event.data
       if (!msg || typeof msg !== 'object') return
       if (msg.type === 'caroslide-field-edit') {
-        save({ [msg.field]: msg.value })
+        applyFields({ [msg.field]: msg.value })
       } else if (msg.type === 'caroslide-fields-edit') {
-        save(msg.fields)
+        applyFields(msg.fields)
       } else if (msg.type === 'caroslide-photo-click') {
         pendingPhotoField.current = msg.field
         fileInputRef.current?.click()
@@ -171,14 +176,14 @@ const SlideCanvasEditor = forwardRef<
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [save, onSelectionChange])
+  }, [applyFields, onSelectionChange])
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     const field = pendingPhotoField.current
     e.target.value = ''
     if (!file || !field) return
-    setSaving(true)
+    setUploading(true)
     setError(null)
     try {
       const supabase = createClient()
@@ -192,9 +197,22 @@ const SlideCanvasEditor = forwardRef<
         return
       }
       const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(uploaded.path)
-      await save({ [field]: pub.publicUrl })
+      // Optimistic local update (2026-07-28) -- didn't need one before, since the old save() path
+      // always forced a real reload right after, which was what actually showed the new photo.
+      // Now that field edits never trigger a reload, this needs to show the new photo itself, same
+      // as every other edit already does.
+      const doc = iframeRef.current?.contentDocument
+      const fieldDef = data?.fields.find((f) => f.field === field)
+      if (doc && fieldDef) {
+        const el = doc.querySelector(fieldDef.selector) as HTMLElement | null
+        if (el) {
+          if (fieldDef.kind === 'photo-img') (el as HTMLImageElement).src = pub.publicUrl
+          else el.style.backgroundImage = `url('${pub.publicUrl}')`
+        }
+      }
+      applyFields({ [field]: pub.publicUrl })
     } finally {
-      setSaving(false)
+      setUploading(false)
     }
   }
 
@@ -1002,7 +1020,7 @@ const SlideCanvasEditor = forwardRef<
         style={{ width: 1080, height: data.canvasH, transform: `scale(${scale})`, transformOrigin: 'top left', border: 'none' }}
       />
       <input ref={fileInputRef} type="file" accept="image/*" className="slide-canvas-editor-file-input" onChange={handleFileSelected} />
-      {saving && <div className="slide-canvas-editor-saving">Saving…</div>}
+      {uploading && <div className="slide-canvas-editor-saving">Uploading…</div>}
     </div>
   )
 })

@@ -420,6 +420,7 @@ export type SlideEditorData = {
   fields: SlideEditorField[]
   primaryColor: string
   secondaryColor: string
+  values: Record<string, string>
 }
 
 /**
@@ -427,10 +428,20 @@ export type SlideEditorData = {
  * the PNG) so the client can render it live in an iframe and let the user click directly on the
  * actual text/photo elements -- see editableFields.ts for the selector map that makes this
  * possible without hand-annotating every template file.
+ *
+ * localValues (2026-07-28, explicit-Save build): field edits no longer persist to the DB the
+ * instant they happen -- they accumulate client-side in Viewer.tsx's `slides` state until the
+ * user hits Save. That means the DB's own `slide.values` goes stale the moment you make an
+ * unsaved edit; re-fetching it here on every slide switch would silently revert whatever hasn't
+ * been saved yet. When provided, localValues (the caller's current in-memory values for this
+ * slide) is used to fill the template instead of the DB row's -- the DB fetch still happens, for
+ * the auth check and the slide's `template` name, just not for `values` when a fresher local copy
+ * exists.
  */
 export async function getSlideEditorHtml(
   carouselId: string,
-  slideIndex: number
+  slideIndex: number,
+  localValues?: Record<string, string>
 ): Promise<SlideEditorData | { error: string }> {
   const supabase = await createClient()
   const {
@@ -452,9 +463,9 @@ export async function getSlideEditorHtml(
     return { error: 'This slide was created before editing was supported -- try a new one.' }
   }
 
+  const values = localValues ?? slide.values
   const templateHtml = await loadTemplate(slide.template)
-  const html = fillTemplate(templateHtml, slide.values)
-  const values = slide.values
+  const html = fillTemplate(templateHtml, values)
   const fields: SlideEditorField[] = (EDITABLE_FIELDS[slide.template] ?? []).map((f) =>
     f.movable
       ? { ...f, posX: parseInt(values[`${f.field}_POS_X`] ?? '0', 10) || 0, posY: parseInt(values[`${f.field}_POS_Y`] ?? '0', 10) || 0 }
@@ -462,10 +473,11 @@ export async function getSlideEditorHtml(
   )
   return {
     html,
-    canvasH: Number(slide.values.CANVAS_H) || 1350,
+    canvasH: Number(values.CANVAS_H) || 1350,
     fields,
-    primaryColor: slide.values.PRIMARY || '#D97757',
-    secondaryColor: slide.values.SECONDARY || '#F4C95D',
+    primaryColor: values.PRIMARY || '#D97757',
+    secondaryColor: values.SECONDARY || '#F4C95D',
+    values,
   }
 }
 

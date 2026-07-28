@@ -10,6 +10,7 @@ import type { Slide } from '@/backend/lib/types'
 import { ContentValues } from './captions'
 import { findUsablePhoto } from './images'
 import { sanitizeStrayEscapes } from './render'
+import { FONT_LINKS } from './fonts'
 
 const anthropic = new Anthropic()
 
@@ -42,7 +43,30 @@ const EditClassification = z.object({
   clarifyingQuestion: z.string().optional(),
 })
 
-const VALID_EDIT_TYPES = ['copy_rewrite', 'photo_swap', 'template_change', 'brand_kit_redirect', 'ambiguous'] as const
+// Extended 2026-07-28 (Jaylen: "make sure our chat can take care of whatever the users needs...
+// objects moved, objects deleted, something undone, ... change of text coloring, change of text
+// font") -- delete_object/move_object/color_change/font_change all reuse existing per-field
+// mechanisms the click-in-place editor already has (the _DISPLAY toggle, POS_X/POS_Y offsets, the
+// same wrap-in-a-span approach the color/font pickers use) -- chat just gets a way to reach them.
+// undo/redo are real edit types the model classifies (broad phrasing: "undo that", "go back", "put
+// it back the way it was"), but neither actually touches the server at all -- undo history only
+// ever exists in Viewer.tsx's local React state (the explicit-Save build made saving deliberate,
+// not automatic), so editSlide (below) just confirms the intent and the CLIENT calls its own
+// existing undo()/redo() directly. Background/border color changes deliberately NOT included here
+// (Jaylen: skip those) -- most templates hardcode those, would need template-file changes first.
+const VALID_EDIT_TYPES = [
+  'copy_rewrite',
+  'photo_swap',
+  'delete_object',
+  'move_object',
+  'color_change',
+  'font_change',
+  'undo',
+  'redo',
+  'template_change',
+  'brand_kit_redirect',
+  'ambiguous',
+] as const
 export type EditType = (typeof VALID_EDIT_TYPES)[number]
 
 export type EditClassificationResult = {
@@ -69,7 +93,7 @@ export async function classifyEdit(input: {
     })
     .join('\n')
 
-  const systemPrompt = `You are classifying a chat-edit request for a real social media carousel. Your job is ONLY to classify -- which slide(s), what kind of edit, which field if it's a photo swap. Do not write any actual new copy or pick any actual photo here.
+  const systemPrompt = `You are classifying a chat-edit request for a real social media carousel. Your job is ONLY to classify -- which slide(s), what kind of edit, which field it targets (for photo_swap/delete_object/move_object/color_change/font_change). Do not write any actual new copy, pick any actual photo, or write any actual color/font here -- a separate step handles that.
 
 ## The carousel's real slides right now
 
@@ -83,11 +107,17 @@ The code already knows which slide is currently being viewed (slide ${input.curr
 
 - "copy_rewrite": the message asks to change wording/tone/emphasis of a caption, headline, kicker, story, stat number/label, tagline, statement, subhead, or CTA text.
 - "photo_swap": the message asks to change, swap, or replace a photo/image.
+- "delete_object": the message asks to remove/delete/hide an element -- the divider line, the logo, a circle photo, or a text field. Set targetField to the real field name (check "current content" for the actual field names this slide's template has, e.g. DIVIDER, LOGO_HTML, CIRCLE_L_IMG, CAPTION_HTML).
+- "move_object": the message asks to reposition/move/nudge an element (e.g. "move the logo up", "shift the circle right", "center the caption"). Set targetField the same way.
+- "color_change": the message asks to change the COLOR of specific TEXT on this slide (e.g. "make 'SALE' red", "turn the headline gold"). Set targetField to the real text field this refers to. This is NOT for brand colors/logo/font overall -- see brand_kit_redirect below.
+- "font_change": the message asks to change the FONT/typeface of specific TEXT on this slide (e.g. "make the caption Poppins", "use a bolder font for this word"). Set targetField the same way. Also NOT for the carousel's overall brand font -- see brand_kit_redirect below.
+- "undo": the message asks to undo, revert, or go back on the last change (e.g. "undo that", "undo the last edit", "go back", "put it back the way it was", "never mind, undo").
+- "redo": the message asks to redo or reapply a change that was just undone (e.g. "redo that", "put it back", right after an undo).
 - "template_change": the message asks to change the whole visual layout/style of a slide (e.g. "make this a stat slide instead", "use a different look for this one", "add circles to this slide"). This is NOT supported yet -- still classify it as this type, don't force it into copy_rewrite or photo_swap.
-- "brand_kit_redirect": the message is actually about brand colors, logo, or font -- these aren't chat-edits, they belong in the Brand Kit settings.
+- "brand_kit_redirect": the message is about the carousel's OVERALL brand colors, logo, or font (not one specific text field/word on one slide) -- these live in the Brand Kit settings, not chat-edits. ("make my brand color green", "change my logo", "use a different font for everything" -> brand_kit_redirect. "make this ONE word green" or "make THIS caption a different font" -> color_change/font_change instead.)
 - "ambiguous": the message doesn't give enough to act on confidently -- write a short, specific clarifyingQuestion.
 
-If editType is "photo_swap" and the target slide's template has MORE than one real photo field (check "current content" above for which BG_IMG/CIRCLE_L_IMG/CIRCLE_R_IMG/IMG_LEFT/etc. fields it actually has) and the message doesn't say which one, set editType to "ambiguous" and ask which photo they mean instead of guessing.
+If editType is "photo_swap"/"delete_object"/"move_object"/"color_change"/"font_change" and the target slide's template has MORE than one field that plausibly matches (check "current content" above for the real field names it actually has) and the message doesn't say which one clearly enough, set editType to "ambiguous" and ask which one they mean instead of guessing.
 
 The user's message: "${input.message}"`
 
@@ -211,4 +241,142 @@ Reply with ONLY the search brief, nothing else.`
 export async function swapPhoto(brief: string): Promise<string | null> {
   const photo = await findUsablePhoto(brief)
   return photo?.url ?? null
+}
+
+/**
+ * "Move it" chat edits (2026-07-28) -- interprets a natural-language direction/magnitude into a
+ * pixel delta relative to the field's CURRENT offset, not an absolute target -- "move it down more"
+ * builds on wherever it already is, same as dragging it again would. Deliberately a rough nudge,
+ * not precise placement -- precise placement is what dragging is for; chat is the rough-direction
+ * path, matching how a designer would eyeball a nudge amount rather than typing exact coordinates.
+ */
+export async function generateMoveDelta(input: {
+  message: string
+  currentPosX: number
+  currentPosY: number
+}): Promise<{ deltaX: number; deltaY: number }> {
+  const MoveDelta = z.object({ deltaX: z.number(), deltaY: z.number() })
+  const systemPrompt = `A user wants to reposition one element on a real social media carousel slide via chat, relative to where it already is (currently offset ${input.currentPosX}px horizontally, ${input.currentPosY}px vertically from its default spot). The canvas is 1080px wide. Positive deltaX moves right, negative moves left; positive deltaY moves down, negative moves up.
+
+Pick a REASONABLE pixel nudge for the instruction -- a small nudge ("a bit", "slightly") is roughly 30-60px, a normal move ("down", "to the left", no qualifier) is roughly 80-150px, a big move ("to the corner", "way over", "a lot") is roughly 200-300px. "Center it" / "put it back" / "reset the position" should return whatever delta cancels out the CURRENT offset exactly (deltaX = ${-input.currentPosX}, deltaY = ${-input.currentPosY}).
+
+## The user's instruction
+
+"${input.message}"
+
+Return only the pixel delta to ADD to the current position.`
+
+  const format = zodOutputFormat(MoveDelta)
+  const message = await anthropic.messages.create({
+    model: CLASSIFY_MODEL,
+    max_tokens: 128,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: 'Compute the move now.' }],
+    output_config: { format },
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  return format.parse(text)
+}
+
+/**
+ * "Change the color of X" chat edits (2026-07-28) -- identifies the EXACT plain-text substring to
+ * recolor and resolves the requested color to a real hex value. Matched against the field's own
+ * CURRENTLY STORED text, not a guessed-at rendered version -- templates often apply
+ * text-transform:uppercase via CSS while the real stored value is normal/mixed case, so matching
+ * against the rendered look would silently never find anything. Execution (wrapTextWithStyle
+ * below) mirrors the click-in-place color picker's own wrap mechanism -- just AI-identified
+ * instead of user-dragged.
+ */
+export async function generateColorEdit(input: {
+  message: string
+  currentHtml: string
+  primary: string
+  secondary: string
+}): Promise<{ matchText: string; hex: string } | null> {
+  const ColorEdit = z.object({ matchText: z.string(), hex: z.string() })
+  const plainText = input.currentHtml.replace(/<[^>]+>/g, '')
+  const systemPrompt = `A user wants to change the color of part of a text field on a real social media carousel slide, via chat. Identify the EXACT, VERBATIM plain-text substring (a word or short phrase, copied character-for-character from "Current text" below -- no punctuation added/removed, no case changes) the instruction refers to, and the target color as a hex code.
+
+## Current text (verbatim -- match against THIS exact text, not an uppercase or otherwise-reformatted guess)
+
+"${plainText}"
+
+## This carousel's brand colors
+
+PRIMARY: ${input.primary}, SECONDARY: ${input.secondary} -- use one of these if the instruction says "brand color", "primary color", "secondary color", or similar. Otherwise resolve a plain color name (red, blue, gold, etc.) to a reasonable real hex value yourself.
+
+## The user's instruction
+
+"${input.message}"
+
+If the instruction doesn't clearly name which words to recolor, or no target color, set matchText to an empty string instead of guessing.`
+
+  const format = zodOutputFormat(ColorEdit)
+  const message = await anthropic.messages.create({
+    model: CLASSIFY_MODEL,
+    max_tokens: 256,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: 'Identify the edit now.' }],
+    output_config: { format },
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  const parsed = format.parse(text)
+  if (!parsed.matchText || !plainText.includes(parsed.matchText)) return null
+  return parsed
+}
+
+/** Same shape as generateColorEdit, for font instead of color -- constrained to the exact same
+ * 5-font whitelist the click-in-place font picker and Brand Kit already use (FONT_LINKS), not an
+ * open-ended font name the AI could invent that was never actually loaded/tested. */
+export async function generateFontEdit(input: {
+  message: string
+  currentHtml: string
+}): Promise<{ matchText: string; fontFamily: string } | null> {
+  const FontEdit = z.object({ matchText: z.string(), fontName: z.string() })
+  const plainText = input.currentHtml.replace(/<[^>]+>/g, '')
+  const fontNames = Object.keys(FONT_LINKS)
+  const systemPrompt = `A user wants to change the font of part of a text field on a real social media carousel slide, via chat. Identify the EXACT, VERBATIM plain-text substring (copied character-for-character from "Current text" below) the instruction refers to, and which font to use.
+
+## Current text (verbatim)
+
+"${plainText}"
+
+## Available fonts -- pick EXACTLY one of these names, no others
+
+${fontNames.join(', ')}
+
+## The user's instruction
+
+"${input.message}"
+
+If the instruction doesn't clearly name which words, or asks for a font not in this list, set matchText to an empty string instead of guessing.`
+
+  const format = zodOutputFormat(FontEdit)
+  const message = await anthropic.messages.create({
+    model: CLASSIFY_MODEL,
+    max_tokens: 256,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: 'Identify the edit now.' }],
+    output_config: { format },
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  const parsed = format.parse(text)
+  if (!parsed.matchText || !plainText.includes(parsed.matchText) || !fontNames.includes(parsed.fontName)) return null
+  return { matchText: parsed.matchText, fontFamily: FONT_LINKS[parsed.fontName].family }
+}
+
+/** Wraps the first verbatim occurrence of matchText in a field's raw HTML with a new inline style
+ * -- a plain string search/replace is safe here (unlike the click-in-place picker's Range-based
+ * version) since matchText is always a fully-known, already-validated substring, never an
+ * arbitrary user selection that could straddle element boundaries. Returns null (fails safe,
+ * doesn't guess) if matchText isn't found VERBATIM IN THE RAW HTML -- it was only checked against
+ * the plain-text version when the AI proposed it, and a match spanning across an existing tag
+ * boundary (e.g. two adjacent c1/c2 spans) wouldn't appear as one contiguous run in the raw markup
+ * even though it does in stripped plain text. */
+export function wrapTextWithStyle(html: string, matchText: string, styleProp: string, styleValue: string): string | null {
+  const idx = html.indexOf(matchText)
+  if (idx === -1) return null
+  const before = html.slice(0, idx)
+  const after = html.slice(idx + matchText.length)
+  return `${before}<span style="${styleProp}:${styleValue}">${matchText}</span>${after}`
 }

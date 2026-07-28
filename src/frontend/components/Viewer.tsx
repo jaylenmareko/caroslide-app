@@ -313,9 +313,38 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
     el.style.height = `${el.scrollHeight}px`
   }, [chatMessage])
 
+  // Fast-path for obvious undo/redo phrasing (2026-07-28) -- checked BEFORE ensureSaved() runs,
+  // deliberately skipping the server entirely for these. The normal path below flushes pending
+  // local edits first (editSlide needs a fresh DB view), but for an undo/redo request that flush
+  // would force-save the exact change the user is asking to undo, defeating the whole point.
+  // Covers the common, unambiguous phrasings with zero server round-trip; anything less obvious
+  // still reaches the real classification (which does flush first) -- a minor, harmless
+  // inefficiency for those rarer phrasings (one save that a follow-up undo then reverts locally
+  // anyway), not a correctness bug, just not worth the complexity of avoiding entirely.
+  const UNDO_REDO_PATTERN = /^(please\s+)?(undo|redo)(\s+(that|it|this|the last (change|edit|thing)))?\.?$/i
+
   async function handleChatSend() {
     const message = chatMessage.trim()
     if (!message || chatSending) return
+    const quickMatch = UNDO_REDO_PATTERN.exec(message)
+    if (quickMatch) {
+      setChatMessage('')
+      setChatReply(null)
+      if (quickMatch[2].toLowerCase() === 'redo') {
+        if (future.length === 0) setChatReply('Nothing to redo.')
+        else {
+          redo()
+          setChatReply('Redone.')
+        }
+      } else {
+        if (past.length === 0) setChatReply('Nothing to undo yet.')
+        else {
+          undo()
+          setChatReply('Undone.')
+        }
+      }
+      return
+    }
     setChatSending(true)
     setChatReply(null)
     try {
@@ -333,6 +362,25 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
         commitSlides(result.slides)
         setChatMessage('')
         setChatReply('Updated.')
+      } else if (result.type === 'client_undo') {
+        // Never touched the server at all -- there's no server-side undo history to act on (see
+        // EditSlideResult's own comment). Just call the exact same local undo() the topbar
+        // button/Ctrl+Z already use, entirely client-side.
+        setChatMessage('')
+        if (past.length === 0) {
+          setChatReply('Nothing to undo yet.')
+        } else {
+          undo()
+          setChatReply('Undone.')
+        }
+      } else if (result.type === 'client_redo') {
+        setChatMessage('')
+        if (future.length === 0) {
+          setChatReply('Nothing to redo.')
+        } else {
+          redo()
+          setChatReply('Redone.')
+        }
       } else {
         // clarify / redirect / unsupported / error -- none of these touch slides, just tell the
         // user what happened instead of silently doing nothing (the original bug: the button did

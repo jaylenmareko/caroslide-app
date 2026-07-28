@@ -5,7 +5,16 @@ import { headers } from 'next/headers'
 import { createClient } from '@/backend/lib/supabase/server'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
 import { generateCarousel, renderAndGuard } from '@/backend/lib/generation/pipeline'
-import { classifyEdit, rewriteCopy, generateSwapBrief, swapPhoto } from '@/backend/lib/generation/edit'
+import {
+  classifyEdit,
+  rewriteCopy,
+  generateSwapBrief,
+  swapPhoto,
+  generateMoveDelta,
+  generateColorEdit,
+  generateFontEdit,
+  wrapTextWithStyle,
+} from '@/backend/lib/generation/edit'
 import { loadTemplate, fillTemplate, renderSlide } from '@/backend/lib/generation/render'
 import { EDITABLE_FIELDS, type EditableField } from '@/backend/lib/generation/editableFields'
 import {
@@ -272,9 +281,22 @@ export async function updateCarouselSlides(id: string, slides: Slide[]) {
   if (error) throw new Error(error.message)
 }
 
-export type EditSlideResult =
+// Shared by updateSlideField (a single field-level save, never undo/redo) and editSlide (which
+// adds the two client-only variants below).
+export type FieldUpdateResult =
   | { type: 'clarify' | 'redirect' | 'unsupported' | 'error'; message: string }
   | { type: 'updated'; slides: Slide[] }
+
+export type EditSlideResult =
+  | FieldUpdateResult
+  // undo/redo (2026-07-28) never touch the server at all -- undo history only ever exists in
+  // Viewer.tsx's local React state (the explicit-Save build made saving deliberate, not automatic
+  // per edit, so there's no server-side history to act on). This just confirms the classified
+  // intent; the client calls its own existing undo()/redo() directly on receiving it. Two separate
+  // variants (not one `client_undo' | 'client_redo'` discriminant) for clean, unambiguous
+  // discriminated-union narrowing at every call site.
+  | { type: 'client_undo' }
+  | { type: 'client_redo' }
 
 /** Pulls the real Storage path back out of a Supabase public URL (everything after the bucket
  * name) so a re-uploaded slide's old file can be cleaned up -- same no-orphaned-storage
@@ -339,6 +361,11 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       message: "Changing a slide's whole layout isn't supported yet -- try describing a text or photo change instead.",
     }
   }
+  // undo/redo (2026-07-28) never touch a slide or the DB at all -- there's no server-side undo
+  // history to act on (it only ever exists in Viewer.tsx's local React state, per the explicit-Save
+  // build). Just confirm the classified intent; the caller calls its own local undo()/redo().
+  if (classification.editType === 'undo') return { type: 'client_undo' }
+  if (classification.editType === 'redo') return { type: 'client_redo' }
 
   const targetIndices = classification.slideIndices.length > 0 ? classification.slideIndices : [currentSlideIndex]
   const updatedSlides = [...slides]
@@ -362,8 +389,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       })
       console.log(`[chat-edit] rewriteCopy changed fields: ${JSON.stringify(changed)}`)
       Object.assign(newValues, changed)
-    } else {
-      // photo_swap
+    } else if (classification.editType === 'photo_swap') {
       const field = classification.targetField
       if (!field || !(field in slide.values)) {
         return { type: 'clarify', message: 'Which photo on this slide do you mean?' }
@@ -377,6 +403,56 @@ export async function editSlide(carouselId: string, message: string, currentSlid
         }
       }
       newValues[field] = newUrl
+    } else if (classification.editType === 'delete_object') {
+      // Same two mechanisms the click-in-place hover-X/topbar delete already use -- clear a text
+      // field to '', or toggle a move-only/photo field's own `_DISPLAY` placeholder to 'hidden'.
+      // No new deletion path, just a chat route to the existing one.
+      const field = classification.targetField
+      const fieldDef = field ? EDITABLE_FIELDS[slide.template]?.find((f) => f.field === field) : undefined
+      if (!field || !fieldDef) {
+        return { type: 'clarify', message: 'Which element on this slide do you mean?' }
+      }
+      if (fieldDef.kind === 'text') {
+        newValues[field] = ''
+      } else {
+        newValues[`${field}_DISPLAY`] = 'hidden'
+      }
+    } else if (classification.editType === 'move_object') {
+      const field = classification.targetField
+      const fieldDef = field ? EDITABLE_FIELDS[slide.template]?.find((f) => f.field === field) : undefined
+      if (!field || !fieldDef?.movable) {
+        return { type: 'clarify', message: 'Which element on this slide do you mean, and how should it move?' }
+      }
+      const currentPosX = parseInt(slide.values[`${field}_POS_X`] ?? '0', 10) || 0
+      const currentPosY = parseInt(slide.values[`${field}_POS_Y`] ?? '0', 10) || 0
+      const delta = await generateMoveDelta({ message, currentPosX, currentPosY })
+      newValues[`${field}_POS_X`] = `${Math.round(currentPosX + delta.deltaX)}px`
+      newValues[`${field}_POS_Y`] = `${Math.round(currentPosY + delta.deltaY)}px`
+    } else if (classification.editType === 'color_change' || classification.editType === 'font_change') {
+      // Same wrap-in-a-span mechanism the click-in-place color/font pickers already use -- just
+      // AI-identified (which exact substring, which color/font) instead of user-selected.
+      const field = classification.targetField
+      if (!field || !(field in slide.values)) {
+        return { type: 'clarify', message: 'Which text on this slide do you mean?' }
+      }
+      const currentHtml = slide.values[field]
+      const edit =
+        classification.editType === 'color_change'
+          ? await generateColorEdit({ message, currentHtml, primary: slide.values.PRIMARY, secondary: slide.values.SECONDARY })
+          : await generateFontEdit({ message, currentHtml })
+      if (!edit) {
+        return { type: 'clarify', message: 'Which exact word(s) do you want to change, and to what?' }
+      }
+      const styleProp = classification.editType === 'color_change' ? 'color' : 'font-family'
+      const styleValue = classification.editType === 'color_change' ? (edit as { hex: string }).hex : (edit as { fontFamily: string }).fontFamily
+      const wrapped = wrapTextWithStyle(currentHtml, edit.matchText, styleProp, styleValue)
+      if (!wrapped) {
+        return {
+          type: 'error',
+          message: `Couldn't apply that -- the exact text "${edit.matchText}" spans more than this field allows. Try a shorter or different word.`,
+        }
+      }
+      newValues[field] = wrapped
     }
 
     const result = await renderAndGuard(slide.template, newValues, idx + 1, brandKit?.voice_description ?? null)
@@ -500,7 +576,7 @@ export async function updateSlideField(
   slideIndex: number,
   field: string | Record<string, string>,
   newValue?: string
-): Promise<EditSlideResult> {
+): Promise<FieldUpdateResult> {
   const supabase = await createClient()
   const {
     data: { user },

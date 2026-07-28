@@ -399,7 +399,18 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     }
   }
   if (classification.editType === 'brand_kit_redirect') {
-    return { type: 'redirect', message: 'Brand colors, logo, and font live in the Brand Kit button above, not chat edits.' }
+    // Real gap found live (2026-07-28): the old message just pointed at Brand Kit, but
+    // brand_colors/logo_url/font are snapshotted onto THIS carousel at creation time (types.ts),
+    // never read live off brand_kits again -- so a Brand Kit change genuinely does nothing to a
+    // carousel that already exists, only to carousels created after the change. The old message
+    // sent someone on a dead-end errand for what they actually asked. Now says that plainly instead
+    // of guessing at a fix for the underlying limitation (background/border color changes on an
+    // existing carousel are a separate, unbuilt feature -- see chat-editing-behavior.md's scope).
+    return {
+      type: 'redirect',
+      message:
+        "This carousel's brand colors, logo, and font are locked in from when it was created -- Brand Kit only changes carousels made after you update it, not this one. There's no way to change those on an existing carousel yet.",
+    }
   }
   if (classification.editType === 'template_change') {
     return {

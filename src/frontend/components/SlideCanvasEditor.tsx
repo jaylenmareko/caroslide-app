@@ -794,11 +794,18 @@ const SlideCanvasEditor = forwardRef<
     e.preventDefault();
     e.stopPropagation();
     var sel = document.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     var active = document.activeElement;
-    if (active && active.getAttribute('contenteditable') === 'true') {
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && active && active.getAttribute('contenteditable') === 'true') {
+      // Live selection still genuinely valid at this exact tap -- use it directly.
       fontSavedRange = sel.getRangeAt(0).cloneRange();
       fontSavedField = active;
+    } else if (lastValidRange && lastValidField) {
+      // Already collapsed by the time this tap landed -- fall back to the most recent known-good
+      // selection tracked continuously by the selectionchange listener above.
+      fontSavedRange = lastValidRange;
+      fontSavedField = lastValidField;
+    } else {
+      return;
     }
     closePicker();
     var triggerRect = fontTrigger.getBoundingClientRect();
@@ -816,6 +823,15 @@ const SlideCanvasEditor = forwardRef<
   colorToolbar.appendChild(pickerTrigger);
   colorToolbar.appendChild(fontTrigger);
 
+  // Continuously-tracked fallback (2026-07-28, real bug reported live on an actual phone: the font
+  // panel opens fine but tapping a font silently does nothing) -- the earlier fix (save the range
+  // at trigger-tap time) assumed the selection is still genuinely valid at THAT moment, but iOS's
+  // native text-selection UI can already be mid-collapse by the time a touch even reaches the Aa
+  // circle (which sits farther from the original selection than a nearby swatch does, meaning more
+  // finger-travel time for the native UI to give up during). Updated on every selectionchange while
+  // a real selection exists, so there's always a recent known-good range/field to fall back on
+  // regardless of exactly when the live Selection object itself collapses.
+  var lastValidRange = null, lastValidField = null;
   document.addEventListener('selectionchange', function(){
     var active = document.activeElement;
     var sel = document.getSelection();
@@ -823,6 +839,8 @@ const SlideCanvasEditor = forwardRef<
       colorToolbar.style.display = 'none';
       return;
     }
+    lastValidRange = sel.getRangeAt(0).cloneRange();
+    lastValidField = active;
     var rect = sel.getRangeAt(0).getBoundingClientRect();
     colorToolbar.style.display = 'flex';
     // Offset widened 174->208 (2026-07-27) -- the toolbar gained a 6th circle (the font trigger),

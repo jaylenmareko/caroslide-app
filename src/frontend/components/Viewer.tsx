@@ -70,6 +70,13 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   const [dirtySlideIndices, setDirtySlideIndices] = useState<Set<number>>(new Set())
   const [savingAll, setSavingAll] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Real bug found live testing this exact refactor: undo()/redo() correctly revert `slides` state
+  // (confirmed -- dirty/past/future all update right), but SlideCanvasEditor's live iframe DOM,
+  // already showing whatever's being undone, never gets told to reload and reflect the reverted
+  // values, since neither of them ever touches previewUrl (they're local-only, by design). Undo
+  // silently looked like it did nothing. Bumped ONLY inside undo()/redo(), never on a regular field
+  // edit -- SlideCanvasEditor's load-effect depends on this alongside previewUrl.
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Chat-editing and whole-slide deletion still persist immediately (Jaylen: keep those auto-
   // saving -- both are already deliberate, single, already-slow actions, not the rapid-fire
@@ -264,6 +271,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
       touched.forEach((idx) => next.add(idx))
       return next
     })
+    setReloadKey((k) => k + 1)
     goToSlide((c) => Math.min(c, prev.length - 1))
   }
 
@@ -280,6 +288,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
       touched.forEach((idx) => nextSet.add(idx))
       return nextSet
     })
+    setReloadKey((k) => k + 1)
     goToSlide((c) => Math.min(c, next.length - 1))
   }
 
@@ -527,6 +536,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
               displayWidth={stageWidth}
               previewUrl={slides[current]?.url}
               currentValues={slides[current]?.values ?? {}}
+              forceReloadKey={reloadKey}
               onFieldsChanged={handleFieldsChanged}
               onSelectionChange={handleSelectionChange}
             />

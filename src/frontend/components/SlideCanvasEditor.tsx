@@ -50,6 +50,10 @@ const SlideCanvasEditor = forwardRef<
     // changed. Viewer.tsx merges these into its own local state; nothing here waits on or knows
     // about the network.
     onFieldsChanged: (fields: Record<string, string>) => void
+    // Bumped by Viewer.tsx ONLY inside undo()/redo() -- see the load-effect's own comment below for
+    // why this needs to exist at all (a local-only edit never changes previewUrl, but Undo/Redo
+    // still need to force a real reload since they're reverting content the live DOM already shows).
+    forceReloadKey: number
     // Real bug found live 2026-07-26 (Jaylen: "still having the same issue" after the divider-
     // specific fix): this used to collapse "a circle/logo is selected" into the exact same null
     // signal as "nothing is selected" (deletable-only), so the shared Delete button still silently
@@ -68,7 +72,7 @@ const SlideCanvasEditor = forwardRef<
     onSelectionChange?: (field: string | null, deletable: boolean, mode?: 'text' | 'display') => void
   }
 >(function SlideCanvasEditor(
-  { carouselId, slideIndex, displayWidth, previewUrl, currentValues, onFieldsChanged, onSelectionChange },
+  { carouselId, slideIndex, displayWidth, previewUrl, currentValues, forceReloadKey, onFieldsChanged, onSelectionChange },
   ref
 ) {
   const [data, setData] = useState<SlideEditorData | null>(null)
@@ -113,11 +117,20 @@ const SlideCanvasEditor = forwardRef<
   // top-of-file comment), so this effect no longer fires on every keystroke/drag/color pick the
   // way it briefly needed a self-save skip-check to avoid -- that check is gone; there's nothing
   // self-authored left to skip.
+  //
+  // forceReloadKey (2026-07-28, real bug found live): Undo/Redo change Viewer.tsx's `slides` state
+  // (and therefore `currentValues`) WITHOUT ever touching previewUrl, by design -- they're local-
+  // only now, same as every other edit. But that meant clicking Undo correctly reverted React
+  // state (confirmed live: dirty/past/future all updated correctly) while the iframe's own live DOM
+  // -- already showing whatever was undone -- never got told to reload and reflect the reverted
+  // values, so Undo looked like it silently did nothing. Viewer.tsx bumps this number ONLY inside
+  // undo()/redo(), never on a regular field edit, so this effect reloads exactly when it needs to
+  // and no more often than that.
   useEffect(() => {
     void (async () => {
       await load()
     })()
-  }, [load, previewUrl])
+  }, [load, previewUrl, forceReloadKey])
 
   // Local-only field edit (2026-07-28) -- no network call, just tells Viewer.tsx what changed so
   // it can merge it into local state (for undo/redo + the eventual Save). The actual DOM update for

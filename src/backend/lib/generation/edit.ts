@@ -76,6 +76,21 @@ export type EditClassificationResult = {
   clarifyingQuestion?: string
 }
 
+// Defensive normalization (2026-07-28, found live: "move the caption down a bit" came back with
+// targetField "CAPTION_HTML_POS_Y" instead of "CAPTION_HTML") -- the prompt now says explicitly not
+// to do this, but a slide's own `values` JSON (shown to the model as context) has both the base key
+// and its "_POS_X"/"_POS_Y"/"_DISPLAY"/"_SIZE" siblings sitting right next to each other, so a model
+// slip here is cheap to guard against in code rather than trust the prompt alone -- same "don't
+// trust the schema/prompt to fully enforce this, validate defensively" pattern as editType above.
+// These 4 suffixes are exactly the per-field metadata keys editableFields.ts/actions.ts ever append
+// to a base field name, so stripping one is always safe, never ambiguous.
+const TARGET_FIELD_SUFFIXES = ['_POS_X', '_POS_Y', '_DISPLAY', '_SIZE'] as const
+function normalizeTargetField(field: string | undefined): string | undefined {
+  if (!field) return field
+  const suffix = TARGET_FIELD_SUFFIXES.find((s) => field.endsWith(s))
+  return suffix ? field.slice(0, -suffix.length) : field
+}
+
 /**
  * Classifies a chat-edit message: which slide(s) it touches, what kind of edit it is, and (for
  * photo_swap) which field. Uses each slide's own real template/values as context so "make it
@@ -119,6 +134,8 @@ The code already knows which slide is currently being viewed (slide ${input.curr
 
 If editType is "photo_swap"/"delete_object"/"move_object"/"color_change"/"font_change" and the target slide's template has MORE than one field that plausibly matches (check "current content" above for the real field names it actually has) and the message doesn't say which one clearly enough, set editType to "ambiguous" and ask which one they mean instead of guessing.
 
+targetField must always be the BASE field name (e.g. "CAPTION_HTML", "LOGO_HTML", "CIRCLE_L_IMG") -- NEVER a field ending in "_POS_X", "_POS_Y", "_DISPLAY", or "_SIZE". Those suffixed keys in "current content" are internal per-field metadata (this field's own position/visibility/size override), not separate objects you can target -- "move the caption down" targets "CAPTION_HTML", not "CAPTION_HTML_POS_Y", even though the Y-position key is what actually changes under the hood.
+
 The user's message: "${input.message}"`
 
   const format = zodOutputFormat(EditClassification)
@@ -144,7 +161,7 @@ The user's message: "${input.message}"`
   return {
     slideIndices: parsed.slideIndices,
     editType,
-    targetField: parsed.targetField,
+    targetField: normalizeTargetField(parsed.targetField),
     clarifyingQuestion:
       editType === 'ambiguous' ? parsed.clarifyingQuestion || 'Not sure what you meant -- could you rephrase that?' : parsed.clarifyingQuestion,
   }

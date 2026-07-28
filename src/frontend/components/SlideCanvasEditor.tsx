@@ -77,6 +77,15 @@ const SlideCanvasEditor = forwardRef<
 ) {
   const [data, setData] = useState<SlideEditorData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Real bug found live (2026-07-28): mutating an existing iframe's srcDoc attribute does NOT
+  // reliably reload its content in Chromium -- confirmed directly: after Undo, the iframe element's
+  // OWN srcdoc attribute held the correct, reverted HTML, but contentDocument kept showing the
+  // stale pre-undo content regardless of how long it waited. This affects every reload path, not
+  // just Undo/Redo (chat-editing, Save finishing) -- the only fully reliable fix is forcing React to
+  // throw away the old iframe DOM node and create a fresh one, which always parses its srcdoc at
+  // creation time. Bumped every time load() actually lands new data; folded into the iframe's own
+  // key below so React remounts it on every real reload, not just the first one.
+  const [loadGeneration, setLoadGeneration] = useState(0)
   // Only ever true during a photo upload now -- the one remaining action here that genuinely still
   // needs a network call (getting a Storage URL for the picked file) before it can even apply
   // locally. Every other edit is instant, no network, no loading state.
@@ -109,6 +118,7 @@ const SlideCanvasEditor = forwardRef<
     }
     setError(null)
     setData(result)
+    setLoadGeneration((g) => g + 1)
   }, [carouselId, slideIndex, onSelectionChange])
 
   // previewUrl in the dependency list re-runs load() whenever this slide's rendered image changes
@@ -1026,7 +1036,7 @@ const SlideCanvasEditor = forwardRef<
   return (
     <div className="slide-canvas-editor" style={{ width: displayWidth, height: data.canvasH * scale }}>
       <iframe
-        key={slideIndex}
+        key={`${slideIndex}-${loadGeneration}`}
         ref={iframeRef}
         srcDoc={injectedHtml}
         title="Slide editor"

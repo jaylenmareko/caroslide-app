@@ -708,14 +708,18 @@ const SlideCanvasEditor = forwardRef<
   fontPanel.style.cssText = 'position:absolute;display:none;z-index:61;background:#1a1a1a;border-radius:14px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:340px;';
   FONTS.forEach(function(f){
     // Each option previewed in its own real typeface (Canva-style) so picking one shows exactly
-    // what it'll look like before committing, not just a plain text label.
+    // what it'll look like before committing, not just a plain text label. Real bug found live on
+    // an actual phone (2026-07-27): every row rendered in the same generic fallback font, because
+    // ensureFontLoaded only ran at the moment of PICKING a font -- the other 4 options' font files
+    // were never fetched just to browse the list, so their font-family CSS had nothing to apply.
+    // Loading all 5 up front here (not lazily) makes the live preview actually true.
+    ensureFontLoaded(f.param);
     var row = document.createElement('div');
     row.style.cssText = 'padding:16px 18px;border-radius:8px;cursor:pointer;color:#fff;font-size:30px;line-height:1.2;font-family:' + f.family + ';touch-action:manipulation;';
     row.textContent = f.name;
     row.addEventListener('pointerdown', function(e){
       e.preventDefault();
       e.stopPropagation();
-      ensureFontLoaded(f.param);
       applyFontToSelection(f.family, null);
       closeFontPanel();
     });
@@ -795,6 +799,14 @@ const SlideCanvasEditor = forwardRef<
       // move-dragging and text-selecting are mutually exclusive states for the same field, same as
       // the existing contenteditable-guard just below already assumes.
       hit.style.touchAction = 'none';
+      // Real bug found live on an actual phone (2026-07-27): a long-press on a movable circle photo
+      // (a real <img>) triggered iOS Safari's own native image callout (Share.../Save to Photos/
+      // Copy/Look Up) instead of starting our drag -- a separate Safari-specific gesture that
+      // touch-action:none doesn't cover at all. -webkit-touch-callout only suppresses that specific
+      // long-press-on-image-or-link menu; it doesn't affect the native text-selection context menu
+      // (Cut/Copy/Paste), which already worked correctly and should keep working once a text field
+      // is actually in edit mode.
+      hit.style.webkitTouchCallout = 'none';
       // Pointer Events (2026-07-27), not mouse-only -- unifies mouse/touch/pen so the same drag-to-
       // move/drag-to-select logic works on a real phone, not just a desktop cursor. Real bug found
       // live: this whole interaction was wired exclusively to mousedown/mousemove/mouseup, which

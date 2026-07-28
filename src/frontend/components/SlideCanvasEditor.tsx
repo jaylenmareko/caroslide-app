@@ -761,7 +761,21 @@ const SlideCanvasEditor = forwardRef<
     row.addEventListener('pointerdown', function(e){
       e.preventDefault();
       e.stopPropagation();
-      applyFontToSelection(f.family, null);
+      // Real bug found live on an actual phone (2026-07-28, Jaylen: "the text unhighlight but the
+      // font choices still show up. i click one and it doesn't work"): unlike a color swatch (one
+      // tap, applies to whatever's selected at that same tap), picking a font is a TWO-tap flow --
+      // tap the trigger to open this panel, then tap a row here. On mobile, iOS's native text-
+      // selection UI can collapse the actual Selection object between those two taps (even though
+      // the field itself never loses focus), so re-reading document.getSelection() here can find
+      // nothing left to apply to. Same class of problem the hex color input already solved -- save
+      // the range at trigger-tap time (still reliably live then) and restore it here before
+      // applying, instead of trusting whatever the live selection happens to be by now.
+      if (fontSavedRange && fontSavedField) {
+        var sel = document.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(fontSavedRange);
+      }
+      applyFontToSelection(f.family, fontSavedField);
       closeFontPanel();
     });
     row.addEventListener('mouseenter', function(){ row.style.background = 'rgba(255,255,255,0.1)'; });
@@ -770,14 +784,22 @@ const SlideCanvasEditor = forwardRef<
   });
   document.body.appendChild(fontPanel);
 
+  var fontSavedRange = null, fontSavedField = null;
   function closeFontPanel(){
     fontPanel.style.display = 'none';
+    fontSavedRange = null;
+    fontSavedField = null;
   }
   fontTrigger.addEventListener('pointerdown', function(e){
     e.preventDefault();
     e.stopPropagation();
     var sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var active = document.activeElement;
+    if (active && active.getAttribute('contenteditable') === 'true') {
+      fontSavedRange = sel.getRangeAt(0).cloneRange();
+      fontSavedField = active;
+    }
     closePicker();
     var triggerRect = fontTrigger.getBoundingClientRect();
     var panelLeft = Math.min(triggerRect.left, document.documentElement.clientWidth - 340 - 8);

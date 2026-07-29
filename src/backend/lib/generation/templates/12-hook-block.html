@@ -63,7 +63,14 @@
   .headline { font-size:{{HEADLINE_SIZE|78px}}; font-weight:900; line-height:1.08; letter-spacing:-1px; transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
   .headline .c1 { color:{{SECONDARY_TEXT}}; }
   .headline .c2 { color:#ffffff; }
-  .headline .c3 { color:{{PRIMARY_TEXT}}; -webkit-text-stroke:2px #ffffff; }
+  /* Real bug found live (2026-07-29): .block's own background is a gradient starting AT
+     {{PRIMARY}} itself (see .block above), so .c3 text near that corner sits on a background
+     that's the same color family no matter what PRIMARY_TEXT computes to -- the generic
+     luminance-vs-#0a0a0a fix (pipeline.ts) can't help here since the background isn't black at
+     all near this text. The stroke that was already here (2px) existed for exactly this reason
+     but was too thin to read as an outline against a large bold Archivo Black glyph at this size --
+     confirmed by rendering both side by side. 4px + a soft white glow is the verified fix. */
+  .headline .c3 { color:{{PRIMARY_TEXT}}; -webkit-text-stroke:4px #ffffff; text-shadow:0 0 3px rgba(255,255,255,0.8); }
 
   .story { font-size:32px; font-weight:600; line-height:1.45; color:#d8d8d8; margin-top:36px; max-width:880px; transform:translate({{STORY_HTML_POS_X|0px}}, {{STORY_HTML_POS_Y|0px}}); }
 </style>

@@ -19,9 +19,16 @@ function HeroWords({ text }: { text: string }) {
   )
 }
 
+// The World Cup / Bangladesh entries below are real Caroslide output (2026-07-29) -- generated
+// directly through the same pipeline real users hit, not hand-mocked like the rest of this array --
+// swapped in for the old static mockups on those exact same two topics rather than kept alongside
+// them, since showing both a fake and a real cover for the same story would just be confusing.
 const MARQUEE_IMAGES = [
-  '/mock/caroslide-the-odyssey.jpg', '/mock/caroslide-world-cup-final-preview.jpg', '/mock/caroslide-five-star-weekend.jpg', '/mock/caroslide-tiktok-emotions-trend.jpg',
-  '/mock/caroslide-glitter-freckles.jpg', '/mock/caroslide-grok-4-5-launch.jpg', '/mock/caroslide-anthropic-valuation.jpg', '/mock/caroslide-bangladesh-song.jpg',
+  '/mock/caroslide-the-odyssey.jpg',
+  'https://egpbdcgaydmlfthqlkvb.supabase.co/storage/v1/object/public/carousel-slides/55e27047-6a04-4e3b-95ce-d265f19da75f/14f9778d-6399-4bd6-846e-55d972086dd8/slide-1.jpg',
+  '/mock/caroslide-five-star-weekend.jpg', '/mock/caroslide-tiktok-emotions-trend.jpg',
+  '/mock/caroslide-glitter-freckles.jpg', '/mock/caroslide-grok-4-5-launch.jpg', '/mock/caroslide-anthropic-valuation.jpg',
+  'https://egpbdcgaydmlfthqlkvb.supabase.co/storage/v1/object/public/carousel-slides/55e27047-6a04-4e3b-95ce-d265f19da75f/4ac394e3-d91e-49f9-a101-7801e5987921/slide-1.jpg',
   '/mock/caroslide-grande-man.jpg', '/mock/caroslide-hotdog-summer.jpg', '/mock/caroslide-xiaomi-powerbank.jpg', '/mock/caroslide-dai-dai.jpg',
   '/mock/caroslide-spiderman-bnd.jpg', '/mock/caroslide-2016-trend.jpg', '/mock/caroslide-apple-openai-lawsuit.jpg',
 ]

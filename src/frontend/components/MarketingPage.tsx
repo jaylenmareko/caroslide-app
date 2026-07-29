@@ -349,6 +349,9 @@ export default function MarketingPage() {
           <Link href="/login">Sign In</Link>
           <a href="#how-it-works">How it works</a>
           <a href="#faq">FAQ</a>
+          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy</Link>
+          <a href="mailto:support@caroslide.com">Support</a>
         </div>
         <p className="copy">© {new Date().getFullYear()} Caroslide. All rights reserved.</p>
       </footer>

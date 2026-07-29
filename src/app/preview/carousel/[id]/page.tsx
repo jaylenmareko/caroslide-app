@@ -1,6 +1,7 @@
 import Sidebar from '@/frontend/components/Sidebar'
 import Viewer from '@/frontend/components/Viewer'
 import type { Carousel } from '@/backend/lib/types'
+import { blockInProduction } from '@/backend/lib/preview-guard'
 
 const now = new Date().toISOString()
 
@@ -23,6 +24,7 @@ const MOCK: Carousel = {
 }
 
 export default function PreviewCarouselPage() {
+  blockInProduction()
   return (
     <div className="app-shell">
       <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />

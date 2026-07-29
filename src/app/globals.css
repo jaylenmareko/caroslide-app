@@ -896,6 +896,18 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
 .lp-faq-a { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; font-size: 14.5px; color: var(--ink-soft); line-height: 1.55; }
 .lp-faq-item.open .lp-faq-a { max-height: 200px; margin-top: 12px; }
 
+.legal-page { min-height: 100vh; background: var(--bg); }
+.legal-wrap { max-width: 720px; padding: 50px 24px 80px; }
+.legal-brand { margin-bottom: 30px; }
+.legal-brand span { font-size: 26px; }
+.legal-page h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.6px; margin: 0 0 6px; }
+.legal-updated { font-size: 13px; color: var(--ink-faint); margin: 0 0 32px; }
+.legal-page h2 { font-size: 17px; font-weight: 600; margin: 32px 0 10px; }
+.legal-page p, .legal-page li { font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+.legal-page ul { margin: 0 0 16px; padding-left: 20px; }
+.legal-page li { margin-bottom: 6px; }
+.legal-page a { color: var(--green); font-weight: 600; }
+
 .lp-footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 50px 24px 30px; text-align: center; }
 .lp-footer .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; margin-bottom: 14px; }
 .lp-footer .brand svg { width: 30px; height: 30px; }

@@ -1,7 +1,9 @@
 import Sidebar from '@/frontend/components/Sidebar'
 import SettingsForm from '@/frontend/components/SettingsForm'
+import { blockInProduction } from '@/backend/lib/preview-guard'
 
 export default function PreviewSettingsPage() {
+  blockInProduction()
   return (
     <div className="app-shell">
       <Sidebar name="Jaylen Davis" email="jaylen@caroslide.com" />

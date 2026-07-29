@@ -38,17 +38,27 @@ function MarqueeRow({ images }: { images: string[] }) {
       {/* Real fix (2026-07-28, Jaylen: "not instantly seeable... only update the loading speed, not
           size") -- same original files, same dimensions, nothing recompressed. preload hints get
           the browser fetching these before it would otherwise even discover them (it has to
-          download+parse the JS bundle and hydrate this client component first, without this) --
-          fetchPriority tells the browser's own scheduler these matter more than lower-priority
-          requests (fonts, other scripts) competing for the same connection. */}
+          download+parse the JS bundle and hydrate this client component first, without this).
+          Real bug caught live in this same fix: React hoists its OWN <link rel=preload> for any
+          <img> carrying an explicit fetchPriority attribute -- including fetchPriority="auto",
+          which isn't a no-op the way omitting the attribute is. Setting it on every image (instead
+          of leaving it unset on the non-eager ones) silently preloaded all 15 marquee images at
+          once, splitting bandwidth across all of them instead of prioritizing the ones actually
+          visible at first paint -- confirmed via the raw served HTML, not assumed. Fixed by only
+          ever setting fetchPriority on the eager ones; the rest get no attribute at all, not "auto". */}
       {images.slice(0, MARQUEE_EAGER_COUNT).map((src) => (
         <link key={src} rel="preload" as="image" href={src} />
       ))}
       <div className="lp-marquee-track">
-        {doubled.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={i} src={src} alt="" fetchPriority={i < MARQUEE_EAGER_COUNT ? 'high' : 'auto'} />
-        ))}
+        {doubled.map((src, i) =>
+          i < MARQUEE_EAGER_COUNT ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt="" fetchPriority="high" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt="" />
+          )
+        )}
       </div>
     </div>
   )
@@ -71,8 +81,15 @@ function Step3Carousel({ images }: { images: string[] }) {
             earlier/prioritized. Only the FIRST slide needs a preload -- that's the one shown before
             anyone clicks the arrows, later ones are a user-initiated action, not a page-load one. */}
         {current === 0 && <link rel="preload" as="image" href={images[0]} />}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[current]} alt={`Example carousel slide ${current + 1}`} fetchPriority={current === 0 ? 'high' : 'auto'} />
+        {/* fetchPriority only ever set (not set to "auto") when true -- see MarqueeRow's comment on
+            why an explicit "auto" isn't the same as omitting the attribute. */}
+        {current === 0 ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={images[current]} alt={`Example carousel slide ${current + 1}`} fetchPriority="high" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={images[current]} alt={`Example carousel slide ${current + 1}`} />
+        )}
         <button
           className="lp-carousel-arrow left"
           onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}

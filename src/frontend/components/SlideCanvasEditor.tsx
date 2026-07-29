@@ -833,6 +833,28 @@ const SlideCanvasEditor = forwardRef<
       // the right place regardless of whether this field has ever been moved before.
       if (f.posX || f.posY) hit.style.transform = 'translate(' + (f.posX || 0) + 'px, ' + (f.posY || 0) + 'px)';
       el.parentNode.appendChild(hit);
+    } else {
+      // Real bug found live (2026-07-29, Jaylen's own words: "I can't move this circle for some
+      // reason so if the divider is over it... that circle won't move"): a real z-index conflict,
+      // made newly reachable by widening the divider's padded hit-zone earlier today. A normal-sized
+      // field like a circle has no z-index at all (z-index:auto), but the divider's padded overlay
+      // above explicitly sets z-index:40 -- CSS stacking gives an explicit z-index priority over
+      // "auto" regardless of DOM order, so whenever a dragged circle visually overlaps the
+      // divider's (now much bigger) invisible hit-zone, the divider's overlay silently wins every
+      // click/drag meant for the circle underneath. z-index only takes effect on a positioned
+      // element -- and, critically, only ranks against OTHER elements in the SAME stacking context,
+      // not just any overlapping element on the page. A circle's own transform (.circle-wrap's
+      // translate(), present even at 0px,0px) already makes IT the real stacking-context root, not
+      // the plain <img> inside it -- setting z-index on the img alone would only rank it against
+      // siblings inside that same wrapper (there are none), never against the divider's hit-div
+      // outside it. Same target this field's own moveTarget ternary uses below, so the z-index
+      // lands on whichever element the stacking (and the drag transform) actually happens on. 45
+      // sits above the divider-class padded overlays (40) but below the delete-button's own z-index
+      // (50), so a normal-sized field always wins a stacking conflict against a thin auxiliary
+      // element like the divider, without ever out-ranking a delete button that belongs elsewhere.
+      var zIndexTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
+      if (getComputedStyle(zIndexTarget).position === 'static') zIndexTarget.style.position = 'relative';
+      zIndexTarget.style.zIndex = '45';
     }
 
     hit.style.cursor = 'pointer';

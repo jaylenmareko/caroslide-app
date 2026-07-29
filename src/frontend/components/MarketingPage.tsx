@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Reveal from './Reveal'
 
 
@@ -32,8 +33,16 @@ function MarqueeRow({ images }: { images: string[] }) {
     <div className="lp-marquee-zone">
       <div className="lp-marquee-track">
         {doubled.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={i} src={src} alt="" />
+          // Real bug found live (2026-07-28, Jaylen: marquee + Step 3 "not instantly seeable"):
+          // these were plain <img> tags serving the real, uncompressed source JPEGs (750KB-1.4MB
+          // each) at their real ~1080px resolution, just to display a 380px-wide thumbnail -- same
+          // root cause DashboardGrid.tsx's thumbnails already hit and fixed (2026-07-22). next/image
+          // resizes/compresses to the actual display size. priority on just the first few (visible
+          // at first paint on a normal screen, same "cap the eager ones" precedent as
+          // DashboardGrid's first-8 cap) skips the lazy-load IntersectionObserver wait and preloads
+          // immediately; the rest lazy-load with next/image's own rootMargin buffer, which is plenty
+          // of lead time before a marquee image scrolls into view given the 28s loop.
+          <Image key={i} src={src} alt="" width={380} height={475} priority={i < 6} />
         ))}
       </div>
     </div>
@@ -53,8 +62,11 @@ function Step3Carousel({ images }: { images: string[] }) {
   return (
     <div className="lp-carousel">
       <div className="lp-carousel-frame">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[current]} alt={`Example carousel slide ${current + 1}`} />
+        {/* Same fix as MarqueeRow above -- a real ~1.2MB source JPEG at full resolution just to
+            fill a 520px-wide frame. Only ever one of these mounted at a time (current), so
+            priority here doesn't compete for bandwidth the way marking all 30 marquee images
+            would. */}
+        <Image src={images[current]} alt={`Example carousel slide ${current + 1}`} width={520} height={650} priority />
         <button
           className="lp-carousel-arrow left"
           onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}

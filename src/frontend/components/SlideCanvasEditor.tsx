@@ -852,9 +852,21 @@ const SlideCanvasEditor = forwardRef<
       // sits above the divider-class padded overlays (40) but below the delete-button's own z-index
       // (50), so a normal-sized field always wins a stacking conflict against a thin auxiliary
       // element like the divider, without ever out-ranking a delete button that belongs elsewhere.
-      var zIndexTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
-      if (getComputedStyle(zIndexTarget).position === 'static') zIndexTarget.style.position = 'relative';
-      zIndexTarget.style.zIndex = '45';
+      //
+      // Real bug caught live testing THIS fix (2026-07-29, same session): applying this to every
+      // "big enough" field, not just movable ones, gave the full-canvas BG_IMG background photo
+      // (kind: photo-bg, not movable, no drag of its own to protect) z-index:45 too -- since it
+      // covers the entire canvas, that put it above the divider's hit-zone EVERYWHERE, blocking the
+      // divider from ever being selected again, not just where a circle happens to overlap it.
+      // Confirmed via a real mouse drag on the divider failing after this, then via
+      // elementFromPoint showing .photo sitting on top. Only a field that's actually movable (and
+      // therefore has a drag interaction worth protecting from the divider's overlay) needs this at
+      // all -- a non-movable full-canvas background has no such competing interaction to lose.
+      if (f.movable) {
+        var zIndexTarget = f.kind === 'photo-img' ? (el.closest('.circle-wrap') || el) : el;
+        if (getComputedStyle(zIndexTarget).position === 'static') zIndexTarget.style.position = 'relative';
+        zIndexTarget.style.zIndex = '45';
+      }
     }
 
     hit.style.cursor = 'pointer';

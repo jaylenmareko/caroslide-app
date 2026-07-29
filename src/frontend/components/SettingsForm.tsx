@@ -336,20 +336,23 @@ export default function SettingsForm({
                 </div>
               </div>
             </div>
-            <div className="plan-upgrade-row">
-              {(['starter', 'pro'] as Plan[]).map((plan) => (
-                <button
-                  key={plan}
-                  className="settings-save"
-                  style={{ marginTop: 0 }}
-                  onClick={() => handleUpgrade(plan)}
-                  disabled={billingLoading !== null}
-                >
-                  {billingLoading === plan
-                    ? 'Loading…'
-                    : `Upgrade to ${PLAN_LABELS[plan]} (${PLAN_PRICES[plan]}) — ${PLAN_CAROUSEL_LIMITS[plan]} carousels/mo`}
-                </button>
-              ))}
+            <div className="settings-plan-cards">
+              {(['starter', 'pro'] as Plan[]).map((plan) => {
+                const [amount, period] = PLAN_PRICES[plan].split('/')
+                return (
+                  <div key={plan} className={`settings-plan-card${plan === 'pro' ? ' featured' : ''}`}>
+                    <span className="plan-badge">{PLAN_LABELS[plan]}</span>
+                    <div className="settings-plan-amount">
+                      {amount}
+                      <span className="settings-plan-period">/{period}</span>
+                    </div>
+                    <p className="settings-plan-desc">{PLAN_CAROUSEL_LIMITS[plan]} carousels a month — every angle, format, and look.</p>
+                    <button className="settings-save" onClick={() => handleUpgrade(plan)} disabled={billingLoading !== null}>
+                      {billingLoading === plan ? 'Loading…' : `Upgrade to ${PLAN_LABELS[plan]}`}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </>
         )}
@@ -358,17 +361,16 @@ export default function SettingsForm({
           <div className="plan-current-desc" style={{ marginTop: 0 }}>
             Carousel packs -- {creditBalance} credit{creditBalance === 1 ? '' : 's'} available
           </div>
-          <div className="plan-upgrade-row">
+          <div className="settings-pack-cards">
             {PACK_OPTIONS.map(({ size, price }) => (
-              <button
-                key={size}
-                className="settings-save"
-                style={{ marginTop: 0 }}
-                onClick={() => handleBuyPack(size)}
-                disabled={billingLoading !== null}
-              >
-                {billingLoading === size ? 'Loading…' : `${size} carousels -- ${price}`}
-              </button>
+              <div key={size} className="settings-pack-card">
+                <span className="plan-badge">{size} Pack</span>
+                <div className="settings-pack-amount">{price}</div>
+                <p className="settings-pack-desc">{size} extra carousels, use any time -- no expiration.</p>
+                <button className="settings-save" onClick={() => handleBuyPack(size)} disabled={billingLoading !== null}>
+                  {billingLoading === size ? 'Loading…' : `Buy ${size} pack`}
+                </button>
+              </div>
             ))}
           </div>
           <p className="plan-upsell">Went over your monthly limit? Buy a pack instead of waiting for renewal.</p>

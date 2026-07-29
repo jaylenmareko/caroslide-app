@@ -159,6 +159,23 @@ a { color: inherit; }
 .plan-upgrade-row .settings-save { flex: 1 1 auto; white-space: nowrap; }
 .plan-packs { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
 
+/* Plan/pack cards (2026-07-29, Jaylen: "make the plans into cards, just like the landing
+   page... same for the packs, it makes it easier to understand") -- reuses the exact
+   .lp-pricing-card shape/spacing so the choice reads the same wherever it appears, just
+   scaled down for the settings page's narrower 640px column instead of the landing page's
+   920px pricing row. */
+.settings-plan-cards, .settings-pack-cards { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.settings-plan-card, .settings-pack-card {
+  flex: 1 1 200px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px 20px 18px; text-align: left; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
+}
+.settings-plan-card.featured { border: 1.5px solid var(--green); box-shadow: var(--shadow-md); }
+.settings-plan-amount, .settings-pack-amount { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; margin: 12px 0 6px; }
+.settings-plan-period { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+.settings-plan-desc, .settings-pack-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 16px; flex: 1; }
+.settings-plan-card .settings-save, .settings-pack-card .settings-save { width: 100%; justify-content: center; margin-top: 0; }
+@media (max-width: 520px) { .settings-plan-cards, .settings-pack-cards { flex-direction: column; } }
+
 /* ---------- dashboard ---------- */
 .dash-section { padding: 48px 0 70px; }
 .dash-head { margin-bottom: 26px; }

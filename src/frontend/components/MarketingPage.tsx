@@ -26,14 +26,28 @@ const MARQUEE_IMAGES = [
   '/mock/caroslide-spiderman-bnd.jpg', '/mock/caroslide-2016-trend.jpg', '/mock/caroslide-apple-openai-lawsuit.jpg',
 ]
 
+// How many marquee images are actually visible at first paint on a normal screen -- these are the
+// ones worth telling the browser to fetch early/first; the rest scroll into view later, so there's
+// no "not instantly seeable" complaint to fix for them.
+const MARQUEE_EAGER_COUNT = 6
+
 function MarqueeRow({ images }: { images: string[] }) {
   const doubled = [...images, ...images]
   return (
     <div className="lp-marquee-zone">
+      {/* Real fix (2026-07-28, Jaylen: "not instantly seeable... only update the loading speed, not
+          size") -- same original files, same dimensions, nothing recompressed. preload hints get
+          the browser fetching these before it would otherwise even discover them (it has to
+          download+parse the JS bundle and hydrate this client component first, without this) --
+          fetchPriority tells the browser's own scheduler these matter more than lower-priority
+          requests (fonts, other scripts) competing for the same connection. */}
+      {images.slice(0, MARQUEE_EAGER_COUNT).map((src) => (
+        <link key={src} rel="preload" as="image" href={src} />
+      ))}
       <div className="lp-marquee-track">
         {doubled.map((src, i) => (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={i} src={src} alt="" />
+          <img key={i} src={src} alt="" fetchPriority={i < MARQUEE_EAGER_COUNT ? 'high' : 'auto'} />
         ))}
       </div>
     </div>
@@ -53,8 +67,12 @@ function Step3Carousel({ images }: { images: string[] }) {
   return (
     <div className="lp-carousel">
       <div className="lp-carousel-frame">
+        {/* Same fix as MarqueeRow above -- original file, original dimensions, just fetched
+            earlier/prioritized. Only the FIRST slide needs a preload -- that's the one shown before
+            anyone clicks the arrows, later ones are a user-initiated action, not a page-load one. */}
+        {current === 0 && <link rel="preload" as="image" href={images[0]} />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[current]} alt={`Example carousel slide ${current + 1}`} />
+        <img src={images[current]} alt={`Example carousel slide ${current + 1}`} fetchPriority={current === 0 ? 'high' : 'auto'} />
         <button
           className="lp-carousel-arrow left"
           onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}

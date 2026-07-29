@@ -63,7 +63,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   // updateSlideField (the real cost: a Cloudflare render + Storage upload), then handed the result
   // to this commitSlides(), which ALWAYS called updateCarouselSlides() again right after -- a fully
   // redundant second DB write of the exact same result. Click-in-place field edits (text, color,
-  // font, drag-move/resize, delete, photo swap) no longer touch the network at all until the user
+  // font, drag-move/resize, delete) no longer touch the network at all until the user
   // hits the new topbar Save button -- see SlideCanvasEditor.tsx's own top-of-file comment for the
   // client side of this. dirtySlideIndices tracks which slides have unsaved local edits since the
   // last successful save, so Save only re-renders the ones that actually changed, not every slide.

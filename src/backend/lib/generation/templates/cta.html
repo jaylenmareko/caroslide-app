@@ -15,7 +15,7 @@
      span -- see pipeline.ts's buildBrandValues) into all-caps, breaking the exact brand
      treatment every other template already renders correctly. Real bug, not a design choice --
      no other template does this. */
-  .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; margin-bottom:70px; }
+  .logo { font-size:26px; font-weight:800; letter-spacing:4px; color:{{PRIMARY}}; margin-bottom:70px; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo span { color:#ffffff; }
   .logo img { height:40px; width:auto; display:block; margin:0 auto; } /* used instead of the text+span when the brand has a real logo image, see LOGO_HTML */
   h1 { font-size:80px; font-weight:900; color:#ffffff; line-height:1.1; letter-spacing:-2px; margin-bottom:36px; transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }

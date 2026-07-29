@@ -525,11 +525,6 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
 .slide-canvas-editor iframe { display: block; }
 .slide-canvas-editor-error, .slide-canvas-editor-loading { aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 13px; color: var(--ink); }
 .slide-canvas-editor-fallback { display: block; aspect-ratio: 4/5; object-fit: cover; }
-.slide-canvas-editor-saving {
-  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(10,10,10,0.8); color: #fff;
-  font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 100px; z-index: 20;
-}
-.slide-canvas-editor-file-input { display: none; }
 
 
 .lightbox {

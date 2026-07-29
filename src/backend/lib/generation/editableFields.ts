@@ -139,10 +139,16 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
     { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true, deletable: true },
   ],
+  // LOGO_HTML added 2026-07-28 (Jaylen: "slide 5 the logo isn't an object like the logo on the
+  // rest of the pages") -- real gap, not a design choice: cta.html renders a real .logo div (same
+  // as every other template) but was the only template whose editableFields entry never listed it,
+  // so it never got a click-to-select/move/delete handler at all. See the template's own .logo CSS
+  // rule for the matching visibility/transform placeholders this now relies on.
   'cta.html': [
     { field: 'HEADLINE_HTML', selector: 'h1', kind: 'text', movable: true, deletable: true },
     { field: 'SUBHEAD', selector: '.sub', kind: 'text', movable: true, deletable: true },
     { field: 'CTA_TEXT', selector: '.btn', kind: 'text', movable: true, deletable: true },
     { field: 'MICRO_TEXT', selector: '.micro', kind: 'text', movable: true, deletable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
 }

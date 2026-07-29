@@ -2,7 +2,6 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { getSlideEditorHtml, type SlideEditorData } from '@/backend/lib/actions'
-import { createClient } from '@/backend/lib/supabase/client'
 
 // Click-in-place editor (2026-07-22). Renders the slide's REAL filled template HTML live in an
 // iframe (not the flat PNG the rest of the app shows) so individual fields are real, clickable DOM
@@ -46,7 +45,7 @@ const SlideCanvasEditor = forwardRef<
     // below for why this is captured via a ref instead of a dependency.
     currentValues: Record<string, string>
     // Replaces the old onSlidesUpdated -- fires on every local field edit (typed text, a color/
-    // font pick, a drag-move/resize commit, a delete, a photo swap) with just the field(s) that
+    // font pick, a drag-move/resize commit, a delete) with just the field(s) that
     // changed. Viewer.tsx merges these into its own local state; nothing here waits on or knows
     // about the network.
     onFieldsChanged: (fields: Record<string, string>) => void
@@ -86,13 +85,7 @@ const SlideCanvasEditor = forwardRef<
   // creation time. Bumped every time load() actually lands new data; folded into the iframe's own
   // key below so React remounts it on every real reload, not just the first one.
   const [loadGeneration, setLoadGeneration] = useState(0)
-  // Only ever true during a photo upload now -- the one remaining action here that genuinely still
-  // needs a network call (getting a Storage URL for the picked file) before it can even apply
-  // locally. Every other edit is instant, no network, no loading state.
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const pendingPhotoField = useRef<string | null>(null)
   // Read inside load() via .current, deliberately NOT a dependency of that useCallback -- Viewer.tsx
   // passes a new currentValues object on every single local edit (its own state just changed), and
   // if load() depended on it directly, the effect below (keyed on [load, previewUrl]) would fire
@@ -185,9 +178,6 @@ const SlideCanvasEditor = forwardRef<
         applyFields({ [msg.field]: msg.value })
       } else if (msg.type === 'caroslide-fields-edit') {
         applyFields(msg.fields)
-      } else if (msg.type === 'caroslide-photo-click') {
-        pendingPhotoField.current = msg.field
-        fileInputRef.current?.click()
       } else if (msg.type === 'caroslide-field-selected') {
         // Pass all three through -- Viewer.tsx needs to tell "selected, but this field has no
         // delete action" (a circle/logo -- no-op) apart from "nothing selected at all" (slide-
@@ -200,44 +190,6 @@ const SlideCanvasEditor = forwardRef<
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [applyFields, onSelectionChange])
-
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    const field = pendingPhotoField.current
-    e.target.value = ''
-    if (!file || !field) return
-    setUploading(true)
-    setError(null)
-    try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      const path = `${user?.id}/${crypto.randomUUID()}-${file.name}`
-      const { data: uploaded, error: uploadError } = await supabase.storage.from('carousel-uploads').upload(path, file)
-      if (uploadError || !uploaded) {
-        setError('Upload failed -- try again.')
-        return
-      }
-      const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(uploaded.path)
-      // Optimistic local update (2026-07-28) -- didn't need one before, since the old save() path
-      // always forced a real reload right after, which was what actually showed the new photo.
-      // Now that field edits never trigger a reload, this needs to show the new photo itself, same
-      // as every other edit already does.
-      const doc = iframeRef.current?.contentDocument
-      const fieldDef = data?.fields.find((f) => f.field === field)
-      if (doc && fieldDef) {
-        const el = doc.querySelector(fieldDef.selector) as HTMLElement | null
-        if (el) {
-          if (fieldDef.kind === 'photo-img') (el as HTMLImageElement).src = pub.publicUrl
-          else el.style.backgroundImage = `url('${pub.publicUrl}')`
-        }
-      }
-      applyFields({ [field]: pub.publicUrl })
-    } finally {
-      setUploading(false)
-    }
-  }
 
   // Real fallback, not an empty box: a carousel created before click-in-place editing existed (no
   // stored template/values) hits this same "error" path on every load, and previously left the
@@ -382,7 +334,15 @@ const SlideCanvasEditor = forwardRef<
   // to visibly relocate something, which is inherently a much larger movement than this, so this
   // doesn't trade away real drag detection to get it.
   var THRESH = 16 / ${scale};
-  var PAD = 14;
+  // Real bug found live (2026-07-28, Jaylen: "hard for me to tab the line object on the circle +
+  // photo look") -- same class of bug as THRESH above: a fixed 14 native-unit pad around a thin
+  // field's own tiny bounding box (the divider is a real 3px-tall line) shrinks along with
+  // everything else at this component's display scale, so the padded hit-zone that looked
+  // reasonable at 1080px full size could render at well under 10 real on-screen px on a normal
+  // phone-sized preview -- genuinely hard to tap. Expressing it as a real-pixel budget divided by
+  // scale keeps the ON-SCREEN tap target a constant real size regardless of how small this preview
+  // is currently rendered, same fix as THRESH's own comment above.
+  var PAD = 14 / ${scale};
 
   // Selection state (2026-07-24, real feedback: "when I select text it stays selected and I can
   // do whatever -- other objects don't do anything"). Text already had an obvious selected state
@@ -1042,25 +1002,14 @@ const SlideCanvasEditor = forwardRef<
         parent.postMessage({ type: 'caroslide-field-selected', field: null, deletable: false }, '*');
       });
     } else if (f.kind === 'photo-img' && f.movable) {
-      // Circles: click selects (same persistent outline as everything else, no competing action
-      // to guess between), drag moves (handled above), double-click swaps.
+      // Circles: click selects (same persistent outline as everything else), drag moves (handled
+      // above). Manual swap removed (2026-07-28, Jaylen: "for simplicity users shouldn't be able to
+      // manually swap images -- that should be a chat edit") -- this used to also open a file
+      // picker on double-click.
       hit.addEventListener('click', function(e){
         e.stopPropagation();
         if (justDragged) return;
         selectThis();
-      });
-      hit.addEventListener('dblclick', function(e){
-        e.stopPropagation();
-        if (justDragged) return;
-        parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
-      });
-    } else if (f.kind === 'photo-img' || f.kind === 'photo-bg') {
-      // Main/background photos: no move action exists, so a single click still swaps, unchanged.
-      hit.addEventListener('click', function(e){
-        e.stopPropagation();
-        if (justDragged) return;
-        deselect();
-        parent.postMessage({ type: 'caroslide-photo-click', field: f.field }, '*');
       });
     } else if (f.kind === 'move-only') {
       // Logo, divider: no text to edit, no photo to swap -- click selects (persistent outline +
@@ -1084,8 +1033,6 @@ const SlideCanvasEditor = forwardRef<
         title="Slide editor"
         style={{ width: 1080, height: data.canvasH, transform: `scale(${scale})`, transformOrigin: 'top left', border: 'none' }}
       />
-      <input ref={fileInputRef} type="file" accept="image/*" className="slide-canvas-editor-file-input" onChange={handleFileSelected} />
-      {uploading && <div className="slide-canvas-editor-saving">Uploading…</div>}
     </div>
   )
 })

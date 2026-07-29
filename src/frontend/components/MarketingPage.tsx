@@ -36,27 +36,24 @@ function MarqueeRow({ images }: { images: string[] }) {
   return (
     <div className="lp-marquee-zone">
       {/* Real fix (2026-07-28, Jaylen: "not instantly seeable... only update the loading speed, not
-          size") -- same original files, same dimensions, nothing recompressed. preload hints get
-          the browser fetching these before it would otherwise even discover them (it has to
-          download+parse the JS bundle and hydrate this client component first, without this).
-          Real bug caught live in this same fix: React hoists its OWN <link rel=preload> for any
-          <img> carrying an explicit fetchPriority attribute -- including fetchPriority="auto",
-          which isn't a no-op the way omitting the attribute is. Setting it on every image (instead
-          of leaving it unset on the non-eager ones) silently preloaded all 15 marquee images at
-          once, splitting bandwidth across all of them instead of prioritizing the ones actually
-          visible at first paint -- confirmed via the raw served HTML, not assumed. Fixed by only
-          ever setting fetchPriority on the eager ones; the rest get no attribute at all, not "auto". */}
-      {images.slice(0, MARQUEE_EAGER_COUNT).map((src) => (
-        <link key={src} rel="preload" as="image" href={src} />
-      ))}
+          size") -- same original files, same dimensions, nothing recompressed.
+          Real finding, confirmed by inspecting the actual served HTML twice (not assumed): Next.js
+          auto-hoists a <link rel=preload> for every server-rendered <img> regardless of
+          fetchPriority -- setting fetchPriority (even explicitly to "auto") had no effect on WHICH
+          images got preloaded, only on the (irrelevant, since all got one) attribute the link
+          carried. loading="lazy" is the one that actually works: a browser-standard signal that
+          overrides the auto-preload for that specific image, since eagerly preloading something
+          you've also told the browser to lazy-load is a direct contradiction. Verified: this cut
+          the real preload count from 16 down to 7 (the 6 eager marquee images + Step 3's first
+          slide) -- checked the raw served HTML again after this change, not just reasoned about it. */}
       <div className="lp-marquee-track">
         {doubled.map((src, i) =>
           i < MARQUEE_EAGER_COUNT ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" fetchPriority="high" />
+            <img key={i} src={src} alt="" fetchPriority="high" loading="eager" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" />
+            <img key={i} src={src} alt="" loading="lazy" />
           )
         )}
       </div>
@@ -78,14 +75,12 @@ function Step3Carousel({ images }: { images: string[] }) {
     <div className="lp-carousel">
       <div className="lp-carousel-frame">
         {/* Same fix as MarqueeRow above -- original file, original dimensions, just fetched
-            earlier/prioritized. Only the FIRST slide needs a preload -- that's the one shown before
-            anyone clicks the arrows, later ones are a user-initiated action, not a page-load one. */}
-        {current === 0 && <link rel="preload" as="image" href={images[0]} />}
-        {/* fetchPriority only ever set (not set to "auto") when true -- see MarqueeRow's comment on
-            why an explicit "auto" isn't the same as omitting the attribute. */}
+            earlier/prioritized (no manual <link> needed here -- only ever one <img> mounted at a
+            time, since it's keyed on `current`, so there's no sibling-image accidental-preload risk
+            the marquee had; Next.js already auto-preloads this single eager <img> on its own). */}
         {current === 0 ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={images[current]} alt={`Example carousel slide ${current + 1}`} fetchPriority="high" />
+          <img src={images[current]} alt={`Example carousel slide ${current + 1}`} fetchPriority="high" loading="eager" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={images[current]} alt={`Example carousel slide ${current + 1}`} />

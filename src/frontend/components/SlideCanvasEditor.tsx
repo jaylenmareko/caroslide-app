@@ -823,6 +823,15 @@ const SlideCanvasEditor = forwardRef<
       hit.style.top = (el.offsetTop - PAD) + 'px';
       hit.style.width = (el.offsetWidth + PAD * 2) + 'px';
       hit.style.height = (el.offsetHeight + PAD * 2) + 'px';
+      // Same bug this field's onMove fix (below) closes for a LIVE drag, but at load time: el's own
+      // CSS already carries a translate() from a PREVIOUSLY saved POS_X/POS_Y (baked in as this
+      // template's real {{FIELD_POS_X}}/{{FIELD_POS_Y}} placeholders) -- offsetLeft/offsetTop never
+      // reflect that (transforms don't affect layout), so a divider already moved and saved in an
+      // earlier session would start out MISALIGNED with its own hit-zone on the very next load, not
+      // just after a fresh drag. f.posX/posY are the server's already-parsed current values (see
+      // actions.ts's getSlideEditorHtml) -- apply the same translate to hit up front so it starts in
+      // the right place regardless of whether this field has ever been moved before.
+      if (f.posX || f.posY) hit.style.transform = 'translate(' + (f.posX || 0) + 'px, ' + (f.posY || 0) + 'px)';
       el.parentNode.appendChild(hit);
     }
 
@@ -890,6 +899,20 @@ const SlideCanvasEditor = forwardRef<
             finalX = Math.round(baseX + dx);
             finalY = Math.round(baseY + dy);
             moveTarget.style.transform = 'translate(' + finalX + 'px, ' + finalY + 'px)';
+            // Real bug found live (2026-07-28, Jaylen: "once it's locked in place, I can't try and
+            // get it again" -- confirmed via the recording's own audio, not just the visuals): for
+            // a thin field like the divider, hit is a SEPARATE synthetic overlay div positioned
+            // once via absolute left/top computed from el's ORIGINAL (pre-drag) offsetLeft/offsetTop
+            // -- a CSS transform on moveTarget repositions it visually without ever changing
+            // offsetLeft/offsetTop (transforms are paint-time only, not layout), so hit silently
+            // stayed behind at the pre-move position forever after the first drag, while the
+            // visible element moved on. First drag always worked (hit and the element still lined
+            // up); every drag after that missed, because hit was never told to move too. Circles
+            // never hit this (they're always over 20px, so hit IS el itself there -- clicking the
+            // real element always hits wherever it visually painted, transform included). Mirroring
+            // the identical transform onto hit keeps the two in lockstep regardless of how many
+            // times this gets dragged.
+            if (hit !== el) hit.style.transform = 'translate(' + finalX + 'px, ' + finalY + 'px)';
           }
         }
         function onUp(){

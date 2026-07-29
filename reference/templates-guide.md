@@ -56,6 +56,21 @@ Every caption is 2-3 `<span>` clauses: `.c1`/`.c2`/`.c3` (or `.accent`/`.muted` 
 
 ## Color contrast against the dark background — check it, don't eyeball it
 
+**Automated in the real app (2026-07-28):** this whole section was written as a manual step for
+whoever fills `values.json` by hand in this skill's own workflow — it was never ported into the
+real app's generation pipeline, so every real carousel generated through Caroslide skipped it
+entirely until a dark navy brand color (`#1E3A5F`, ≈0.21) shipped unreadable on a live carousel.
+`buildBrandValues()` (`caroslide-app/src/backend/lib/generation/pipeline.ts`) now computes
+`PRIMARY_TEXT`/`SECONDARY_TEXT` automatically from the real `PRIMARY`/`SECONDARY` on every single
+generation — the exact luminance-check-then-lighten-toward-white logic below, as real code, not a
+step someone has to remember. Every template's `.c1`/`.c3`/`.accent`/`.stat`/`.tagline`/`.kicker`
+now reference `{{PRIMARY_TEXT}}`/`{{SECONDARY_TEXT}}`, never the raw `{{PRIMARY}}`/`{{SECONDARY}}`
+directly. Raw `{{PRIMARY}}`/`{{SECONDARY}}` stay in use for non-text/decorative spots (logo
+wordmark fallback, button fills, glow/dot background accents) — see this section's own note below
+on why the raw hex is fine there. If you're hand-filling a template outside the app (the `/carousel`
+skill's own manual flow), the check below still applies to you directly since there's no pipeline
+code doing it for you in that path.
+
 Every template's base background is near-black (`background:#0a0a0a`), and the scrim-style templates (3, 6, 9's split zone, 10) fade to that same near-black exactly where captions sit. A brand's real PRIMARY/SECONDARY color can look perfectly fine as a UI color on a white page (buttons, logos, links) and still be nearly illegible as caption/stat text on these templates — those are two different backgrounds, and "it's our brand color" doesn't mean it's readable here. This bit a real carousel: Caroslide's own brand purple, `#512888`, is dark enough that it read as invisible-ish both as plain caption text (`8-photo-grid.html`) and as an overlay caption on a photo scrim (`10-split-overlay.html`) — the failure showed up in two unrelated slides because it's the same root cause (a dark color on a dark background), not two coincidental glitches.
 
 **The check, before finalizing any color into `values.json`:** compute perceived luminance for the candidate text color — `(0.299×R + 0.587×G + 0.114×B) / 255`, using 0-255 RGB values, giving a result from 0 (black) to 1 (white). If it comes out below roughly **0.35-0.4**, that color will read as poor-to-illegible against `#0a0a0a` and must not be used directly for `.c1`/`.c2`/`.c3` caption spans, `.stat`, or `.tagline`. For reference: `#512888` computes to ≈0.25 (fails); `#38BDF8` computes to ≈0.62 (passes comfortably); the existing default accent `#D97757` computes to ≈0.55 (passes).

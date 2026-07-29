@@ -70,6 +70,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '3-flip.html': [
     { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
@@ -85,10 +86,12 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photocol img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '5-stat-takeover.html': [
     { field: 'CAPTION_HTML', selector: '.caption', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photostrip img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '6-minimal-magazine.html': [
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
@@ -97,10 +100,12 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_NUMBER', selector: '.stat', kind: 'text', movable: true, deletable: true },
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'BG_IMG', selector: '.photo img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '7-keynote.html': [
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
     { field: 'STATEMENT_HTML', selector: '.statement', kind: 'text', movable: true, deletable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '8-photo-grid.html': [
     { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true, deletable: true },
@@ -110,6 +115,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'IMG_MAIN', selector: '.grid-main img', kind: 'photo-img' },
     { field: 'IMG_TOP', selector: '.grid-side .cell:nth-child(1) img', kind: 'photo-img' },
     { field: 'IMG_BOTTOM', selector: '.grid-side .cell:nth-child(2) img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   '9-split-flip.html': [
     { field: 'TAGLINE', selector: '.tagline', kind: 'text', movable: true, deletable: true },
@@ -118,11 +124,16 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'STAT_LABEL', selector: '.statlbl', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
+  // 10-split-overlay.html deliberately uses a DIFFERENT selector (.brand-badge, not .logo) --
+  // this template's own logo lives bottom-center on the split line, not top-left like every
+  // other template (see the template's own comment). Same field name/kind/behavior otherwise.
   '10-split-overlay.html': [
     { field: 'CAPTION_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
     { field: 'IMG_LEFT', selector: '.half.l img', kind: 'photo-img' },
     { field: 'IMG_RIGHT', selector: '.half.r img', kind: 'photo-img' },
+    { field: 'LOGO_HTML', selector: '.brand-badge', kind: 'move-only', movable: true, deletable: true },
   ],
   '11-single-circle.html': [
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
@@ -138,6 +149,7 @@ export const EDITABLE_FIELDS: Record<string, EditableField[]> = {
     { field: 'KICKER', selector: '.kicker', kind: 'text', movable: true, deletable: true },
     { field: 'HEADLINE_HTML', selector: '.headline', kind: 'text', movable: true, deletable: true },
     { field: 'STORY_HTML', selector: '.story', kind: 'text', movable: true, deletable: true },
+    { field: 'LOGO_HTML', selector: '.logo', kind: 'move-only', movable: true, deletable: true },
   ],
   // LOGO_HTML added 2026-07-28 (Jaylen: "slide 5 the logo isn't an object like the logo on the
   // rest of the pages") -- real gap, not a design choice: cta.html renders a real .logo div (same

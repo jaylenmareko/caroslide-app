@@ -61,6 +61,47 @@ const globalRenderLimit = createLimiter(2)
 // canvas height as initial generation, keyed the same way.
 export const CANVAS_H: Record<Format, number> = { Post: 1350 }
 
+// Real bug found live (2026-07-28, Jaylen: "we can't be having the contrast that makes things hard
+// to read... we have to be perfect consistently"): a real carousel used a dark navy brand color
+// (#1E3A5F, perceived luminance ~0.21) directly as caption/headline accent text on a photo-scrim
+// template -- exactly the failure mode reference/templates-guide.md already documents in its
+// "Color contrast against the dark background" section (worked example: Caroslide's own #512888
+// failing the same way). That doc's fix (compute luminance, lighten toward white if it fails a
+// ~0.4 threshold, keep the hue) was written as a MANUAL step for whoever fills values.json by hand
+// in the `/carousel` skill workflow -- it was never ported into this app's real generation pipeline,
+// so every real carousel generated here skipped the check entirely. This closes that gap for good:
+// computed automatically from the brand's actual PRIMARY/SECONDARY every single generation, not a
+// per-carousel judgment call an AI caption-writer could get wrong or skip.
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '')
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean
+  const n = parseInt(full, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')
+  return `#${c(r)}${c(g)}${c(b)}`
+}
+function perceivedLuminance(r: number, g: number, b: number): number {
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+}
+// Mirrors templates-guide.md's documented fix exactly: mix toward white in small steps until the
+// formula clears the threshold, rather than swapping to an unrelated color -- keeps the brand's own
+// hue recognizable, just lighter. 0.4 (the top of the doc's 0.35-0.4 range) is used here, not the
+// lower bound -- this runs against EVERY brand's colors on EVERY carousel with no human eyeballing
+// the result afterward, so the safer end of the documented range is the right default.
+function ensureTextSafe(hex: string): string {
+  const [r, g, b] = hexToRgb(hex)
+  if (perceivedLuminance(r, g, b) >= 0.4) return hex
+  for (let t = 0.05; t <= 1; t += 0.05) {
+    const mr = r + (255 - r) * t
+    const mg = g + (255 - g) * t
+    const mb = b + (255 - b) * t
+    if (perceivedLuminance(mr, mg, mb) >= 0.4) return rgbToHex(mr, mg, mb)
+  }
+  return '#ffffff'
+}
+
 // Extracted into its own exported function (2026-07-21, chat-editing build) -- a single-slide edit
 // re-render needs the exact same brand values (colors, logo/Caroslide-wordmark fallback, font) as
 // initial generation, not a second drifted copy of this logic.
@@ -81,9 +122,19 @@ export function buildBrandValues(input: {
   const FRAUNCES_LOGO_FONT_LINK =
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&display=swap">'
 
+  const PRIMARY = input.brandColors[0] ?? '#D97757'
+  const SECONDARY = input.brandColors[1] ?? '#F4C95D'
+
   return {
-    PRIMARY: input.brandColors[0] ?? '#D97757',
-    SECONDARY: input.brandColors[1] ?? '#F4C95D',
+    PRIMARY,
+    SECONDARY,
+    // Text-safe variants (2026-07-28) -- every template's caption/headline/stat/tagline/kicker
+    // accent spans use these, NOT raw PRIMARY/SECONDARY, per templates-guide.md's documented
+    // contrast rule. Decorative/non-text uses (logo wordmark fallback, button fills, glow/dot
+    // background accents) keep the raw brand color on purpose -- see that doc section for why the
+    // dark hex is still fine there.
+    PRIMARY_TEXT: ensureTextSafe(PRIMARY),
+    SECONDARY_TEXT: ensureTextSafe(SECONDARY),
     // Real product decision (Jaylen, 2026-07-21): if the user never uploads a brand logo, fall
     // back to Caroslide's OWN wordmark rather than the account's own name -- a carousel with no
     // brand logo set should read as "made with Caroslide," not silently promote whatever text

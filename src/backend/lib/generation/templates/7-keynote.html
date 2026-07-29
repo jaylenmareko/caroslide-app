@@ -16,15 +16,15 @@
   html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#000000; font-family:{{FONT_FAMILY|'Segoe UI', Arial, sans-serif}}; }
   .slide { width:1080px; height:{{CANVAS_H}}px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:120px; position:relative; }
 
-  .logo { position:absolute; top:50px; left:60px; font-size:30px; font-weight:900; letter-spacing:1px; }
+  .logo { position:absolute; top:50px; left:60px; font-size:30px; font-weight:900; letter-spacing:1px; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
   .logo img { height:32px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
-  .kicker { font-size:28px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:{{SECONDARY}}; margin-bottom:40px; transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
+  .kicker { font-size:28px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:{{SECONDARY_TEXT}}; margin-bottom:40px; transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
   .statement { font-size:{{STATEMENT_SIZE|84px}}; font-weight:900; line-height:1.15; letter-spacing:-2px; color:#ffffff; transform:translate({{STATEMENT_HTML_POS_X|0px}}, {{STATEMENT_HTML_POS_Y|0px}}); }
-  .statement .c1 { color:{{SECONDARY}}; }
+  .statement .c1 { color:{{SECONDARY_TEXT}}; }
   .statement .c2 { color:#ffffff; }
-  .statement .c3 { color:{{PRIMARY}}; }
+  .statement .c3 { color:{{PRIMARY_TEXT}}; }
 </style>
 </head>
 <body>

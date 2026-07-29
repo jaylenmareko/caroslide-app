@@ -21,22 +21,22 @@
   .split { width:100%; height:42.96vh; display:flex; position:relative; {{SPLIT_DIRECTION|flex-direction:row;}} }
   .half { flex:1; overflow:hidden; position:relative; background:#3a3a3a; }
   .half img { width:100%; height:100%; object-fit:cover; display:block; }
-  .logo { position:absolute; top:36px; left:36px; font-size:30px; font-weight:900; letter-spacing:1px; z-index:5; text-shadow:0 2px 8px rgba(0,0,0,0.6); }
+  .logo { position:absolute; top:36px; left:36px; font-size:30px; font-weight:900; letter-spacing:1px; z-index:5; text-shadow:0 2px 8px rgba(0,0,0,0.6); visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
   .logo img { height:30px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
   .textzone { flex:1; background:#0a0a0a; display:flex; flex-direction:column; align-items:{{TEXT_ALIGN_V|flex-start}}; justify-content:center; padding:70px 70px; }
   .caption { text-align:center; font-family:'Impact','Arial Narrow',Arial,sans-serif; font-size:{{CAPTION_SIZE|70px}}; line-height:1.16; letter-spacing:0.5px; text-transform:uppercase; transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
-  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c1 { color:{{SECONDARY_TEXT}}; }
   .caption .c2 { color:#ffffff; }
-  .caption .c3 { color:{{PRIMARY}}; }
+  .caption .c3 { color:{{PRIMARY_TEXT}}; }
 
   /* Dual-mode like 4-vertical-split.html/8-photo-grid.html: fill .caption for a plain caption, or
      .stat/.statlbl for a stat takeover, leave the other pair's placeholders unset. Added 2026-07-18
      — this template previously had no dedicated stat treatment at all, so "stat mode" meant just
      writing the number as the first word of the normal 70px caption, which read as barely-bigger
      than the surrounding text instead of a real stat callout. */
-  .stat { font-size:{{STAT_SIZE|150px}}; font-weight:900; color:{{SECONDARY}}; letter-spacing:-4px; line-height:1; text-align:center; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
+  .stat { font-size:{{STAT_SIZE|150px}}; font-weight:900; color:{{SECONDARY_TEXT}}; letter-spacing:-4px; line-height:1; text-align:center; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
   .statlbl { font-size:28px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; text-align:center; margin-top:10px; transform:translate({{STAT_LABEL_POS_X|0px}}, {{STAT_LABEL_POS_Y|0px}}); }
 </style>
 </head>

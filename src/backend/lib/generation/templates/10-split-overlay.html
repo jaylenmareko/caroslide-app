@@ -35,7 +35,15 @@
 
   .brand-line { position:absolute; left:80px; right:80px; bottom:{{BRAND_LINE_BOTTOM|200px}}; height:1px; background:rgba(255,255,255,0.4); z-index:4; }
   .brand-badge {
-    position:absolute; left:50%; bottom:{{BRAND_LINE_BOTTOM|200px}}; transform:translate(-50%, -50%);
+    position:absolute; left:50%; bottom:{{BRAND_LINE_BOTTOM|200px}};
+    /* Chained translate(), not a second transform property -- CSS only allows one `transform`
+       declaration, so the existing self-centering translate(-50%,-50%) and the click-in-place
+       drag offset (LOGO_HTML_POS_X/Y, same convention every other template's real .logo uses)
+       have to compose in one value. Order matters: centering first (relative to the badge's own
+       size), then the user's drag delta on top of that already-centered position -- reversing the
+       order would make the drag distance itself get shrunk by the -50% scale term. */
+    transform:translate(-50%, -50%) translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}});
+    visibility:{{LOGO_HTML_DISPLAY|visible}};
     background:rgba(0,0,0,0.85); border:1px solid rgba(255,255,255,0.5); border-radius:100px;
     padding:8px 22px; font-size:18px; font-weight:900; letter-spacing:1px; z-index:5; white-space:nowrap;
   }
@@ -47,9 +55,9 @@
      brand color can pass the documented luminance check against pure #0a0a0a and still read
      poorly once real photo color bleeds through underneath the scrim). */
   .headline { position:absolute; left:70px; right:70px; bottom:110px; font-size:{{HEADLINE_SIZE|52px}}; font-weight:900; line-height:1.2; color:#ffffff; letter-spacing:-1px; text-align:center; text-wrap:balance; z-index:4; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
-  .headline .c1 { color:{{SECONDARY}}; }
+  .headline .c1 { color:{{SECONDARY_TEXT}}; }
   .headline .c2 { color:#ffffff; }
-  .headline .c3 { color:{{PRIMARY}}; }
+  .headline .c3 { color:{{PRIMARY_TEXT}}; }
 </style>
 </head>
 <body>

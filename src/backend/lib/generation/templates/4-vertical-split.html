@@ -21,11 +21,11 @@
   .side-fade { position:absolute; top:0; {{FADE_SIDE|right}}:0; bottom:0; width:140px; background:linear-gradient({{FADE_ANGLE|90deg}}, rgba(10,10,10,0) 0%, #0a0a0a 100%); z-index:2; }
 
   .textcol { width:480px; height:{{CANVAS_H}}px; background:#0a0a0a; display:flex; flex-direction:column; justify-content:center; padding:60px 50px; position:relative; }
-  .logo { position:absolute; top:50px; {{LOGO_SIDE|left}}:50px; font-size:28px; font-weight:900; letter-spacing:1px; }
+  .logo { position:absolute; top:50px; {{LOGO_SIDE|left}}:50px; font-size:28px; font-weight:900; letter-spacing:1px; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{PRIMARY}}; } .logo .b { color:#ffffff; }
   .logo img { height:28px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
-  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:30px; transform:translate({{TAGLINE_POS_X|0px}}, {{TAGLINE_POS_Y|0px}}); }
+  .tagline { font-size:28px; font-weight:800; color:{{SECONDARY_TEXT}}; letter-spacing:1px; text-transform:uppercase; margin-bottom:30px; transform:translate({{TAGLINE_POS_X|0px}}, {{TAGLINE_POS_Y|0px}}); }
   /* Bumped 118px -> 165px (2026-07-11, Jaylen: "bold stat needs to be very big") — this is the whole
      point of this look, the number should dominate the column at a glance, not read as a normal
      headline. Tighter -6px letter-spacing (was -4px) keeps 4-character stats ("100%", "2.5x") from
@@ -35,12 +35,12 @@
      "500M" (4 chars, all wide numerals/letterforms — no narrow "1" or "%" to lean on) still clipped
      off the right edge at 165px. Use the STAT_SIZE placeholder to size down per-stat rather than shrinking the
      default for every carousel — e.g. 130px for a 4-5 char wide-glyph stat like this one. */
-  .stat { font-size:{{STAT_SIZE|165px}}; font-weight:900; color:{{SECONDARY}}; letter-spacing:-6px; line-height:1; margin-bottom:8px; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
+  .stat { font-size:{{STAT_SIZE|165px}}; font-weight:900; color:{{SECONDARY_TEXT}}; letter-spacing:-6px; line-height:1; margin-bottom:8px; transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }
   .statlbl { font-size:26px; font-weight:700; color:#9a9a9a; letter-spacing:1px; text-transform:uppercase; margin-bottom:40px; transform:translate({{STAT_LABEL_POS_X|0px}}, {{STAT_LABEL_POS_Y|0px}}); }
   .caption { font-size:38px; font-weight:800; line-height:1.34; transform:translate({{CAPTION_HTML_POS_X|0px}}, {{CAPTION_HTML_POS_Y|0px}}); }
-  .caption .c1 { color:{{SECONDARY}}; }
+  .caption .c1 { color:{{SECONDARY_TEXT}}; }
   .caption .c2 { color:#ffffff; }
-  .caption .c3 { color:{{PRIMARY}}; }
+  .caption .c3 { color:{{PRIMARY_TEXT}}; }
 
   /* proof circle bleeds off the OUTER edge of the photo column (canvas edge) — keep offset
      small (~20px) or the tag label gets clipped by the canvas boundary.

@@ -49,7 +49,7 @@
      image asset and automatically tints with the brand's own SECONDARY color. */
   .dots { position:absolute; top:60px; right:60px; width:160px; height:160px; opacity:0.35; background-image:radial-gradient({{SECONDARY}} 2.5px, transparent 2.5px); background-size:18px 18px; z-index:1; }
 
-  .logo { position:absolute; top:50px; left:60px; font-size:32px; font-weight:900; letter-spacing:1px; z-index:5; }
+  .logo { position:absolute; top:50px; left:60px; font-size:32px; font-weight:900; letter-spacing:1px; z-index:5; visibility:{{LOGO_HTML_DISPLAY|visible}}; transform:translate({{LOGO_HTML_POS_X|0px}}, {{LOGO_HTML_POS_Y|0px}}); }
   .logo .a { color:{{SECONDARY}}; } .logo .b { color:#ffffff; }
   .logo img { height:32px; width:auto; display:block; } /* used instead of .a/.b spans when the brand has a real logo image, see LOGO_HTML */
 
@@ -58,12 +58,12 @@
      regardless of how long the headline/story end up being. */
   .stage { flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding:190px 85px 90px; position:relative; z-index:2; }
 
-  .kicker { font-size:26px; font-weight:800; color:{{SECONDARY}}; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
+  .kicker { font-size:26px; font-weight:800; color:{{SECONDARY_TEXT}}; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
 
   .headline { font-size:{{HEADLINE_SIZE|78px}}; font-weight:900; line-height:1.08; letter-spacing:-1px; transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
-  .headline .c1 { color:{{SECONDARY}}; }
+  .headline .c1 { color:{{SECONDARY_TEXT}}; }
   .headline .c2 { color:#ffffff; }
-  .headline .c3 { color:{{PRIMARY}}; -webkit-text-stroke:2px #ffffff; }
+  .headline .c3 { color:{{PRIMARY_TEXT}}; -webkit-text-stroke:2px #ffffff; }
 
   .story { font-size:32px; font-weight:600; line-height:1.45; color:#d8d8d8; margin-top:36px; max-width:880px; transform:translate({{STORY_HTML_POS_X|0px}}, {{STORY_HTML_POS_Y|0px}}); }
 </style>

@@ -55,13 +55,13 @@
   /* text-shadow extended to kicker/headline/story 2026-07-21 (previously only .stat/.statlbl had
      it, a real inconsistency within this same file) -- see 6-minimal-magazine.html's matching
      comment for why this template needs it (photo-scrim background, not solid black). */
-  .kicker { font-size:28px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:{{SECONDARY_LIGHT|#f87171}}; margin-bottom:14px; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
+  .kicker { font-size:28px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:{{SECONDARY_TEXT}}; margin-bottom:14px; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{KICKER_POS_X|0px}}, {{KICKER_POS_Y|0px}}); }
   .kicker:empty { margin-bottom:0; line-height:0; }
   .headline { font-size:{{HEADLINE_SIZE|56px}}; font-weight:900; line-height:1.18; color:#ffffff; letter-spacing:-1px; text-wrap:balance; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{HEADLINE_HTML_POS_X|0px}}, {{HEADLINE_HTML_POS_Y|0px}}); }
-  .headline .accent { color:{{SECONDARY}}; }
+  .headline .accent { color:{{SECONDARY_TEXT}}; }
   /* narrative/story slides use a running paragraph instead of kicker+headline */
   .story { position:absolute; left:70px; right:90px; bottom:130px; font-size:{{STORY_SIZE|42px}}; font-weight:700; line-height:1.4; color:#ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.55); transform:translate({{STORY_HTML_POS_X|0px}}, {{STORY_HTML_POS_Y|0px}}); }
-  .story .accent { color:{{PRIMARY}}; }
+  .story .accent { color:{{PRIMARY_TEXT}}; }
   .story .muted { color:#9a9a9a; }
 
   .stat { position:absolute; left:70px; right:70px; bottom:180px; font-size:{{STAT_SIZE|140px}}; font-weight:900; color:#ffffff; letter-spacing:-3px; line-height:1; text-align:center; text-shadow:0 2px 14px rgba(0,0,0,0.6); transform:translate({{STAT_NUMBER_POS_X|0px}}, {{STAT_NUMBER_POS_Y|0px}}); }

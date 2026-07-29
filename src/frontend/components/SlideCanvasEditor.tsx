@@ -929,6 +929,19 @@ const SlideCanvasEditor = forwardRef<
             payload[f.field + '_POS_X'] = finalX + 'px';
             payload[f.field + '_POS_Y'] = finalY + 'px';
             parent.postMessage({ type: 'caroslide-fields-edit', fields: payload }, '*');
+            // Real bug found live (2026-07-28/29, confirmed via a real mouse drag test after the
+            // hit-tracking fix above -- that fix alone wasn't enough): f.posX/f.posY are the
+            // server's values from the ORIGINAL page load (see getSlideEditorHtml) and were never
+            // updated after a move committed locally. A SECOND drag's baseX/baseY (read a few lines
+            // up, at the top of this pointerdown handler) would still start from the stale
+            // load-time position, not where the first drag actually left it -- so the second drag's
+            // delta got added to the WRONG base, often landing back near the same absolute spot the
+            // object was already at (looked like "nothing happened", not a visible jump, since typical
+            // real drag distances are similar in magnitude round to round). Updating f.posX/f.posY
+            // here means the NEXT drag on this same field starts from the right place, however many
+            // times it's dragged in this session.
+            f.posX = finalX;
+            f.posY = finalY;
           }
         }
         hit.addEventListener('pointermove', onMove);

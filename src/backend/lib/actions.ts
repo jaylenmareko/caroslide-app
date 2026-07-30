@@ -156,35 +156,30 @@ export async function createCarousel(input: {
     .maybeSingle()
 
   const isActivePaid = subscription?.status === 'active' && subscription.plan
-  const limit = isActivePaid ? PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] : FREE_LIFETIME_CAROUSEL_LIMIT
+  // Falls back to the free limit (fail closed) on any plan value PLAN_CAROUSEL_LIMITS doesn't
+  // recognize -- a stale/out-of-band DB value (e.g. the pre-2026-07-27 'unlimited' plan the schema
+  // used to allow) must never silently grant unlimited generation just because the lookup misses.
+  const limit = isActivePaid
+    ? (PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] ?? FREE_LIFETIME_CAROUSEL_LIMIT)
+    : FREE_LIFETIME_CAROUSEL_LIMIT
 
-  let countQuery = supabase
-    .from('carousels')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-  if (isActivePaid && subscription!.current_period_start) {
-    countQuery = countQuery.gte('created_at', subscription!.current_period_start)
-  }
-  const { count: existingCount } = await countQuery
-
-  if ((existingCount ?? 0) >= limit) {
-    // Over the plan's cap (or never subscribed) -- fall back to purchased carousel-pack credits
-    // (see migration 009) before blocking. Balance is always sum(delta), never a stored counter.
-    const { data: ledgerRows } = await supabase.from('credit_ledger').select('delta').eq('user_id', user!.id)
-    const creditBalance = (ledgerRows ?? []).reduce((sum, row) => sum + row.delta, 0)
-
-    if (creditBalance <= 0) {
-      throw new Error(
-        isActivePaid
-          ? `You've used all ${limit} carousels for this billing period. It renews automatically, or buy a carousel pack in Settings.`
-          : `You've used your free carousel. Upgrade or buy a carousel pack in Settings.`
-      )
-    }
-
-    const { error: consumeError } = await supabase
-      .from('credit_ledger')
-      .insert({ user_id: user!.id, delta: -1, reason: 'consumption' })
-    if (consumeError) throw new Error(`Failed to use a carousel-pack credit: ${consumeError.message}`)
+  // Real bug found in code review (2026-07-30): counting existing carousels, checking the credit
+  // balance, and inserting the consumption row used to be three separate round trips with the real
+  // generation pipeline (many seconds) in between -- concurrent requests from the same account could
+  // all read the same pre-consumption state and all pass. Migration 013's check_and_consume_carousel_limit
+  // does the whole check-and-consume atomically in one Postgres function (advisory-locked per user),
+  // closing that race.
+  const { data: limitCheck, error: limitError } = await supabase.rpc('check_and_consume_carousel_limit', {
+    p_limit: limit,
+    p_period_start: isActivePaid && subscription!.current_period_start ? subscription!.current_period_start : null,
+  })
+  if (limitError) throw new Error(`Failed to check carousel limit: ${limitError.message}`)
+  if (!limitCheck?.[0]?.allowed) {
+    throw new Error(
+      isActivePaid
+        ? `You've used all ${limit} carousels for this billing period. It renews automatically, or buy a carousel pack in Settings.`
+        : `You've used your free carousel. Upgrade or buy a carousel pack in Settings.`
+    )
   }
 
   // voice_description is read live from the account's brand_kits row, not snapshotted onto the

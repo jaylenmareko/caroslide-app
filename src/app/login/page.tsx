@@ -48,7 +48,7 @@ function LoginForm() {
   const router = useRouter()
 
   useEffect(() => {
-    if (mode !== 'signup' || !turnstileReady || !turnstileContainerRef.current) return
+    if (!turnstileReady || !turnstileContainerRef.current) return
     if (!window.turnstile || !TURNSTILE_SITE_KEY) return
 
     turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
@@ -64,6 +64,9 @@ function LoginForm() {
         turnstileWidgetId.current = null
       }
     }
+    // mode is a dep (not just used inside) because switching signin<->signup remounts the
+    // container via React's `key={mode}` on the wrapping div -- the old widget's DOM node is gone,
+    // so it must be re-rendered into the new one, not just left pointing at a stale ref.
   }, [mode, turnstileReady])
 
   const topic = searchParams.get('topic')
@@ -104,10 +107,18 @@ function LoginForm() {
         return
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: { captchaToken: captchaToken ?? undefined },
+      })
       if (error) {
         setError(error.message)
         setLoading(false)
+        setCaptchaToken(null)
+        if (turnstileWidgetId.current && window.turnstile) {
+          window.turnstile.reset(turnstileWidgetId.current)
+        }
         return
       }
     }
@@ -187,13 +198,15 @@ function LoginForm() {
                 required
               />
             </div>
-            {mode === 'signup' && (
-              <div className="auth-field" ref={turnstileContainerRef} />
-            )}
+            {/* Supabase's CAPTCHA protection gates both the signup and password sign-in
+                endpoints identically (it's a single Attack Protection toggle, not per-endpoint) --
+                the widget has to render for both modes, or sign-in fails server-side with
+                captcha_failed even though the client never told the user anything was wrong. */}
+            <div className="auth-field" ref={turnstileContainerRef} />
             <button
               className="auth-submit"
               type="submit"
-              disabled={loading || (mode === 'signup' && !captchaToken)}
+              disabled={loading || !captchaToken}
             >
               {loading ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
             </button>

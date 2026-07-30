@@ -1,9 +1,30 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Script from 'next/script'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/backend/lib/supabase/client'
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string
+          callback: (token: string) => void
+          'error-callback'?: () => void
+          'expired-callback'?: () => void
+        }
+      ) => string
+      reset: (widgetId: string) => void
+      remove: (widgetId: string) => void
+    }
+  }
+}
 
 function LoginForm() {
   const searchParams = useSearchParams()
@@ -20,7 +41,30 @@ function LoginForm() {
   )
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [turnstileReady, setTurnstileReady] = useState(false)
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
+  const turnstileWidgetId = useRef<string | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    if (mode !== 'signup' || !turnstileReady || !turnstileContainerRef.current) return
+    if (!window.turnstile || !TURNSTILE_SITE_KEY) return
+
+    turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token) => setCaptchaToken(token),
+      'error-callback': () => setCaptchaToken(null),
+      'expired-callback': () => setCaptchaToken(null),
+    })
+
+    return () => {
+      if (turnstileWidgetId.current && window.turnstile) {
+        window.turnstile.remove(turnstileWidgetId.current)
+        turnstileWidgetId.current = null
+      }
+    }
+  }, [mode, turnstileReady])
 
   const topic = searchParams.get('topic')
   const postAuthDest = topic ? `/new?topic=${encodeURIComponent(topic)}` : '/dashboard'
@@ -41,11 +85,16 @@ function LoginForm() {
         options: {
           data: { name },
           emailRedirectTo: confirmUrl.toString(),
+          captchaToken: captchaToken ?? undefined,
         },
       })
       if (error) {
         setError(error.message)
         setLoading(false)
+        setCaptchaToken(null)
+        if (turnstileWidgetId.current && window.turnstile) {
+          window.turnstile.reset(turnstileWidgetId.current)
+        }
         return
       }
       if (!data.session) {
@@ -85,6 +134,11 @@ function LoginForm() {
 
   return (
     <div className="auth-wrap">
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        strategy="afterInteractive"
+        onLoad={() => setTurnstileReady(true)}
+      />
       <Link href="/" className="auth-top-brand">
         <span>Caroslide</span>
       </Link>
@@ -133,7 +187,14 @@ function LoginForm() {
                 required
               />
             </div>
-            <button className="auth-submit" type="submit" disabled={loading}>
+            {mode === 'signup' && (
+              <div className="auth-field" ref={turnstileContainerRef} />
+            )}
+            <button
+              className="auth-submit"
+              type="submit"
+              disabled={loading || (mode === 'signup' && !captchaToken)}
+            >
               {loading ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
             </button>
           </form>

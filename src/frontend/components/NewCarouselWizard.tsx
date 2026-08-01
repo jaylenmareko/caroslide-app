@@ -25,9 +25,12 @@ const LOOK_PREVIEW: Record<Look, string> = {
   'Bold Hook': '/template-previews/12-hook-block.png',
 }
 
-function LookMockup({ look }: { look: Look }) {
+// alt carries the title+description that used to render as visible text (removed 2026-08-01, per
+// Jaylen: "just see the mockups") -- a screen-reader user still needs SOME way to tell these 5
+// options apart, even though sighted users now only see the image.
+function LookMockup({ look, desc }: { look: Look; desc: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="tpl-preview-img" src={LOOK_PREVIEW[look]} alt="" />
+  return <img className="tpl-preview-img" src={LOOK_PREVIEW[look]} alt={`${look} -- ${desc}`} />
 }
 
 // Circles + Photo, Photo Focus, and Bold Stat each map to more than one real
@@ -74,9 +77,9 @@ function variantsFor(look: Look) {
 }
 
 function VariantMockup({ look, variant }: { look: Look; variant: TemplateVariant }) {
-  const preview = variantsFor(look).find((v) => v.title === variant)!.preview
+  const entry = variantsFor(look).find((v) => v.title === variant)!
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="tpl-preview-img" src={preview} alt="" />
+  return <img className="tpl-preview-img" src={entry.preview} alt={`${variant} -- ${entry.desc}`} />
 }
 
 export default function NewCarouselWizard({
@@ -168,7 +171,7 @@ export default function NewCarouselWizard({
               onClick={() => pickLook(l.title)}
             >
               <div className="pick-card-preview">
-                <LookMockup look={l.title} />
+                <LookMockup look={l.title} desc={l.desc} />
               </div>
             </div>
           ))}

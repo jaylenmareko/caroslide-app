@@ -122,19 +122,41 @@ export function createDurableObjectTokenLimiter(namespace: DurableObjectNamespac
       }
       await sleep(300 + Math.random() * 400)
     }
-    const result = await fn()
-    await stub
-      .fetch('http://anthropic-limiter/true-up', {
-        method: 'POST',
-        body: JSON.stringify({
-          windowStart,
-          estimatedInputTokens: estimate.inputTokens,
-          estimatedOutputTokens: estimate.outputTokens,
-          actualInputTokens: result.usage?.input_tokens,
-          actualOutputTokens: result.usage?.output_tokens,
-        }),
-      })
-      .catch(() => {})
-    return result
+    // Real bug found in review (2026-08-01): a thrown fn() (network error, exhausted SDK retries,
+    // a genuine 429) used to skip true-up entirely, permanently holding its full ESTIMATED
+    // reservation against this window's budget even though it consumed none of it -- exactly the
+    // kind of leaked-slot bug renderSemaphore.ts's lease/finally pattern already guards against,
+    // just missed here. try/finally with actual=0 on the error path releases the reservation back
+    // regardless of outcome, same discipline as the render lease's release.
+    try {
+      const result = await fn()
+      await stub
+        .fetch('http://anthropic-limiter/true-up', {
+          method: 'POST',
+          body: JSON.stringify({
+            windowStart,
+            estimatedInputTokens: estimate.inputTokens,
+            estimatedOutputTokens: estimate.outputTokens,
+            actualInputTokens: result.usage?.input_tokens,
+            actualOutputTokens: result.usage?.output_tokens,
+          }),
+        })
+        .catch(() => {})
+      return result
+    } catch (err) {
+      await stub
+        .fetch('http://anthropic-limiter/true-up', {
+          method: 'POST',
+          body: JSON.stringify({
+            windowStart,
+            estimatedInputTokens: estimate.inputTokens,
+            estimatedOutputTokens: estimate.outputTokens,
+            actualInputTokens: 0,
+            actualOutputTokens: 0,
+          }),
+        })
+        .catch(() => {})
+      throw err
+    }
   }
 }

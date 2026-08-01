@@ -71,19 +71,39 @@ export function createDurableObjectTokenLimiter(namespace: DurableObjectNamespac
       }
       await sleep(300 + Math.random() * 400)
     }
-    const result = await fn()
-    await stub
-      .fetch('http://anthropic-limiter/true-up', {
-        method: 'POST',
-        body: JSON.stringify({
-          windowStart,
-          estimatedInputTokens: estimate.inputTokens,
-          estimatedOutputTokens: estimate.outputTokens,
-          actualInputTokens: result.usage?.input_tokens,
-          actualOutputTokens: result.usage?.output_tokens,
-        }),
-      })
-      .catch(() => {})
-    return result
+    // Real bug found in review (2026-08-01), same fix as anthropicRateLimiter.ts's own client --
+    // a thrown fn() used to skip true-up entirely, permanently holding its full ESTIMATED
+    // reservation against this window's budget even though it consumed none of it. try/finally
+    // with actual=0 on the error path releases the reservation back regardless of outcome.
+    try {
+      const result = await fn()
+      await stub
+        .fetch('http://anthropic-limiter/true-up', {
+          method: 'POST',
+          body: JSON.stringify({
+            windowStart,
+            estimatedInputTokens: estimate.inputTokens,
+            estimatedOutputTokens: estimate.outputTokens,
+            actualInputTokens: result.usage?.input_tokens,
+            actualOutputTokens: result.usage?.output_tokens,
+          }),
+        })
+        .catch(() => {})
+      return result
+    } catch (err) {
+      await stub
+        .fetch('http://anthropic-limiter/true-up', {
+          method: 'POST',
+          body: JSON.stringify({
+            windowStart,
+            estimatedInputTokens: estimate.inputTokens,
+            estimatedOutputTokens: estimate.outputTokens,
+            actualInputTokens: 0,
+            actualOutputTokens: 0,
+          }),
+        })
+        .catch(() => {})
+      throw err
+    }
   }
 }

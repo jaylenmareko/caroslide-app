@@ -170,13 +170,6 @@ export default function NewCarouselWizard({
               <div className="pick-card-preview">
                 <LookMockup look={l.title} />
               </div>
-              <div className="title">
-                {l.title}
-                {l.title === RECOMMENDED_LOOK && (
-                  <span className="rec-badge show">Recommended</span>
-                )}
-              </div>
-              <div className="desc">{l.desc}</div>
             </div>
           ))}
         </div>
@@ -194,8 +187,6 @@ export default function NewCarouselWizard({
                 <div className="pick-card-preview">
                   <VariantMockup look={effectiveLook} variant={v.title} />
                 </div>
-                <div className="title">{v.title}</div>
-                <div className="desc">{v.desc}</div>
               </div>
             ))}
           </div>

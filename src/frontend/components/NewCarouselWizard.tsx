@@ -19,7 +19,7 @@ const LOOKS: { title: Look; desc: string }[] = [
 // what a user picks here is what the template actually looks like.
 const LOOK_PREVIEW: Record<Look, string> = {
   'Circles + Photo': '/template-previews/1-circles-photo.png',
-  'Photo Focus': '/template-previews/2-side-by-side.png',
+  'Photo Focus': '/template-previews/6-editorial.png',
   'Plain Text': '/template-previews/7-plain-text.png',
   'Bold Stat': '/template-previews/5-bold-stat.png',
   'Bold Hook': '/template-previews/12-hook-block.png',

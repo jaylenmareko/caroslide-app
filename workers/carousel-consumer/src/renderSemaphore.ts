@@ -27,22 +27,38 @@ export type DurableObjectNamespaceLike = {
 
 // Real measured ceiling for this account (pulled live from Cloudflare's own docs, 2026-08-01,
 // Workers Paid plan): 120 concurrent Browser Rendering sessions, 600 REST API requests/min (10/s).
-// The original value of 2 here was a guess ("Cloudflare's docs describe browser concurrency limits
-// in that range") made before that real number was confirmed -- it left ~98% of the account's real
-// capacity unused, which is the actual reason 1000 concurrent users would have queued for hours
-// instead of minutes. 20 leaves 6x headroom under the real 120-concurrent ceiling (room for
-// Jaylen's own manual testing/other traffic on the same account) and keeps sustained throughput
-// well under the 10 req/s REST cap even with retries factored in.
-const MAX_CONCURRENT = 20
+//
+// Real gap found in review (2026-08-01, following Jaylen's "1000 people at once shouldn't take
+// 35-40 minutes" pushback): a pure concurrency cap alone doesn't actually respect the 10 req/s
+// ceiling -- it only bounds how many renders are simultaneously IN FLIGHT, not the RATE at which
+// NEW ones start. Under real bursty load (many carousels' captions finishing around the same
+// moment), a concurrency cap of 20 (or even 60) can still legally let 20-60 brand-new render
+// requests fire within the same second the instant slots free up -- comfortably blowing past 10/s
+// even though "only 20 are in flight." This mirrors the exact class of gap already fixed for
+// Anthropic calls (concurrency alone isn't the same thing as a rolling-window rate budget) -- so
+// this DO now tracks BOTH: a real request-RATE window (requestTimestamps, 1s granularity, budgeted
+// at 8/s -- 80% of the real 10/s ceiling) in addition to the existing lease-based concurrency cap.
+//
+// MAX_CONCURRENT raised from 20 to 60 alongside this fix -- at ~7s/render, saturating an 8/s rate
+// budget needs ~56 renders genuinely in flight at once (8 * 7), so the OLD concurrency cap of 20
+// was itself the tighter, accidental bottleneck (throttling to ~2.9 renders/sec, far under what
+// the account can actually sustain). 60 leaves real headroom under the true 120-concurrent ceiling
+// while letting the new rate cap -- not an arbitrarily low concurrency number -- be the thing that
+// actually limits throughput.
+const MAX_CONCURRENT = 60
+const RATE_WINDOW_MS = 1000
+const RATE_BUDGET_PER_WINDOW = 8
 // Generous on purpose -- covers a render's own retry/backoff cascade (render.ts retries up to 4
 // times, a single 429 backoff alone can wait up to 90s) plus the render itself, with real headroom.
 const LEASE_DURATION_MS = 8 * 60 * 1000
 
 export class RenderSemaphore {
   leases: Map<string, number> // leaseId -> expiresAt (ms epoch)
+  requestTimestamps: number[] // ms epoch of each request granted in the current rate window
 
   constructor() {
     this.leases = new Map()
+    this.requestTimestamps = []
   }
 
   private pruneExpired() {
@@ -50,6 +66,7 @@ export class RenderSemaphore {
     for (const [id, expiresAt] of this.leases) {
       if (expiresAt <= now) this.leases.delete(id)
     }
+    this.requestTimestamps = this.requestTimestamps.filter((t) => now - t < RATE_WINDOW_MS)
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -60,8 +77,11 @@ export class RenderSemaphore {
     if (url.pathname === '/acquire') {
       this.pruneExpired()
       if (this.leases.size >= MAX_CONCURRENT) return json({ granted: false })
+      if (this.requestTimestamps.length >= RATE_BUDGET_PER_WINDOW) return json({ granted: false })
       if (!body.leaseId) return json({ granted: false })
-      this.leases.set(body.leaseId, Date.now() + LEASE_DURATION_MS)
+      const now = Date.now()
+      this.leases.set(body.leaseId, now + LEASE_DURATION_MS)
+      this.requestTimestamps.push(now)
       return json({ granted: true })
     }
 

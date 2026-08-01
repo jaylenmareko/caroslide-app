@@ -54,15 +54,23 @@ export default function SettingsForm({
   const [changingPassword, setChangingPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [passwordSaved, setPasswordSaved] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
+  // Real bug found in review (2026-08-01): this had no error branch at all -- a rejected
+  // updateUser (password too short/weak per Supabase's own server-side rule, a network error,
+  // an expired session) just silently did nothing. The button looked like it did nothing,
+  // with zero indication anything went wrong.
   async function handlePasswordSave() {
+    setPasswordError(null)
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (!error) {
-      setPasswordSaved(true)
-      setChangingPassword(false)
-      setNewPassword('')
+    if (error) {
+      setPasswordError(error.message)
+      return
     }
+    setPasswordSaved(true)
+    setChangingPassword(false)
+    setNewPassword('')
   }
 
   return (
@@ -100,18 +108,21 @@ export default function SettingsForm({
             <div className="label">Password</div>
           </div>
           {changingPassword ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="settings-input"
-                type="password"
-                placeholder="New password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                minLength={6}
-              />
-              <button className="settings-link-btn" onClick={handlePasswordSave}>
-                Save
-              </button>
+            <div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="settings-input"
+                  type="password"
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={6}
+                />
+                <button className="settings-link-btn" onClick={handlePasswordSave}>
+                  Save
+                </button>
+              </div>
+              {passwordError && <div className="auth-error" style={{ marginTop: 8, marginBottom: 0 }}>{passwordError}</div>}
             </div>
           ) : (
             <button className="settings-link-btn" onClick={() => setChangingPassword(true)}>

@@ -1,6 +1,5 @@
 import { createClient } from '@/backend/lib/supabase/server'
 import SettingsForm from '@/frontend/components/SettingsForm'
-import type { BrandKit } from '@/backend/lib/types'
 import type { Subscription } from '@/backend/lib/stripe'
 
 export default async function SettingsPage() {
@@ -8,12 +7,6 @@ export default async function SettingsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { data: brandKit } = await supabase
-    .from('brand_kits')
-    .select('*')
-    .eq('user_id', user!.id)
-    .maybeSingle()
 
   const { data: subscription } = await supabase
     .from('subscriptions')
@@ -31,7 +24,6 @@ export default async function SettingsPage() {
     <SettingsForm
       name={name}
       email={user!.email!}
-      brandKit={brandKit as BrandKit | null}
       subscription={subscription as Subscription | null}
       creditBalance={creditBalance}
     />

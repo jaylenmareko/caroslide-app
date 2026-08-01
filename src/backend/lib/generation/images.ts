@@ -231,6 +231,52 @@ async function firstUsablePhotoFromPages(candidateUrls: string[]): Promise<Usabl
   return null
 }
 
+async function trySourcingTiers(query: string): Promise<UsablePhoto | null> {
+  const pexelsUrls = await pexelsSearch(query)
+  for (const url of pexelsUrls) {
+    const result = await fetchAndValidateImage(url)
+    if (result) return result
+  }
+
+  const images = await tavilyImageSearch(query)
+  for (const image of images) {
+    const result = await fetchAndValidateImage(image.url)
+    if (result) return result
+  }
+
+  const candidatePages = await tavilyCandidateUrls(query)
+  return firstUsablePhotoFromPages(candidatePages)
+}
+
+/** Real bug found live (2026-07-31, Jaylen: "this cannot happen" -- a required visible photo slot,
+ * e.g. a cover slide's circle, shipping as a flat-color placeholder instead of a real photo):
+ * captions.ts sometimes writes an overly specific/awkward photoBrief (observed live: "web
+ * application error crash message on monitor close-up photo") that all 3 sourcing tiers search
+ * with the EXACT SAME narrow query -- if that specific phrase just isn't well-represented on
+ * Pexels/the open web, every tier fails together, there was no broader fallback. One cheap Haiku
+ * call (only on that rare failure, not on every photo) rewrites the brief into a much more
+ * generic, more searchable 2-4 word query for the same general subject -- e.g. "laptop screen" or
+ * "computer monitor" instead of the specific scene above -- and retries all 3 tiers once more with
+ * that before finally giving up to the placeholder. */
+async function broadenQuery(photoBrief: string): Promise<string | null> {
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 30,
+      messages: [
+        {
+          role: 'user',
+          content: `A photo search for "${photoBrief} photo" found nothing usable. Write a much simpler, more generic 2-4 word photo search query for roughly the same subject -- something a real stock photo library is likely to actually have. Reply with ONLY the simplified query, nothing else.`,
+        },
+      ],
+    })
+    const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim()
+    return text && text.length > 0 ? text : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Primary photo-sourcing entrypoint, three tiers in priority order (2026-07-21):
  *
@@ -246,23 +292,17 @@ async function firstUsablePhotoFromPages(candidateUrls: string[]): Promise<Usabl
  * 3. Tavily page-search + og:image scrape -- the original approach, ~50% hit rate alone but still
  *    a real working fallback when both of the above come up empty.
  *
- * All three share the same dimension + stock-domain validation via fetchAndValidateImage.
+ * All three share the same dimension + stock-domain validation via fetchAndValidateImage. A 4th,
+ * broadened-query retry (see broadenQuery's own comment) only fires if all 3 tiers fail the
+ * original brief -- the common case never pays for it.
  */
 export async function findUsablePhoto(photoBrief: string): Promise<UsablePhoto | null> {
   const query = `${photoBrief} photo`
+  const direct = await trySourcingTiers(query)
+  if (direct) return direct
 
-  const pexelsUrls = await pexelsSearch(query)
-  for (const url of pexelsUrls) {
-    const result = await fetchAndValidateImage(url)
-    if (result) return result
-  }
-
-  const images = await tavilyImageSearch(query)
-  for (const image of images) {
-    const result = await fetchAndValidateImage(image.url)
-    if (result) return result
-  }
-
-  const candidatePages = await tavilyCandidateUrls(query)
-  return firstUsablePhotoFromPages(candidatePages)
+  const broadened = await broadenQuery(photoBrief)
+  if (!broadened) return null
+  console.warn(`[generation] photo search broadened after a miss: "${photoBrief}" -> "${broadened}"`)
+  return trySourcingTiers(`${broadened} photo`)
 }

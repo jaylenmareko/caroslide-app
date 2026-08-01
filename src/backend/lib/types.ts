@@ -41,6 +41,12 @@ export type Carousel = {
   brand_colors: string[] | null
   logo_url: string | null
   font: string | null
+  // 2026-07-31 -- real generation runs in the background (ctx.waitUntil, see actions.ts's
+  // createCarousel) so the initial request can redirect here almost instantly instead of holding
+  // one HTTP request open for the full 2-3 minute pipeline (which Cloudflare's edge proxy can and
+  // did kill mid-flight). 'generating' until the background write lands, then 'ready'/'failed'.
+  status: 'generating' | 'ready' | 'failed'
+  error_message: string | null
   created_at: string
   updated_at: string
 }

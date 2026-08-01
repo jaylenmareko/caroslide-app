@@ -1,21 +1,26 @@
-import { createClient } from '@/backend/lib/supabase/server'
+import Link from 'next/link'
+import { getCarouselLimitStatus } from '@/backend/lib/actions'
 import NewCarouselWizard from '@/frontend/components/NewCarouselWizard'
-import type { BrandKit } from '@/backend/lib/types'
 
 export default async function NewCarouselPage(props: PageProps<'/new'>) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: brandKit } = await supabase
-    .from('brand_kits')
-    .select('*')
-    .eq('user_id', user!.id)
-    .maybeSingle()
-
   const { topic } = await props.searchParams
   const initialBrief = typeof topic === 'string' ? topic : undefined
 
-  return <NewCarouselWizard existingBrandKit={brandKit as BrandKit | null} initialBrief={initialBrief} />
+  // Proactive gate -- catches an exhausted free/paid account before they sink time into the
+  // whole wizard, rather than only after they click Generate on the last step. The atomic RPC
+  // in createCarousel is still the real enforcement; this is a UI courtesy check only.
+  const { atLimit, message } = await getCarouselLimitStatus()
+  if (atLimit) {
+    return (
+      <section className="new-section wrap">
+        <h1>You&apos;re out of carousels</h1>
+        <p className="lede">{message}</p>
+        <Link href="/settings" className="settings-save">
+          Go to Settings
+        </Link>
+      </section>
+    )
+  }
+
+  return <NewCarouselWizard initialBrief={initialBrief} />
 }

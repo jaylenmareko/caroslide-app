@@ -27,5 +27,16 @@
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
+	},
+	// Producer side only -- createCarousel enqueues a message here instead of running the real
+	// generation pipeline inline. ctx.waitUntil() (tried first, 2026-07-31) only buys 30s past the
+	// response before Cloudflare kills whatever's still running -- nowhere near enough for a real
+	// 2-3 minute generation. A Queue consumer is its own real Worker invocation with the normal
+	// full time budget, not bound by that 30s post-response cap. See workers/carousel-consumer/
+	// for the actual consumer that does the work.
+	"queues": {
+		"producers": [
+			{ "queue": "caroslide-carousel-generation", "binding": "CAROUSEL_QUEUE" }
+		]
 	}
 }

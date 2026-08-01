@@ -19,6 +19,8 @@ const MOCK: Carousel = {
   font: 'Inter Tight',
   slides: [1, 2, 3, 4, 5].map((i) => ({ url: `/mock/wagyuvalue-${i}.jpg` })),
   reference_images: [],
+  status: 'ready',
+  error_message: null,
   created_at: now,
   updated_at: now,
 }

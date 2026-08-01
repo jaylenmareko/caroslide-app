@@ -1,10 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/backend/lib/supabase/client'
-import { saveBrandKit, createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/backend/lib/actions'
-import type { BrandKit } from '@/backend/lib/types'
-import { MAX_ATTACHMENT_MB, BRAND_FONTS, DEFAULT_BRAND_FONT } from '@/backend/lib/types'
+import { createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/backend/lib/actions'
 import { PLAN_CAROUSEL_LIMITS, PLAN_PRICES, type Subscription, type Plan, type PackSize } from '@/backend/lib/plans'
 
 const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro' }
@@ -16,13 +14,11 @@ const PACK_OPTIONS: { size: PackSize; price: string }[] = [
 export default function SettingsForm({
   name,
   email,
-  brandKit,
   subscription,
   creditBalance,
 }: {
   name: string
   email: string
-  brandKit: BrandKit | null
   subscription: Subscription | null
   creditBalance: number
 }) {
@@ -59,15 +55,6 @@ export default function SettingsForm({
   const [newPassword, setNewPassword] = useState('')
   const [passwordSaved, setPasswordSaved] = useState(false)
 
-  const [colors, setColors] = useState<string[]>(brandKit?.colors ?? ['#5B7A5E', '#F1E6D2', '#16130f'])
-  const [logoUrl, setLogoUrl] = useState<string | null>(brandKit?.logo_url ?? null)
-  const [font, setFont] = useState(brandKit?.font ?? DEFAULT_BRAND_FONT)
-  const [voiceDescription, setVoiceDescription] = useState(brandKit?.voice_description ?? '')
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [logoError, setLogoError] = useState<string | null>(null)
-  const [brandSaved, setBrandSaved] = useState(false)
-  const logoInputRef = useRef<HTMLInputElement>(null)
-
   async function handlePasswordSave() {
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
@@ -78,57 +65,10 @@ export default function SettingsForm({
     }
   }
 
-  function handleLogoClick() {
-    logoInputRef.current?.click()
-  }
-
-  async function handleLogoSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-
-    setLogoError(null)
-
-    if (!file.type.startsWith('image/')) {
-      setLogoError('Logo must be an image file.')
-      return
-    }
-    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-      setLogoError(`Logo must be under ${MAX_ATTACHMENT_MB}MB.`)
-      return
-    }
-
-    setUploadingLogo(true)
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const path = `${user?.id}/logo-${crypto.randomUUID()}-${file.name}`
-    const { data, error } = await supabase.storage.from('carousel-uploads').upload(path, file)
-    setUploadingLogo(false)
-
-    if (error || !data) {
-      setLogoError('Upload failed — try again.')
-      return
-    }
-    const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(data.path)
-    setLogoUrl(pub.publicUrl)
-  }
-
-  function handleRemoveLogo() {
-    setLogoUrl(null)
-  }
-
-  async function handleBrandSave() {
-    await saveBrandKit({ colors, logoUrl, font, voiceDescription: voiceDescription.trim() || null })
-    setBrandSaved(true)
-    setTimeout(() => setBrandSaved(false), 2000)
-  }
-
   return (
     <section className="settings-section wrap">
       <h1>Settings</h1>
-      <p className="lede">Your account, brand defaults, and plan.</p>
+      <p className="lede">Your account and plan.</p>
 
       <div className="settings-block">
         <div className="settings-block-head">
@@ -179,121 +119,6 @@ export default function SettingsForm({
             </button>
           )}
         </div>
-      </div>
-
-      <div className="settings-block">
-        <div className="settings-block-head">
-          <div className="settings-block-icon">
-            <svg viewBox="0 0 24 24" width={17} height={17} fill="none">
-              <circle cx="7" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-              <circle cx="17" cy="6.5" r="2.4" stroke="currentColor" strokeWidth="1.8" />
-              <circle cx="17" cy="17.5" r="2.4" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
-          </div>
-          <div>
-            <h2>Brand Kit</h2>
-            <p className="sub">
-              Save your colors and logo once — every new carousel starts pre-filled with this instead of asking every time.
-            </p>
-          </div>
-        </div>
-
-        <div className="settings-field-label">Colors</div>
-        <div className="brand-color-picker">
-          {colors.map((c, i) => (
-            <div key={i} className="brand-color-card">
-              <label className="color-swatch-input" style={{ background: c }}>
-                <input
-                  type="color"
-                  value={c}
-                  aria-label={`Brand color ${i + 1}`}
-                  onChange={(e) => {
-                    const next = [...colors]
-                    next[i] = e.target.value
-                    setColors(next)
-                  }}
-                />
-              </label>
-              <input
-                type="text"
-                className="hex-input"
-                value={c}
-                aria-label={`Brand color ${i + 1} hex code`}
-                maxLength={7}
-                placeholder="#000000"
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const v = '#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)
-                  const next = [...colors]
-                  next[i] = v
-                  setColors(next)
-                }}
-              />
-              <div className="brand-color-label">Color {i + 1}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="settings-field-label">Logo</div>
-        <input
-          ref={logoInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={handleLogoSelected}
-        />
-        {logoUrl ? (
-          <div className="brand-logo-preview">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt="Brand logo" />
-            <div className="brand-logo-preview-actions">
-              <button type="button" className="settings-link-btn" onClick={handleLogoClick}>
-                Replace
-              </button>
-              <button type="button" className="settings-link-btn danger" onClick={handleRemoveLogo}>
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="brand-logo-upload" onClick={handleLogoClick}>
-            {uploadingLogo ? 'Uploading…' : 'Drop your logo here, or click to upload'}
-          </div>
-        )}
-        {logoError && <p className="attach-limit-error">{logoError}</p>}
-
-        <div className="settings-field-label">Font</div>
-        <div className="brand-font-row">
-          {BRAND_FONTS.map((f) => (
-            <button
-              type="button"
-              key={f.name}
-              className={`brand-font-chip${font === f.name ? ' selected' : ''}`}
-              style={{ fontFamily: f.cssVar }}
-              onClick={() => setFont(f.name)}
-            >
-              {f.name}
-            </button>
-          ))}
-        </div>
-        <p className="wiz-step-hint" style={{ margin: '0 0 18px' }}>
-          Skip this and every carousel uses {DEFAULT_BRAND_FONT} by default.
-        </p>
-
-        <div className="settings-field-label">Voice &amp; Tone</div>
-        <textarea
-          className="settings-textarea"
-          placeholder="Who you are, who you're talking to, and how you sound — a founder detail, your real audience, a phrase you always use. This shapes the topic and tone of every carousel."
-          value={voiceDescription}
-          onChange={(e) => setVoiceDescription(e.target.value)}
-        />
-        <p className="wiz-step-hint" style={{ margin: '0 0 18px' }}>
-          Optional, but the more specific the better — a real detail beats a generic description.
-        </p>
-
-        <button className="settings-save" onClick={handleBrandSave}>
-          {brandSaved ? 'Saved ✓' : 'Save brand kit'}
-        </button>
       </div>
 
       <div className="settings-block">

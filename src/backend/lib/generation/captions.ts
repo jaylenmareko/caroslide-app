@@ -1,17 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
-import { readFile } from 'fs/promises'
-import path from 'path'
 import type { Angle, Format, Look, TemplateVariant } from '@/backend/lib/types'
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { loadTemplate, requiredPlaceholderFields } from './render'
 import { tavilySearch } from './research'
 import { photosNeeded } from './images'
 import { EDITABLE_FIELDS } from './editableFields'
+import { REFERENCE_DOCS } from './referenceDocs.generated'
 
 const anthropic = new Anthropic()
-const REFERENCE_DIR = path.join(process.cwd(), 'reference')
 
 // Measured live (2026-07-20): the full reference docs run the system prompt to ~21.8k input
 // tokens, and the model was reliably returning a real title but completely empty photoBriefs/
@@ -171,6 +169,111 @@ export type GeneratedCarousel = {
 // call instead of once) but no wall-clock cost -- the 5 calls run in parallel, same as the
 // already-parallelized photo/render work in pipeline.ts.
 
+const CLASSIFY_MODEL = 'claude-haiku-4-5-20251001'
+
+const AngleClassification = z.object({ angle: z.string() })
+
+// Same 3 descriptions the wizard used to show a user picking manually -- kept identical so
+// removing the question doesn't change what each angle actually means, just who decides it.
+const ANGLE_DESCRIPTIONS: Record<Angle, string> = {
+  Value: 'Direct tips, no story -- a straightforward list of practical advice.',
+  Growth: 'A hook that builds into a story -- narrative arc, personal or brand journey.',
+  Education: 'A real fact, explained -- teaches something specific and true.',
+}
+
+/**
+ * Picks the content angle on the user's behalf (2026-08-01) -- a real usability test found a
+ * first-time user with zero product context got stuck on "Value vs. Growth vs. Education" as the
+ * very first thing the wizard asked, before she even understood what the product was. The
+ * distinction is real and still drives the whole caption arc (see the "Content strategy" section
+ * built below in generateCaptions) -- taking it off the user just means an AI call decides it
+ * instead of a cold, uninformed guess, the same way this pipeline already decides photos, copy,
+ * and layout details on the user's behalf.
+ */
+export async function classifyAngle(brief: string): Promise<Angle> {
+  const systemPrompt = `Pick the single best content angle for a 5-slide social media carousel, based on the brief below. Choose exactly one of:
+
+${(Object.entries(ANGLE_DESCRIPTIONS) as [Angle, string][]).map(([a, d]) => `- ${a}: ${d}`).join('\n')}
+
+## Brief
+
+${brief || '(no brief given -- pick whichever angle best fits a generic, broadly appealing post)'}`
+
+  const format = zodOutputFormat(AngleClassification)
+  const message = await anthropic.messages.create({
+    model: CLASSIFY_MODEL,
+    max_tokens: 128,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: 'Pick the angle now.' }],
+    output_config: { format },
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  const parsed = format.parse(text)
+  // No real schema-level enum constraint survives this SDK's zod conversion (same bug class
+  // documented throughout this file) -- validate defensively, fall back to the simplest/safest
+  // angle rather than trust the model never invents a 4th value.
+  const valid: Angle[] = ['Value', 'Growth', 'Education']
+  return valid.includes(parsed.angle as Angle) ? (parsed.angle as Angle) : 'Value'
+}
+
+const ColorClassification = z.object({ paletteId: z.string() })
+
+// Caroslide's own real brand colors -- matches globals.css's --green/--green-bright (the actual
+// app-wide accent, not a placeholder), used as both the "no signal" fallback and the "caroslide"
+// palette choice below.
+const CAROSLIDE_PRIMARY = '#512888'
+const CAROSLIDE_SECONDARY = '#38BDF8'
+
+// A curated set, not free-form hex generation (2026-08-01, Brand Kit removed for v1) -- an LLM
+// asked to invent arbitrary hex codes reliably produces muddy or illegible combinations; picking
+// from a small set of real, pre-designed pairs is far more reliable while still being "based on
+// the message," per Jaylen's direction.
+const CURATED_PALETTES: Record<string, { primary: string; secondary: string; desc: string }> = {
+  caroslide: { primary: CAROSLIDE_PRIMARY, secondary: CAROSLIDE_SECONDARY, desc: "Caroslide's own default -- use this when the brief gives no real color/mood/industry signal" },
+  earthy: { primary: '#5B7A5E', secondary: '#F1E6D2', desc: 'Warm, natural, grounded -- wellness, food, agriculture, sustainability' },
+  tech: { primary: '#2563EB', secondary: '#38BDF8', desc: 'Cool, sharp, modern -- software, AI, startups, productivity' },
+  bold: { primary: '#DC2626', secondary: '#F59E0B', desc: 'High-energy, urgent, confident -- fitness, sales, hot takes' },
+  luxury: { primary: '#78350F', secondary: '#D4AF37', desc: 'Elegant, premium -- fashion, finance, high-end services' },
+  playful: { primary: '#DB2777', secondary: '#FBBF24', desc: 'Fun, youthful, energetic -- entertainment, social, lifestyle' },
+  calm: { primary: '#0F766E', secondary: '#A7F3D0', desc: 'Soothing, trustworthy -- healthcare, mindfulness, financial advice' },
+}
+
+/**
+ * Picks PRIMARY/SECONDARY accent colors from the brief instead of asking the user upfront
+ * (2026-08-01, Brand Kit removed for v1 -- Jaylen's direction: "pick the text colors for them
+ * based on their message... if we can't gather anything from the message then default to
+ * caroslide colors"). Skips the AI call entirely on an empty brief -- there's nothing to infer
+ * from, and the "caroslide" palette IS the defined default for exactly that case.
+ */
+export async function classifyColors(brief: string): Promise<{ primary: string; secondary: string }> {
+  if (!brief.trim()) return { primary: CAROSLIDE_PRIMARY, secondary: CAROSLIDE_SECONDARY }
+
+  const systemPrompt = `Pick the single best color palette for a social media carousel, based on the brief below. Choose exactly one palette ID:
+
+${Object.entries(CURATED_PALETTES).map(([id, p]) => `- ${id}: ${p.desc}`).join('\n')}
+
+If the brief gives no real signal about mood, industry, or vibe, choose "caroslide".
+
+## Brief
+
+${brief}`
+
+  const format = zodOutputFormat(ColorClassification)
+  const message = await anthropic.messages.create({
+    model: CLASSIFY_MODEL,
+    max_tokens: 128,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: 'Pick the palette now.' }],
+    output_config: { format },
+  })
+  const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
+  const parsed = format.parse(text)
+  // Same defensive-validation discipline as classifyAngle above -- fall back to the real default
+  // palette rather than trust the model never invents an unlisted paletteId.
+  const palette = CURATED_PALETTES[parsed.paletteId] ?? CURATED_PALETTES.caroslide
+  return { primary: palette.primary, secondary: palette.secondary }
+}
+
 export async function generateCaptions(input: {
   angle: Angle
   format: Format
@@ -183,10 +286,13 @@ export async function generateCaptions(input: {
   const templateFile = templateFileFor(input.look, input.templateVariant)
   const photoCount = photosNeeded(input.templateVariant, input.look)
 
-  const [contentStrategies, templatesGuideFull, generationBehaviorFull, templateHtml, ctaHtml] = await Promise.all([
-    readFile(path.join(REFERENCE_DIR, 'content-strategies.md'), 'utf-8'),
-    readFile(path.join(REFERENCE_DIR, 'templates-guide.md'), 'utf-8'),
-    readFile(path.join(REFERENCE_DIR, 'initial-generation-behavior.md'), 'utf-8'),
+  // Bundled as plain string constants (referenceDocs.generated.ts), not read from disk at
+  // request time -- Cloudflare Workers has no real filesystem at runtime, same reason
+  // loadTemplate's HTML templates are pre-generated too (see generate-reference.mjs's comment).
+  const contentStrategies = REFERENCE_DOCS['content-strategies.md']
+  const templatesGuideFull = REFERENCE_DOCS['templates-guide.md']
+  const generationBehaviorFull = REFERENCE_DOCS['initial-generation-behavior.md']
+  const [templateHtml, ctaHtml] = await Promise.all([
     loadTemplate(templateFile),
     loadTemplate(CTA_TEMPLATE),
   ])

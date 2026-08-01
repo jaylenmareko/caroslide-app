@@ -128,23 +128,23 @@ function Step3Carousel({ images }: { images: string[] }) {
 const FAQS = [
   {
     q: 'What is Caroslide and how does it work?',
-    a: 'Pick an angle (Value, Growth, or Education) and a look. Tell us about your brand. Caroslide writes the copy, designs the slides, and hands you five finished images — ready to post.',
+    a: 'Pick a look, tell us what you want to post about — a topic, an idea, or a brand if you have one — and Caroslide writes the copy, designs the slides, and hands you five finished images, ready to post.',
   },
   {
     q: 'Do I need to write or design anything myself?',
-    a: 'No — Caroslide handles the writing and design. But you still make the calls that matter: the angle, the look, and any change you want in chat afterward. You’re not filling in blanks, and you’re not stuck with the first draft either.',
+    a: 'No — Caroslide handles the writing and design. But you still make the calls that matter: the look, and any change you want in chat afterward. You’re not filling in blanks, and you’re not stuck with the first draft either.',
   },
   {
     q: 'What if I don’t like the first draft?',
     a: 'Tell the chat what to change — "punchier hook on slide 2," "swap the CTA" — and it edits the draft in place. No re-generating from scratch.',
   },
   {
-    q: 'Can I use my own brand colors and photos?',
-    a: 'Yes — attach reference photos and describe your brand colors/voice in the composer, or save them once in Settings → Brand Kit so every new carousel starts pre-filled.',
+    q: 'Can I use my own brand colors?',
+    a: 'Not manually yet — Caroslide picks colors that fit the mood of what you\'re posting about, and falls back to its own palette if there\'s no clear signal. Manual brand controls are on the roadmap.',
   },
   {
     q: 'How is this different from Canva or a template app?',
-    a: 'Template tools hand you a blank layout. Full-auto tools hand you a finished post and hope it sounds like you. Caroslide sits in between — it writes, designs, and picks photos from your angle, then lets you redirect anything in plain chat until it actually sounds like your brand.',
+    a: 'Template tools hand you a blank layout. Full-auto tools hand you a finished post and hope it sounds like you. Caroslide sits in between — it writes, designs, and picks the photos, then lets you redirect anything in plain chat until it actually sounds like your brand.',
   },
 ]
 
@@ -184,11 +184,8 @@ export default function MarketingPage() {
         <h1>
           <HeroWords text="The AI that makes your carousels for you." />
         </h1>
-        <p className="lp-hero-sub">
-          Pick the angle. Caroslide handles the writing, design, and format — the voice stays yours.
-        </p>
         <div className="lp-hero-cta">
-          <span className="pill-label">Drop your topic or brand & watch what happens.</span>
+          <span className="pill-label">Type anything you want to post about & watch what happens.</span>
           <form
             className="lp-hero-form"
             onSubmit={(e) => {
@@ -198,7 +195,7 @@ export default function MarketingPage() {
           >
             <input
               type="text"
-              placeholder="e.g. wagyuwellnessco.com, or paste a topic…"
+              placeholder="What do you want?"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
             />
@@ -208,9 +205,6 @@ export default function MarketingPage() {
               </svg>
             </button>
           </form>
-          <p className="lp-hero-microcopy">
-            No brand yet? <Link href="/login?mode=signup">Just tell us about it</Link>
-          </p>
         </div>
 
         <MarqueeRow images={MARQUEE_IMAGES} />
@@ -221,7 +215,7 @@ export default function MarketingPage() {
           <h2>
             Real carousels, <span className="accent">not templates.</span>
           </h2>
-          <p>Caroslide handles the writing, the design, and the format — you just pick the angle.</p>
+          <p>Caroslide handles the writing, the design, and the format — you just pick the look.</p>
         </Reveal>
 
         <Reveal className="lp-step-row">
@@ -231,14 +225,16 @@ export default function MarketingPage() {
           </div>
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 1</span>
-            <h3>Pick your angle</h3>
-            <p>Value, Growth, or Education — plus the format and look that fits what you&apos;re posting.</p>
+            <h3>Pick a look</h3>
           </div>
           <div className="lp-step-visual">
-            <div className="pick-row" style={{ marginBottom: 0 }}>
-              <div className="pick-card selected"><div className="title">Value</div><div className="desc">Direct tips, no story.</div></div>
-              <div className="pick-card"><div className="title">Growth</div><div className="desc">A hook that builds into a story.</div></div>
-              <div className="pick-card"><div className="title">Education</div><div className="desc">A real fact, explained.</div></div>
+            <div className="lp-look-covers">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="lp-look-cover-img" src="/template-previews/8-photo-grid.png" alt="Photo Focus, Photo Grid style" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="lp-look-cover-img" src="/template-previews/6-editorial.png" alt="Photo Focus, Editorial style" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="lp-look-cover-img" src="/template-previews/11-single-circle-left.png" alt="Circles + Photo, Spotlight Left style" />
             </div>
           </div>
         </Reveal>
@@ -250,17 +246,12 @@ export default function MarketingPage() {
           </div>
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 2</span>
-            <h3>Tell us everything</h3>
-            <p>Brand colors, photos, links, tone — the more you give us, the less back-and-forth later.</p>
+            <h3>Tell us what you want</h3>
           </div>
           <div className="lp-step-visual">
             <div className="new-composer-box" style={{ marginBottom: 0 }}>
-              <textarea rows={3} readOnly value="Cream + forest-green earth tones. Minimal, confident, a little playful — never corporate-stiff." />
-              <div className="composer-bottom-row">
-                <button type="button" className="composer-attach-btn" disabled>
-                  <svg viewBox="0 0 24 24" fill="none"><path d="M21 12.5V7a4 4 0 0 0-4-4h-1M3 11.5V17a4 4 0 0 0 4 4h10a4 4 0 0 0 4-4v-1M9 3H8a4 4 0 0 0-4 4v5M8 13l2.5-2.5a2 2 0 0 1 2.8 0L17 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><circle cx="8" cy="8" r="1.5" fill="currentColor" /></svg>
-                  Attach photos
-                </button>
+              <textarea rows={3} readOnly value="5 things nobody tells you about pricing your first product" />
+              <div className="composer-bottom-row" style={{ justifyContent: 'flex-end' }}>
                 <button className="composer-send-btn" disabled aria-label="Generate">
                   <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
@@ -276,7 +267,6 @@ export default function MarketingPage() {
           <div className="lp-step-text">
             <span className="lp-step-badge">Step 3</span>
             <h3>Get 5 slides, ready to post</h3>
-            <p>No template to fill in — real, finished slides in your brand, in about a minute.</p>
           </div>
           <div className="lp-step-visual" style={{ display: 'flex', justifyContent: 'center' }}>
             <Step3Carousel images={STEP3_SLIDES} />
@@ -317,7 +307,7 @@ export default function MarketingPage() {
           <p>
             We looked at the other carousel tools out there. Every one of them hands you a template and expects
             you to write the copy, pick the photos, and design the layout yourself. Caroslide does all of that —
-            you just pick the angle.
+            you just pick the look.
           </p>
           <blockquote>
             &ldquo;They all have the same concept. They give a template and you do the rest. None have incorporated AI yet.&rdquo;

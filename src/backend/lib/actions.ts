@@ -2,9 +2,13 @@
 
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createClient } from '@/backend/lib/supabase/server'
-import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
-import { generateCarousel, renderAndGuard } from '@/backend/lib/generation/pipeline'
+import type { Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
+import { DEFAULT_BRAND_FONT } from '@/backend/lib/types'
+import { renderAndGuard } from '@/backend/lib/generation/pipeline'
+import type { CarouselGenerationJob } from '@/backend/lib/generation/runGeneration'
+import { classifyAngle, classifyColors } from '@/backend/lib/generation/captions'
 import {
   classifyEdit,
   rewriteCopy,
@@ -60,7 +64,11 @@ export async function createCheckoutSession(plan: Plan) {
       : { customer_email: user!.email }),
     client_reference_id: user!.id,
     subscription_data: { metadata: { user_id: user!.id } },
-    success_url: `${origin}/settings?checkout=success`,
+    // Dashboard, not Settings (2026-08-01, Jaylen: one path regardless of entry point) -- checkout
+    // can be started either from Settings directly or from the free-tier wall on /new (which links
+    // to Settings), but there's only this one real success_url either way, so redirecting it to
+    // /dashboard already unifies both without any extra branching.
+    success_url: `${origin}/dashboard?checkout=success`,
     cancel_url: `${origin}/settings`,
   })
 
@@ -94,7 +102,7 @@ export async function createPackCheckoutSession(size: PackSize) {
       : { customer_email: user!.email }),
     client_reference_id: user!.id,
     metadata: { user_id: user!.id, credit_quantity: String(size) },
-    success_url: `${origin}/settings?checkout=success`,
+    success_url: `${origin}/dashboard?checkout=success`,
     cancel_url: `${origin}/settings`,
   })
 
@@ -126,16 +134,78 @@ export async function createPortalSession() {
   redirect(session.url)
 }
 
+// Real, Stripe-tied plan enforcement (2026-07-26) -- replaces the old flat 20-per-account
+// stopgap. Free/past_due/no-subscription accounts get a lifetime cap (matches the marketing
+// page's "1 carousel free when you sign up"); an active paid plan gets a per-billing-period cap
+// instead, counted from carousels created since current_period_start -- not a stored counter, so
+// it can't drift out of sync with what Stripe actually reports.
+//
+// Shared by createCarousel's real (consuming) check and getCarouselLimitStatus's read-only peek,
+// so the two can never quietly disagree on what "at limit" means.
+async function resolvePlanLimit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<{ isActivePaid: boolean; limit: number; periodStart: string | null }> {
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('plan, status, current_period_start')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  const isActivePaid = !!(subscription?.status === 'active' && subscription.plan)
+  // Falls back to the free limit (fail closed) on any plan value PLAN_CAROUSEL_LIMITS doesn't
+  // recognize -- a stale/out-of-band DB value (e.g. the pre-2026-07-27 'unlimited' plan the schema
+  // used to allow) must never silently grant unlimited generation just because the lookup misses.
+  const limit = isActivePaid
+    ? (PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] ?? FREE_LIFETIME_CAROUSEL_LIMIT)
+    : FREE_LIFETIME_CAROUSEL_LIMIT
+
+  return {
+    isActivePaid,
+    limit,
+    periodStart: isActivePaid && subscription!.current_period_start ? subscription!.current_period_start : null,
+  }
+}
+
+function limitExceededMessage(isActivePaid: boolean, limit: number): string {
+  return isActivePaid
+    ? `You've used all ${limit} carousels for this billing period. It renews automatically, or buy a carousel pack in Settings.`
+    : `You've used your free carousel. Upgrade or buy a carousel pack in Settings.`
+}
+
+// Read-only peek at whether the account is at its carousel limit, purely to gate the "New
+// Carousel" entry point in the UI before a free/exhausted-paid user sinks time into the whole
+// wizard. NOT the enforcement boundary -- createCarousel's atomic RPC below is the only thing
+// that actually decides and consumes; this can theoretically be stale by the time they submit
+// (e.g. a pack purchase completes in another tab), which is fine for a UI hint and would never be
+// fine for the real check.
+export async function getCarouselLimitStatus(): Promise<{ atLimit: boolean; message: string | null }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { atLimit: false, message: null }
+
+  const { isActivePaid, limit, periodStart } = await resolvePlanLimit(supabase, user.id)
+
+  let countQuery = supabase.from('carousels').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+  if (periodStart) countQuery = countQuery.gte('created_at', periodStart)
+  const { count } = await countQuery
+  if ((count ?? 0) < limit) return { atLimit: false, message: null }
+
+  const { data: ledgerRows } = await supabase.from('credit_ledger').select('delta').eq('user_id', user.id)
+  const creditBalance = (ledgerRows ?? []).reduce((sum, row) => sum + row.delta, 0)
+  if (creditBalance > 0) return { atLimit: false, message: null }
+
+  return { atLimit: true, message: limitExceededMessage(isActivePaid, limit) }
+}
+
 export async function createCarousel(input: {
-  angle: Angle
   format: Format
   look: Look
   templateVariant: TemplateVariant | null
   brief: string
   referenceImageUrls: string[]
-  brandColors: string[]
-  logoUrl: string | null
-  font: string
 }) {
   const supabase = await createClient()
   const {
@@ -144,24 +214,7 @@ export async function createCarousel(input: {
 
   if (!user) redirect('/login')
 
-  // Real, Stripe-tied plan enforcement (2026-07-26) -- replaces the old flat 20-per-account
-  // stopgap. Free/past_due/no-subscription accounts get a lifetime cap (matches the marketing
-  // page's "1 carousel free when you sign up"); an active paid plan gets a per-billing-period cap
-  // instead, counted from carousels created since current_period_start -- not a stored counter, so
-  // it can't drift out of sync with what Stripe actually reports.
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan, status, current_period_start')
-    .eq('user_id', user!.id)
-    .maybeSingle()
-
-  const isActivePaid = subscription?.status === 'active' && subscription.plan
-  // Falls back to the free limit (fail closed) on any plan value PLAN_CAROUSEL_LIMITS doesn't
-  // recognize -- a stale/out-of-band DB value (e.g. the pre-2026-07-27 'unlimited' plan the schema
-  // used to allow) must never silently grant unlimited generation just because the lookup misses.
-  const limit = isActivePaid
-    ? (PLAN_CAROUSEL_LIMITS[subscription!.plan as Plan] ?? FREE_LIFETIME_CAROUSEL_LIMIT)
-    : FREE_LIFETIME_CAROUSEL_LIMIT
+  const { isActivePaid, limit, periodStart } = await resolvePlanLimit(supabase, user!.id)
 
   // Real bug found in code review (2026-07-30): counting existing carousels, checking the credit
   // balance, and inserting the consumption row used to be three separate round trips with the real
@@ -171,15 +224,11 @@ export async function createCarousel(input: {
   // closing that race.
   const { data: limitCheck, error: limitError } = await supabase.rpc('check_and_consume_carousel_limit', {
     p_limit: limit,
-    p_period_start: isActivePaid && subscription!.current_period_start ? subscription!.current_period_start : null,
+    p_period_start: periodStart,
   })
   if (limitError) throw new Error(`Failed to check carousel limit: ${limitError.message}`)
   if (!limitCheck?.[0]?.allowed) {
-    throw new Error(
-      isActivePaid
-        ? `You've used all ${limit} carousels for this billing period. It renews automatically, or buy a carousel pack in Settings.`
-        : `You've used your free carousel. Upgrade or buy a carousel pack in Settings.`
-    )
+    throw new Error(limitExceededMessage(isActivePaid, limit))
   }
 
   // voice_description is read live from the account's brand_kits row, not snapshotted onto the
@@ -192,76 +241,90 @@ export async function createCarousel(input: {
     .eq('user_id', user!.id)
     .maybeSingle()
 
-  const generated = await generateCarousel({
-    angle: input.angle,
+  // Angle (Value/Growth/Education) is no longer a wizard question (2026-08-01) -- a real
+  // usability test found a first-time user with zero context got stuck on that exact choice
+  // before she understood what the product even was. An AI call decides it instead, same as
+  // every other judgment call this pipeline already makes on the user's behalf.
+  const angle = await classifyAngle(input.brief)
+  // Same reasoning for colors (Brand Kit removed for v1 entirely, see classifyColors' own
+  // comment) -- picked from the brief instead of a Settings/wizard color picker.
+  const { primary, secondary } = await classifyColors(input.brief)
+  const brandColors = [primary, secondary]
+  // Logo: free accounts show the Caroslide wordmark (buildBrandValues' existing fallback,
+  // unchanged), paid accounts get a genuinely blank logo slot -- Jaylen's direction. No custom
+  // logo upload exists anymore in v1, so logoUrl itself is always null; suppressLogoFallback is
+  // what actually distinguishes the two cases.
+  const font = DEFAULT_BRAND_FONT
+
+  // One folder per carousel (not one random folder per slide, the previous behavior) -- keeps a
+  // carousel's slides grouped together in Storage, and gives runCarouselGeneration's (the Queue
+  // consumer's) own partial-failure cleanup a single known prefix to target instead of no way to
+  // find what was already uploaded.
+  const carouselId = crypto.randomUUID()
+
+  const { error: insertError } = await supabase.from('carousels').insert({
+    // Explicit, not the column's own default -- matches the Storage folder name above, so
+    // deleteCarousel can find and remove this carousel's images by a single known prefix instead
+    // of having no way to associate a DB row with its own uploaded files.
+    id: carouselId,
+    user_id: user!.id,
+    title: input.brief.trim().slice(0, 60) || `${angle} carousel`,
+    angle,
+    format: input.format,
+    look: input.look,
+    template_variant: input.templateVariant,
+    brief: input.brief,
+    slides: [],
+    reference_images: input.referenceImageUrls.map((url) => ({ url })),
+    // Snapshotted here, not read live from brand_kits at generation time --
+    // see the Carousel type's brand_colors/logo_url/font comment.
+    brand_colors: brandColors,
+    logo_url: null,
+    font,
+    status: 'generating',
+  })
+  if (insertError) throw new Error(insertError.message)
+
+  // Real generation work happens in workers/carousel-consumer/, a separate Cloudflare Worker that
+  // consumes this queue -- NOT via ctx.waitUntil() (tried first, 2026-07-31): that only buys ~30s
+  // past this response before Cloudflare kills whatever's still running, nowhere near enough for a
+  // real 2-3 minute generation. A Queue consumer is its own real Worker invocation with the normal
+  // full time budget, so there's no risk of the render step getting silently cut off mid-flight.
+  const job: CarouselGenerationJob = {
+    carouselId,
+    userId: user!.id,
+    angle,
     format: input.format,
     look: input.look,
     templateVariant: input.templateVariant,
     brief: input.brief,
     voiceDescription: brandKit?.voice_description ?? null,
     referenceImageUrls: input.referenceImageUrls,
-    brandColors: input.brandColors,
-    logoUrl: input.logoUrl,
-    font: input.font,
-  })
-
-  // One folder per carousel (not one random folder per slide, the previous behavior) -- keeps a
-  // carousel's slides grouped together in Storage, and gives partial-failure cleanup below a
-  // single known prefix to target instead of no way to find what was already uploaded.
-  const carouselId = crypto.randomUUID()
-  const uploadedPaths: string[] = []
-  const slides = []
-  try {
-    for (let i = 0; i < generated.slides.length; i++) {
-      const slide = generated.slides[i]
-      const path = `${user!.id}/${carouselId}/slide-${i + 1}.jpg`
-      const { error: uploadError } = await supabase.storage
-        .from('carousel-slides')
-        .upload(path, slide.png, { contentType: 'image/jpeg' })
-      if (uploadError) throw new Error(`Slide ${i + 1} upload failed: ${uploadError.message}`)
-      uploadedPaths.push(path)
-
-      const { data: pub } = supabase.storage.from('carousel-slides').getPublicUrl(path)
-      slides.push({ url: pub.publicUrl, template: slide.template, values: slide.values })
-    }
-  } catch (error) {
-    // A later slide failing shouldn't leave earlier slides' real uploads orphaned in Storage with
-    // no DB row ever created to reference them -- best-effort cleanup, then let the real error
-    // surface (this is a resource-leak fix, not something that should mask the actual failure).
-    if (uploadedPaths.length > 0) {
-      await supabase.storage.from('carousel-slides').remove(uploadedPaths)
-    }
-    throw error
+    brandColors,
+    font,
+    suppressLogoFallback: isActivePaid,
   }
+  const { env } = await getCloudflareContext({ async: true })
+  await env.CAROUSEL_QUEUE.send(job)
 
+  redirect(`/carousel/${carouselId}`)
+}
+
+// Lightweight poll target for the carousel page's "generating" state -- just the fields that
+// actually change once runCarouselGeneration finishes, not the whole row. Uses the normal
+// request-scoped client (RLS-governed, same as every other read here), unlike
+// runCarouselGeneration's background write.
+export async function getCarouselGenerationStatus(
+  id: string
+): Promise<{ status: 'generating' | 'ready' | 'failed'; title: string; slides: Slide[]; error_message: string | null }> {
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('carousels')
-    .insert({
-      // Explicit, not the column's own default -- matches the Storage folder name above, so
-      // deleteCarousel below can find and remove this carousel's images by a single known prefix
-      // instead of having no way to associate a DB row with its own uploaded files.
-      id: carouselId,
-      user_id: user!.id,
-      title: generated.title || input.brief.trim().slice(0, 60) || `${input.angle} carousel`,
-      angle: input.angle,
-      format: input.format,
-      look: input.look,
-      template_variant: input.templateVariant,
-      brief: input.brief,
-      slides,
-      reference_images: input.referenceImageUrls.map((url) => ({ url })),
-      // Snapshotted here, not read live from brand_kits at generation time --
-      // see the Carousel type's brand_colors/logo_url/font comment.
-      brand_colors: input.brandColors,
-      logo_url: input.logoUrl,
-      font: input.font,
-    })
-    .select('id')
+    .select('status, title, slides, error_message')
+    .eq('id', id)
     .single()
-
   if (error) throw new Error(error.message)
-
-  redirect(`/carousel/${data.id}`)
+  return data
 }
 
 export async function updateCarouselTitle(id: string, title: string) {
@@ -394,17 +457,14 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     }
   }
   if (classification.editType === 'brand_kit_redirect') {
-    // Real gap found live (2026-07-28): the old message just pointed at Brand Kit, but
-    // brand_colors/logo_url/font are snapshotted onto THIS carousel at creation time (types.ts),
-    // never read live off brand_kits again -- so a Brand Kit change genuinely does nothing to a
-    // carousel that already exists, only to carousels created after the change. The old message
-    // sent someone on a dead-end errand for what they actually asked. Now says that plainly instead
-    // of guessing at a fix for the underlying limitation (background/border color changes on an
-    // existing carousel are a separate, unbuilt feature -- see chat-editing-behavior.md's scope).
+    // Message updated 2026-08-01 (Brand Kit removed for v1) -- there's no Brand Kit settings page
+    // to point to anymore. Colors/font/logo are locked in per-carousel at creation time (colors
+    // AI-picked from the brief, font always the default, logo either the Caroslide wordmark or
+    // blank by plan) and aren't user-editable at all yet, on this carousel or any other.
     return {
       type: 'redirect',
       message:
-        "This carousel's brand colors, logo, and font are locked in from when it was created -- Brand Kit only changes carousels made after you update it, not this one. There's no way to change those on an existing carousel yet.",
+        "This carousel's colors, logo, and font are set automatically when it's created and can't be changed yet -- try describing a change to specific text or a photo instead.",
     }
   }
   if (classification.editType === 'template_change') {

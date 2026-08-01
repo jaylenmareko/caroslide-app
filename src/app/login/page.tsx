@@ -80,6 +80,10 @@ function LoginForm() {
 
     if (mode === 'signup') {
       const confirmUrl = new URL('/auth/confirm', window.location.origin)
+      // Always set at least one param so the confirm-signup email template (which appends
+      // &token_hash=...&type=signup to {{ .RedirectTo }}) never has to guess whether to use
+      // "?" or "&" -- it always has this to safely append onto.
+      confirmUrl.searchParams.set('src', 'email')
       if (topic) confirmUrl.searchParams.set('topic', topic)
 
       const { data, error } = await supabase.auth.signUp({

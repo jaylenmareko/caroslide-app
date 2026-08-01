@@ -1,0 +1,42 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	// Separate Worker from caroslide-app itself -- this is the Cloudflare Queue consumer that does
+	// the REAL carousel generation work (2-3 minutes: captions + photo sourcing + Cloudflare
+	// Browser Rendering renders + guardrail repairs). A Queue consumer invocation is its own real
+	// Worker call with the normal full time budget, unlike ctx.waitUntil() on the main app's own
+	// request (tried first, 2026-07-31) which only buys ~30s past the response before Cloudflare
+	// kills whatever's still running. caroslide-app's createCarousel (actions.ts) just enqueues a
+	// message onto CAROUSEL_QUEUE and redirects immediately -- this Worker does the actual work.
+	"name": "caroslide-carousel-consumer",
+	"account_id": "4f2787f250e16d9e861d68fd74147cd3",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-26",
+	"compatibility_flags": ["nodejs_compat"],
+	// Pure queue consumer -- no fetch handler, no HTTP traffic, so it doesn't need a route or a
+	// workers.dev subdomain.
+	"workers_dev": false,
+	"queues": {
+		"consumers": [
+			{
+				"queue": "caroslide-carousel-generation",
+				// One carousel per invocation -- multiple instances can still run in parallel under
+				// real load (that's the whole reason RenderSemaphore below exists as a real
+				// cross-instance cap, not an in-process one).
+				"max_batch_size": 1,
+				"max_retries": 2
+			}
+		]
+	},
+	// Real, cross-instance render-concurrency cap (2026-07-31) -- see renderSemaphore.ts's own
+	// comment. A single global Durable Object instance (idFromName('singleton')) every parallel
+	// consumer invocation coordinates through, so at most 2 Cloudflare Browser Rendering calls run
+	// at once account-wide, no matter how many carousels are generating concurrently.
+	"durable_objects": {
+		"bindings": [
+			{ "name": "RENDER_SEMAPHORE", "class_name": "RenderSemaphore" }
+		]
+	},
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["RenderSemaphore"] }
+	]
+}

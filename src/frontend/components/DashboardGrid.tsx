@@ -7,7 +7,7 @@ import type { Carousel } from '@/backend/lib/types'
 import { timeAgo } from '@/backend/lib/types'
 import { deleteCarousel } from '@/backend/lib/actions'
 
-type DashboardCarousel = Pick<Carousel, 'id' | 'title' | 'angle' | 'format' | 'updated_at' | 'slides'>
+type DashboardCarousel = Pick<Carousel, 'id' | 'title' | 'updated_at' | 'slides'>
 
 export default function DashboardGrid({ carousels: initialCarousels }: { carousels: DashboardCarousel[] }) {
   const [carousels, setCarousels] = useState(initialCarousels)
@@ -93,10 +93,6 @@ export default function DashboardGrid({ carousels: initialCarousels }: { carouse
               </div>
               <div className="meta">
                 <div className="k">{c.title}</div>
-                <div className="dash-card-tags">
-                  <span className="dash-tag">{c.angle}</span>
-                  <span className="dash-tag neutral">{c.format}</span>
-                </div>
                 <div className="t">{timeAgo(c.updated_at)}</div>
               </div>
             </Link>

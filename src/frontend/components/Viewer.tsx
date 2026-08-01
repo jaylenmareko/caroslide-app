@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import JSZip from 'jszip'
 import type { Carousel, Slide } from '@/backend/lib/types'
 import { updateCarouselTitle, updateCarouselSlides, updateSlideField, editSlide } from '@/backend/lib/actions'
 import SlideCanvasEditor, { type SlideCanvasEditorHandle } from '@/frontend/components/SlideCanvasEditor'
@@ -429,29 +430,71 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
   })
 
   const [downloading, setDownloading] = useState(false)
+  const [downloadingAll, setDownloadingAll] = useState(false)
 
-  async function handleDownloadAll() {
+  function slugify() {
+    return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'carousel'
+  }
+
+  async function downloadOne(url: string, filename: string) {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const ext = blob.type.split('/')[1] || 'jpg'
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = `${filename}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(objectUrl)
+  }
+
+  // Real ask (2026-08-01, Jaylen: individual download stays the default like today, bulk is an
+  // optional extra) -- the main Download button now downloads just the slide currently being
+  // viewed, not all 5 at once. handleDownloadAll (below) is the same all-5 logic this button used
+  // to run, now reachable from its own separate control instead of being the only option.
+  async function handleDownloadCurrent() {
     setDownloading(true)
-    const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'carousel'
-    for (let i = 0; i < slides.length; i++) {
-      try {
+    try {
+      await downloadOne(slides[current].url, `${slugify()}-slide-${current + 1}`)
+    } catch {
+      // a failed fetch shouldn't leave the button stuck disabled
+    }
+    setDownloading(false)
+  }
+
+  // Real bug found live testing this exact feature (2026-08-01): the original version of this
+  // triggered 5 separate `a.click()` downloads in a loop -- Chrome (and other browsers) block/
+  // throttle multiple automatic downloads fired in quick succession without a fresh user gesture
+  // per file, so only the first slide ever actually landed on disk, silently. Bundling all 5 into
+  // one real ZIP (client-side, via jszip) and triggering a single download sidesteps that browser
+  // restriction entirely instead of fighting it, and is arguably better UX for "download all"
+  // anyway -- one file, not five loose ones in the Downloads folder.
+  async function handleDownloadAll() {
+    setDownloadingAll(true)
+    try {
+      const slug = slugify()
+      const zip = new JSZip()
+      for (let i = 0; i < slides.length; i++) {
         const res = await fetch(slides[i].url)
         const blob = await res.blob()
         const ext = blob.type.split('/')[1] || 'jpg'
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${slug}-slide-${i + 1}.${ext}`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        URL.revokeObjectURL(url)
-      } catch {
-        // one slide failing to fetch shouldn't stop the rest from downloading
+        zip.file(`${slug}-slide-${i + 1}.${ext}`, blob)
       }
-      if (i < slides.length - 1) await new Promise((r) => setTimeout(r, 200))
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const objectUrl = URL.createObjectURL(zipBlob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `${slug}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      // a failed fetch shouldn't leave the button stuck disabled
     }
-    setDownloading(false)
+    setDownloadingAll(false)
   }
 
   function commitTitle() {
@@ -552,7 +595,22 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             </svg>
             <span className="lbl">{selectedField && selectedDeletable ? 'Delete object' : 'Delete'}</span>
           </button>
-          <button className="download-btn" onClick={handleDownloadAll} disabled={downloading}>
+          <button
+            className="viewer-icon-btn download-all-btn"
+            aria-label="Download all 5 slides"
+            title="Download all 5 slides"
+            onClick={handleDownloadAll}
+            disabled={downloadingAll}
+          >
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none">
+              <rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" />
+              <rect x="13" y="4" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" />
+              <rect x="4" y="13" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" />
+              <rect x="13" y="13" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+            <span className="lbl">{downloadingAll ? 'Downloading…' : 'Download All'}</span>
+          </button>
+          <button className="download-btn" onClick={handleDownloadCurrent} disabled={downloading}>
             {downloading ? 'Downloading…' : <>⬇ <span className="lbl">Download</span></>}
           </button>
         </div>

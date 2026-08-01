@@ -39,7 +39,7 @@ function createLimiter(maxConcurrent: number) {
     }
   }
 }
-type Limiter = <T>(fn: () => Promise<T>) => Promise<T>
+export type Limiter = <T>(fn: () => Promise<T>) => Promise<T>
 const NO_LIMIT: Limiter = (fn) => fn()
 
 // Real gap found live (2026-07-22, Jaylen: "what happens if many users use this at once?"): a
@@ -109,6 +109,12 @@ export function buildBrandValues(input: {
   brandColors: string[]
   logoUrl: string | null
   font: string
+  // Paid-plan carousels get a genuinely blank logo slot instead of the Caroslide-wordmark
+  // fallback below (2026-08-01, Brand Kit removed for v1 -- Jaylen: free users show the
+  // Caroslide logo, paid users show none). Billing status is decided by the caller
+  // (actions.ts); this stays a plain presentation flag so pipeline.ts doesn't need to know
+  // about plans/subscriptions at all.
+  suppressLogoFallback?: boolean
 }): Record<string, string> {
   const userFontValues = fontValues(input.font)
   // Real bug fixed 2026-07-21: the Caroslide wordmark fallback rendered in whatever generic font
@@ -122,8 +128,10 @@ export function buildBrandValues(input: {
   const FRAUNCES_LOGO_FONT_LINK =
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&display=swap">'
 
-  const PRIMARY = input.brandColors[0] ?? '#D97757'
-  const SECONDARY = input.brandColors[1] ?? '#F4C95D'
+  // Caroslide's own real brand colors (matches captions.ts's classifyColors default) --
+  // not a placeholder, this is the actual fallback for a still-empty array.
+  const PRIMARY = input.brandColors[0] ?? '#512888'
+  const SECONDARY = input.brandColors[1] ?? '#38BDF8'
 
   return {
     PRIMARY,
@@ -156,11 +164,14 @@ export function buildBrandValues(input: {
     // variant is ever added, this needs a real per-template light/dark flag, not a guess.
     LOGO_HTML: input.logoUrl
       ? `<img src="${input.logoUrl}" alt="">`
-      : `<span style="font-family:'Fraunces',serif; font-style:italic; font-weight:600; color:#ffffff">Caroslide</span>`,
+      : input.suppressLogoFallback
+        ? ''
+        : `<span style="font-family:'Fraunces',serif; font-style:italic; font-weight:600; color:#ffffff">Caroslide</span>`,
     ...userFontValues,
-    FONT_LINK_HTML: input.logoUrl
-      ? userFontValues.FONT_LINK_HTML
-      : `${userFontValues.FONT_LINK_HTML}${FRAUNCES_LOGO_FONT_LINK}`,
+    FONT_LINK_HTML:
+      input.logoUrl || input.suppressLogoFallback
+        ? userFontValues.FONT_LINK_HTML
+        : `${userFontValues.FONT_LINK_HTML}${FRAUNCES_LOGO_FONT_LINK}`,
   }
 }
 
@@ -461,6 +472,19 @@ export async function generateCarousel(input: {
   brandColors: string[]
   logoUrl: string | null
   font: string
+  suppressLogoFallback?: boolean
+  // Real gap found live (2026-07-31, Jaylen: "make sure the site is ready for 1 user or 10k users
+  // at once"): globalRenderLimit (below) is a plain in-process semaphore -- it only ever coordinated
+  // renders within ONE running Worker instance. Cloudflare Queues (the consumer that now runs real
+  // generation, see runGeneration.ts) can and does spin up many consumer instances in parallel under
+  // real load, each getting its own independent copy of that limiter -- so total concurrent
+  // Cloudflare Browser Rendering calls across every user generating at once could still blow past
+  // Cloudflare's real account-wide concurrency cap for that API (the actual likely source of this
+  // session's repeated 429s, not just "heavy testing today"). The consumer worker constructs a real
+  // cross-instance limiter (a Durable Object-backed semaphore, workers/carousel-consumer/src/
+  // renderSemaphore.ts) and passes it in here; falls back to the old in-process one when no real
+  // limiter is supplied (local testing, or any future caller outside that Worker).
+  renderLimiter?: Limiter
 }): Promise<{ title: string; slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> }> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
   const canvasH = CANVAS_H[input.format]
@@ -548,10 +572,11 @@ export async function generateCarousel(input: {
   // Real semaphore (createLimiter above), not a timing guess -- see its own comment for why the
   // i*400ms stagger this replaced wasn't enough (repeated live 429s even with staggered starts and
   // jittered repair-retries point at a real Cloudflare concurrency cap, not a time-window one).
-  // Uses the module-level globalRenderLimit (see its own comment) rather than a fresh instance per
-  // call -- real gap found live the same night: a per-call limiter only bounds THIS carousel's own
-  // slides, not the real account-wide cap shared across every concurrent user's carousel.
-  const renderLimit = globalRenderLimit
+  // Prefers input.renderLimiter (a real cross-instance Durable Object semaphore, see this
+  // function's own input comment) over the module-level globalRenderLimit fallback -- the
+  // in-process one only bounds concurrency WITHIN one running Worker instance, not across the many
+  // instances Cloudflare Queues can spin up in parallel under real load.
+  const renderLimit = input.renderLimiter ?? globalRenderLimit
 
   const slides = await Promise.all(
     plans.map(async ({ slide, isCta, templateForSlide, isMotifInnerSlide, photoFieldOrder, needsPhotos, preAssigned, remaining }, i) => {

@@ -41,7 +41,7 @@ export default function TermsPage() {
 
         <h2>4. Content you provide</h2>
         <p>
-          You keep ownership of any brand assets, logos, and reference photos you upload. You grant Caroslide the
+          You keep ownership of any text or brief you provide. You grant Caroslide the
           rights needed to process that content solely to generate your carousels — we don&apos;t use it for
           anything else, and don&apos;t sell it.
         </p>

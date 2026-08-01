@@ -20,8 +20,7 @@ export default function PrivacyPage() {
         <h2>What we collect</h2>
         <ul>
           <li>Account info: name, email, password (stored hashed, never in plain text).</li>
-          <li>Brand kit: colors, logo, font choice, and any voice/tone description you save.</li>
-          <li>Content you create: topics, briefs, uploaded reference photos, and the carousels Caroslide generates for you.</li>
+          <li>Content you create: topics, briefs, and the carousels Caroslide generates for you (including the colors, logo, and font chosen for each one).</li>
           <li>Billing info: handled entirely by Stripe — Caroslide stores your plan/subscription status, not your card details.</li>
           <li>Basic usage data (e.g. generation timestamps) needed to enforce plan limits and prevent abuse.</li>
         </ul>
@@ -42,7 +41,7 @@ export default function PrivacyPage() {
 
         <h2>Your choices</h2>
         <p>
-          You can update or remove your brand kit and content at any time from the app. To delete your account
+          You can delete any carousel at any time from the app. To delete your account
           entirely, contact us and we&apos;ll remove your data from our systems.
         </p>
 

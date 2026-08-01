@@ -107,7 +107,7 @@ export default function NewCarouselWizard({
 
   const stepTitle =
     step === 0 ? 'Choose a Look'
-    : hasVariantStep && step === 1 ? 'Choose a Style for Your Selected Look'
+    : hasVariantStep && step === 1 ? 'Choose a Style'
     : 'What Do You Want?'
 
   function pickLook(l: Look) {

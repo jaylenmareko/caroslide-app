@@ -29,14 +29,26 @@
 	},
 	// Real, cross-instance render-concurrency cap (2026-07-31) -- see renderSemaphore.ts's own
 	// comment. A single global Durable Object instance (idFromName('singleton')) every parallel
-	// consumer invocation coordinates through, so at most 2 Cloudflare Browser Rendering calls run
-	// at once account-wide, no matter how many carousels are generating concurrently.
+	// consumer invocation coordinates through, so at most MAX_CONCURRENT Cloudflare Browser
+	// Rendering calls run at once account-wide, no matter how many carousels are generating
+	// concurrently.
+	//
+	// ANTHROPIC_LIMITER (2026-08-01) -- same cross-instance-coordination reasoning, applied to the
+	// 15-20+ real Claude calls a single carousel generation fires (captions, photo-quality checks,
+	// guardrail repairs, vision review): see anthropicRateLimiter.ts's own comment for why this is a
+	// token-bucket, not a plain semaphore. Also bound cross-worker from caroslide-app itself (see
+	// that app's own wrangler.jsonc) -- chat-edit/click-in-place-edit Claude calls run as Next.js
+	// Server Actions in that Worker, not this one, but spend from the exact same account-wide
+	// Anthropic budget, so they need to coordinate through the same real DO instance, not a second
+	// independent one.
 	"durable_objects": {
 		"bindings": [
-			{ "name": "RENDER_SEMAPHORE", "class_name": "RenderSemaphore" }
+			{ "name": "RENDER_SEMAPHORE", "class_name": "RenderSemaphore" },
+			{ "name": "ANTHROPIC_LIMITER", "class_name": "AnthropicRateLimiter" }
 		]
 	},
 	"migrations": [
-		{ "tag": "v1", "new_sqlite_classes": ["RenderSemaphore"] }
+		{ "tag": "v1", "new_sqlite_classes": ["RenderSemaphore"] },
+		{ "tag": "v2", "new_sqlite_classes": ["AnthropicRateLimiter"] }
 	]
 }

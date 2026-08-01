@@ -38,5 +38,17 @@
 		"producers": [
 			{ "queue": "caroslide-carousel-generation", "binding": "CAROUSEL_QUEUE" }
 		]
+	},
+	// Cross-script binding (2026-08-01) -- this app's own Server Actions (actions.ts's createCarousel
+	// and editSlide) make real Claude calls directly (classifyAngle/classifyColors, chat-edit
+	// classification/rewrites), spending from the exact same account-wide Anthropic per-minute
+	// budget the Queue consumer's initial-generation calls do. The AnthropicRateLimiter Durable
+	// Object class itself is only ever DEFINED in workers/carousel-consumer (see that Worker's own
+	// wrangler.jsonc + migration) -- script_name here points this binding at that same real running
+	// instance instead of standing up a second, independent (and wrong) budget just for this Worker.
+	"durable_objects": {
+		"bindings": [
+			{ "name": "ANTHROPIC_LIMITER", "class_name": "AnthropicRateLimiter", "script_name": "caroslide-carousel-consumer" }
+		]
 	}
 }

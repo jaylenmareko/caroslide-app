@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { imageSize } from 'image-size'
 import type { TemplateVariant } from '@/backend/lib/types'
 import { tavilyCandidateUrls, tavilyImageSearch, pexelsSearch } from './research'
+import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
 
 const anthropic = new Anthropic()
 
@@ -129,23 +130,25 @@ const MEDIA_TYPE_FOR: Record<string, string> = {
  * consistent with how this codebase already handles "does this look right" judgment calls than
  * inventing a new deterministic formula. Runs once per candidate that already passed the
  * mechanical checks, not per every URL tried -- cheap tier (Haiku), same as classifyEdit. */
-async function photoLooksUsable(buffer: Buffer, mediaType: string): Promise<boolean> {
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 60,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: buffer.toString('base64') } },
-          {
-            type: 'text',
-            text: 'This photo is meant to be the hero image on a social carousel slide -- the main subject should be clearly visible, reasonably well-lit, and fill a good portion of the frame. Reply with exactly "OK" if it works for that, or a short reason if it does not (too dark, subject too small/cropped, mostly empty background, etc).',
-          },
-        ],
-      },
-    ],
-  })
+async function photoLooksUsable(buffer: Buffer, mediaType: string, limiter: AnthropicLimiter): Promise<boolean> {
+  const message = await limiter({ inputTokens: 1200, outputTokens: 10 }, () =>
+    anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 60,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: buffer.toString('base64') } },
+            {
+              type: 'text',
+              text: 'This photo is meant to be the hero image on a social carousel slide -- the main subject should be clearly visible, reasonably well-lit, and fill a good portion of the frame. Reply with exactly "OK" if it works for that, or a short reason if it does not (too dark, subject too small/cropped, mostly empty background, etc).',
+            },
+          ],
+        },
+      ],
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim() ?? ''
   return text.toUpperCase().startsWith('OK')
 }
@@ -153,7 +156,7 @@ async function photoLooksUsable(buffer: Buffer, mediaType: string): Promise<bool
 /** Fetches and validates a single image URL directly (dimension check + stock-domain check +
  * a vision quality check) -- shared by both the direct image-search path and the og:image-scrape
  * fallback below, so the same safety checks apply regardless of which path found the URL. */
-async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null> {
+async function fetchAndValidateImage(imgUrl: string, limiter: AnthropicLimiter): Promise<UsablePhoto | null> {
   if (!isSafeHttpUrl(imgUrl)) return null
   if (isStockPhotoHost(imgUrl)) return null
 
@@ -178,7 +181,7 @@ async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null
     // an unrecognized format string.
     const mediaType = type ? MEDIA_TYPE_FOR[type] : undefined
     if (mediaType) {
-      const usable = await photoLooksUsable(buffer, mediaType).catch(() => true) // fail open -- an API hiccup shouldn't sink an otherwise-valid photo
+      const usable = await photoLooksUsable(buffer, mediaType, limiter).catch(() => true) // fail open -- an API hiccup shouldn't sink an otherwise-valid photo
       if (!usable) return null
     }
 
@@ -199,7 +202,7 @@ async function fetchAndValidateImage(imgUrl: string): Promise<UsablePhoto | null
  * candidate URL, matching the skill's own "first one that succeeds, don't chase perfection" rule.
  * Kept as a fallback tier (2026-07-21) -- `findUsablePhoto` below tries real image search first.
  */
-export async function fetchOgImage(pageUrl: string): Promise<UsablePhoto | null> {
+export async function fetchOgImage(pageUrl: string, limiter: AnthropicLimiter = NO_TOKEN_LIMIT): Promise<UsablePhoto | null> {
   if (!isSafeHttpUrl(pageUrl)) return null
   if (isStockPhotoHost(pageUrl)) return null
 
@@ -219,33 +222,33 @@ export async function fetchOgImage(pageUrl: string): Promise<UsablePhoto | null>
     html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
   if (!match) return null
-  return fetchAndValidateImage(match[1])
+  return fetchAndValidateImage(match[1], limiter)
 }
 
 /** Tries each candidate page URL in order, returns the first usable photo. */
-async function firstUsablePhotoFromPages(candidateUrls: string[]): Promise<UsablePhoto | null> {
+async function firstUsablePhotoFromPages(candidateUrls: string[], limiter: AnthropicLimiter): Promise<UsablePhoto | null> {
   for (const url of candidateUrls) {
-    const result = await fetchOgImage(url)
+    const result = await fetchOgImage(url, limiter)
     if (result) return result
   }
   return null
 }
 
-async function trySourcingTiers(query: string): Promise<UsablePhoto | null> {
+async function trySourcingTiers(query: string, limiter: AnthropicLimiter): Promise<UsablePhoto | null> {
   const pexelsUrls = await pexelsSearch(query)
   for (const url of pexelsUrls) {
-    const result = await fetchAndValidateImage(url)
+    const result = await fetchAndValidateImage(url, limiter)
     if (result) return result
   }
 
   const images = await tavilyImageSearch(query)
   for (const image of images) {
-    const result = await fetchAndValidateImage(image.url)
+    const result = await fetchAndValidateImage(image.url, limiter)
     if (result) return result
   }
 
   const candidatePages = await tavilyCandidateUrls(query)
-  return firstUsablePhotoFromPages(candidatePages)
+  return firstUsablePhotoFromPages(candidatePages, limiter)
 }
 
 /** Real bug found live (2026-07-31, Jaylen: "this cannot happen" -- a required visible photo slot,
@@ -258,18 +261,20 @@ async function trySourcingTiers(query: string): Promise<UsablePhoto | null> {
  * generic, more searchable 2-4 word query for the same general subject -- e.g. "laptop screen" or
  * "computer monitor" instead of the specific scene above -- and retries all 3 tiers once more with
  * that before finally giving up to the placeholder. */
-async function broadenQuery(photoBrief: string): Promise<string | null> {
+async function broadenQuery(photoBrief: string, limiter: AnthropicLimiter): Promise<string | null> {
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 30,
-      messages: [
-        {
-          role: 'user',
-          content: `A photo search for "${photoBrief} photo" found nothing usable. Write a much simpler, more generic 2-4 word photo search query for roughly the same subject -- something a real stock photo library is likely to actually have. Reply with ONLY the simplified query, nothing else.`,
-        },
-      ],
-    })
+    const message = await limiter({ inputTokens: 150, outputTokens: 20 }, () =>
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 30,
+        messages: [
+          {
+            role: 'user',
+            content: `A photo search for "${photoBrief} photo" found nothing usable. Write a much simpler, more generic 2-4 word photo search query for roughly the same subject -- something a real stock photo library is likely to actually have. Reply with ONLY the simplified query, nothing else.`,
+          },
+        ],
+      })
+    )
     const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim()
     return text && text.length > 0 ? text : null
   } catch {
@@ -296,13 +301,13 @@ async function broadenQuery(photoBrief: string): Promise<string | null> {
  * broadened-query retry (see broadenQuery's own comment) only fires if all 3 tiers fail the
  * original brief -- the common case never pays for it.
  */
-export async function findUsablePhoto(photoBrief: string): Promise<UsablePhoto | null> {
+export async function findUsablePhoto(photoBrief: string, limiter: AnthropicLimiter = NO_TOKEN_LIMIT): Promise<UsablePhoto | null> {
   const query = `${photoBrief} photo`
-  const direct = await trySourcingTiers(query)
+  const direct = await trySourcingTiers(query, limiter)
   if (direct) return direct
 
-  const broadened = await broadenQuery(photoBrief)
+  const broadened = await broadenQuery(photoBrief, limiter)
   if (!broadened) return null
   console.warn(`[generation] photo search broadened after a miss: "${photoBrief}" -> "${broadened}"`)
-  return trySourcingTiers(`${broadened} photo`)
+  return trySourcingTiers(`${broadened} photo`, limiter)
 }

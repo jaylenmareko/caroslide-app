@@ -8,10 +8,11 @@
 // bundles cleanly here via wrangler's own esbuild exactly like it does inside the Next.js app.
 import { runCarouselGeneration, type CarouselGenerationJob } from '../../../src/backend/lib/generation/runGeneration'
 import { RenderSemaphore, createDurableObjectLimiter, type DurableObjectNamespaceLike } from './renderSemaphore'
+import { AnthropicRateLimiter, createDurableObjectTokenLimiter } from './anthropicRateLimiter'
 
 // Durable Object classes must be exported from the Worker's main module for wrangler to find them
 // (see wrangler.jsonc's durable_objects binding + migration).
-export { RenderSemaphore }
+export { RenderSemaphore, AnthropicRateLimiter }
 
 type Env = {
   ANTHROPIC_API_KEY: string
@@ -22,6 +23,7 @@ type Env = {
   NEXT_PUBLIC_SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
   RENDER_SEMAPHORE: DurableObjectNamespaceLike
+  ANTHROPIC_LIMITER: DurableObjectNamespaceLike
 }
 
 // The shared generation code (render.ts, captions.ts, images.ts, runGeneration.ts's own
@@ -47,11 +49,16 @@ export default {
     // old in-process limiter wasn't enough once generation started running as a Queue consumer
     // (many parallel instances under load, each with its own independent copy of that limiter).
     const renderLimiter = createDurableObjectLimiter(env.RENDER_SEMAPHORE)
+    // Real, cross-instance Anthropic token-bucket limiter (2026-08-01) -- same reasoning as
+    // renderLimiter above, applied to the 15-20+ real Claude calls a single generation fires (see
+    // anthropicRateLimiter.ts's own comment). Also shared with caroslide-app's own Server Actions
+    // (chat-edit calls) via that app's cross-script binding to this same Durable Object class.
+    const anthropicLimiter = createDurableObjectTokenLimiter(env.ANTHROPIC_LIMITER)
     for (const message of batch.messages) {
       // runCarouselGeneration never rethrows (it catches internally and marks the carousel row
       // 'failed' with a real error message) -- a genuinely unexpected crash outside that try/catch
       // is the only thing that would trigger this queue's own retry (max_retries: 2).
-      await runCarouselGeneration(message.body, renderLimiter)
+      await runCarouselGeneration(message.body, renderLimiter, anthropicLimiter)
     }
   },
 }

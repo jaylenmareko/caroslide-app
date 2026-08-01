@@ -7,6 +7,7 @@
 // consumer is its own real Worker invocation with the normal full time budget, not bound by that
 // 30s post-response cap.
 import { generateCarousel, type Limiter } from './pipeline'
+import type { AnthropicLimiter } from './anthropicLimiter'
 // Relative, not the `@/` alias -- this file (and everything else under generation/) is imported
 // directly by workers/carousel-consumer/, a separate Cloudflare Worker build that wrangler bundles
 // with plain esbuild, which doesn't know about Next.js's tsconfig path aliases. Every cross-file
@@ -30,7 +31,11 @@ export type CarouselGenerationJob = {
   suppressLogoFallback: boolean
 }
 
-export async function runCarouselGeneration(input: CarouselGenerationJob, renderLimiter?: Limiter) {
+export async function runCarouselGeneration(
+  input: CarouselGenerationJob,
+  renderLimiter?: Limiter,
+  anthropicLimiter?: AnthropicLimiter
+) {
   console.log(`[generation] background task starting for carousel ${input.carouselId}`)
   const uploadedPaths: string[] = []
   const supabase = createServiceClient()
@@ -48,6 +53,7 @@ export async function runCarouselGeneration(input: CarouselGenerationJob, render
       font: input.font,
       suppressLogoFallback: input.suppressLogoFallback,
       renderLimiter,
+      anthropicLimiter,
     })
     console.log(`[generation] carousel ${input.carouselId} captions+slides generated, uploading ${generated.slides.length} slides`)
 

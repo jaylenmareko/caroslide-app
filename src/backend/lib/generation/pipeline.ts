@@ -8,6 +8,7 @@ import { checkSlide, budgetsFor, textLength, type GuardrailViolation } from './g
 import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
 import { EDITABLE_FIELDS } from './editableFields'
+import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
 
 const anthropic = new Anthropic()
 
@@ -271,11 +272,11 @@ function allocateFromPool(
   return { preAssigned, remaining }
 }
 
-async function searchPhotos(photoBriefs: Record<string, string>): Promise<Record<string, string>> {
+async function searchPhotos(photoBriefs: Record<string, string>, anthropicLimit: AnthropicLimiter): Promise<Record<string, string>> {
   const resolved: Record<string, string> = {}
   await Promise.all(
     Object.entries(photoBriefs).map(async ([field, brief]) => {
-      const photo = await findUsablePhoto(brief)
+      const photo = await findUsablePhoto(brief, anthropicLimit)
       if (photo) {
         resolved[field] = photo.url
       } else {
@@ -352,7 +353,8 @@ function computeSharedSizeOverrides(
 async function repairMissingText(
   values: Record<string, string>,
   violations: GuardrailViolation[],
-  voiceDescription: string | null
+  voiceDescription: string | null,
+  anthropicLimit: AnthropicLimiter
 ): Promise<Record<string, string>> {
   const missing = violations.find((v): v is Extract<GuardrailViolation, { type: 'missing_required_text' }> => v.type === 'missing_required_text')
   const unresolved = violations.find((v): v is Extract<GuardrailViolation, { type: 'unresolved_placeholders' }> => v.type === 'unresolved_placeholders')
@@ -386,31 +388,36 @@ async function repairMissingText(
       `${v.field} is way too long for this template (${v.length} characters against a real ${v.budget}-character ceiling) -- shrinking the font can't fix an overage this large without becoming illegible. Rewrite ${v.field} from scratch as a genuinely short version, at or under ${v.budget} characters, keeping the same core point.`
     )
   }
-  const changed = await rewriteCopy({
-    message: messages.join(' '),
-    currentValues: values,
-    voiceDescription,
-  })
+  const changed = await rewriteCopy(
+    {
+      message: messages.join(' '),
+      currentValues: values,
+      voiceDescription,
+    },
+    anthropicLimit
+  )
   return { ...values, ...changed }
 }
 
-async function visionReview(png: Buffer): Promise<{ ok: boolean; note: string }> {
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: 256,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: png.toString('base64') } },
-          {
-            type: 'text',
-            text: 'Is this social carousel slide visually clean -- no clipped/overlapping text, no obviously broken image, legible? Reply with exactly "OK" if it is, or a one-sentence description of the specific problem if not.',
-          },
-        ],
-      },
-    ],
-  })
+async function visionReview(png: Buffer, anthropicLimit: AnthropicLimiter): Promise<{ ok: boolean; note: string }> {
+  const message = await anthropicLimit({ inputTokens: 1200, outputTokens: 50 }, () =>
+    anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 256,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: png.toString('base64') } },
+            {
+              type: 'text',
+              text: 'Is this social carousel slide visually clean -- no clipped/overlapping text, no obviously broken image, legible? Reply with exactly "OK" if it is, or a one-sentence description of the specific problem if not.',
+            },
+          ],
+        },
+      ],
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim() ?? ''
   return { ok: text.toUpperCase().startsWith('OK'), note: text }
 }
@@ -424,7 +431,8 @@ export async function renderAndGuard(
   values: Record<string, string>,
   slideNumber: number,
   voiceDescription: string | null = null,
-  limit: Limiter = NO_LIMIT
+  limit: Limiter = NO_LIMIT,
+  anthropicLimit: AnthropicLimiter = NO_TOKEN_LIMIT
 ): Promise<{ png: Buffer; values: Record<string, string> }> {
   let current = values
   let { png, filledHtml } = await limit(() => renderSlide(templateFile, current))
@@ -440,7 +448,7 @@ export async function renderAndGuard(
 
   if (violations.length > 0) {
     current = repairOverBudget(current, violations)
-    current = await repairMissingText(current, violations, voiceDescription)
+    current = await repairMissingText(current, violations, voiceDescription, anthropicLimit)
     ;({ png, filledHtml } = await limit(() => renderSlide(templateFile, current)))
     violations = await checkSlide(templateFile, current, filledHtml)
   }
@@ -449,11 +457,11 @@ export async function renderAndGuard(
   // repair pass -- not on every slide by default. One look, at most one more repair+re-render,
   // then ship regardless (chat-edit is the safety net, per the spec -- no open-ended loop).
   if (violations.length > 0) {
-    const review = await visionReview(png)
+    const review = await visionReview(png, anthropicLimit)
     if (!review.ok) {
       console.warn(`[generation] slide ${slideNumber} (${templateFile}) shipped with unresolved issues: ${JSON.stringify(violations)}, vision note: ${review.note}`)
       current = repairOverBudget(current, violations)
-      current = await repairMissingText(current, violations, voiceDescription)
+      current = await repairMissingText(current, violations, voiceDescription, anthropicLimit)
       ;({ png } = await limit(() => renderSlide(templateFile, current)))
     }
   }
@@ -485,9 +493,21 @@ export async function generateCarousel(input: {
   // renderSemaphore.ts) and passes it in here; falls back to the old in-process one when no real
   // limiter is supplied (local testing, or any future caller outside that Worker).
   renderLimiter?: Limiter
+  // Real gap found live (2026-08-01, following the same "make sure the site is ready for 1 user or
+  // 10k users at once" audit that produced renderLimiter above): every direct Claude call this
+  // pipeline makes (captions, photo-quality vision checks, guardrail repairs, vision review) had
+  // zero cross-instance rate coordination -- confirmed live against this account's real Anthropic
+  // rate-limit response headers that a genuine 1000-concurrent-user burst would blow well past the
+  // real per-minute token budget, the same class of problem renderLimiter already closes for
+  // Cloudflare Browser Rendering. See anthropicLimiter.ts's own comment for why this is a
+  // token-bucket, not a plain concurrency semaphore. Same optional-with-fallback shape as
+  // renderLimiter -- falls back to NO_TOKEN_LIMIT (unlimited) for local testing or any future caller
+  // outside the real Worker/consumer.
+  anthropicLimiter?: AnthropicLimiter
 }): Promise<{ title: string; slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> }> {
   const templateFile = templateFileFor(input.look, input.templateVariant)
   const canvasH = CANVAS_H[input.format]
+  const anthropicLimit = input.anthropicLimiter ?? NO_TOKEN_LIMIT
 
   const generated = await generateCaptions({
     angle: input.angle,
@@ -497,6 +517,7 @@ export async function generateCarousel(input: {
     brief: input.brief,
     voiceDescription: input.voiceDescription,
     hasReferenceImages: input.referenceImageUrls.length > 0,
+    anthropicLimiter: anthropicLimit,
   })
 
   const brand = buildBrandValues(input)
@@ -580,7 +601,7 @@ export async function generateCarousel(input: {
 
   const slides = await Promise.all(
     plans.map(async ({ slide, isCta, templateForSlide, isMotifInnerSlide, photoFieldOrder, needsPhotos, preAssigned, remaining }, i) => {
-      const searched = needsPhotos ? await searchPhotos(remaining) : {}
+      const searched = needsPhotos ? await searchPhotos(remaining, anthropicLimit) : {}
       const photoValues: Record<string, string> = { ...preAssigned, ...searched }
       // Real gap found live 2026-07-21: when sourcing genuinely fails for a slot (~50% hit rate
       // observed), the field was left unset entirely -- fillTemplate leaves the literal
@@ -686,7 +707,7 @@ export async function generateCarousel(input: {
       // every retry. renderLimit (a real concurrency cap, not a timing guess -- see its own
       // comment) is what actually bounds how many of these are in flight on Cloudflare at once;
       // the SLOW parts above (photo search, guardrail/repair loop) still run fully in parallel.
-      const result = await renderAndGuard(templateForSlide, values, i + 1, input.voiceDescription, renderLimit)
+      const result = await renderAndGuard(templateForSlide, values, i + 1, input.voiceDescription, renderLimit, anthropicLimit)
       return { png: result.png, template: templateForSlide, values: result.values }
     })
   )

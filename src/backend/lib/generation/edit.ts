@@ -11,6 +11,7 @@ import { ContentValues } from './captions'
 import { findUsablePhoto } from './images'
 import { sanitizeStrayEscapes } from './render'
 import { FONT_LINKS } from './fonts'
+import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
 
 const anthropic = new Anthropic()
 
@@ -96,11 +97,14 @@ function normalizeTargetField(field: string | undefined): string | undefined {
  * photo_swap) which field. Uses each slide's own real template/values as context so "make it
  * punchier" can be judged against what's actually on the screen right now, not guessed blind.
  */
-export async function classifyEdit(input: {
-  message: string
-  currentSlideIndex: number
-  slides: Slide[]
-}): Promise<EditClassificationResult> {
+export async function classifyEdit(
+  input: {
+    message: string
+    currentSlideIndex: number
+    slides: Slide[]
+  },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<EditClassificationResult> {
   const slidesSummary = input.slides
     .map((s, i) => {
       const marker = i === input.currentSlideIndex ? ' (the slide currently being viewed)' : ''
@@ -139,13 +143,15 @@ targetField must always be the BASE field name (e.g. "CAPTION_HTML", "LOGO_HTML"
 The user's message: "${input.message}"`
 
   const format = zodOutputFormat(EditClassification)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Classify this edit request now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 900, outputTokens: 100 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Classify this edit request now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   console.log(`[chat-edit] classify raw output (${text.length} chars): ${text}`)
   const parsed = format.parse(text)
@@ -173,11 +179,14 @@ The user's message: "${input.message}"`
  * the carousel's saved brand snapshot over repeated edits, per chat-editing-execution.md). Returns
  * just the changed fields; caller merges them into the slide's existing values.
  */
-export async function rewriteCopy(input: {
-  message: string
-  currentValues: Record<string, string>
-  voiceDescription: string | null
-}): Promise<Record<string, string>> {
+export async function rewriteCopy(
+  input: {
+    message: string
+    currentValues: Record<string, string>
+    voiceDescription: string | null
+  },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<Record<string, string>> {
   const systemPrompt = `You are editing ONE existing slide of a real social media carousel, per a user's chat instruction. Rewrite ONLY the field(s) the instruction actually implicates -- return every other field completely unset. Never touch PRIMARY/SECONDARY/LOGO_HTML/FONT_FAMILY/CANVAS_H or any image field -- those aren't yours to change here.
 
 ## This slide's current content
@@ -196,13 +205,15 @@ ${input.voiceDescription ? `## Brand voice\n\n${input.voiceDescription}\n\nA spe
 Do all reasoning yourself, directly in plain text. Do not write or execute code -- there is no tool of any kind available in this request.`
 
   const format = zodOutputFormat(ContentValues)
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Make this edit now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 1500, outputTokens: 400 }, () =>
+    anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Make this edit now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   console.log(`[chat-edit] rewrite raw output (${text.length} chars): ${text}`)
   const parsed = format.parse(text)
@@ -223,7 +234,10 @@ Do all reasoning yourself, directly in plain text. Do not write or execute code 
  * slide's own current caption content plus the user's instruction, rather than adding a schema
  * field to persist briefs just for this. Simpler, no migration, good enough for a first version.
  */
-export async function generateSwapBrief(input: { message: string; currentValues: Record<string, string> }): Promise<string> {
+export async function generateSwapBrief(
+  input: { message: string; currentValues: Record<string, string> },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<string> {
   const captionText = Object.values(input.currentValues)
     .filter((v) => typeof v === 'string')
     .join(' ')
@@ -242,12 +256,14 @@ ${captionText}
 
 Reply with ONLY the search brief, nothing else.`
 
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 128,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Write the search brief now.' }],
-  })
+  const message = await limiter({ inputTokens: 500, outputTokens: 20 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 128,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Write the search brief now.' }],
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text.trim() ?? ''
   return text
 }
@@ -255,8 +271,8 @@ Reply with ONLY the search brief, nothing else.`
 /** Sources a real replacement photo for a swap edit, reusing the same 3-tier pipeline
  * (Pexels → Tavily image search → og:image scrape) and stock-domain/dimension validation as
  * initial generation -- no separate, drifted photo-sourcing path for edits. */
-export async function swapPhoto(brief: string): Promise<string | null> {
-  const photo = await findUsablePhoto(brief)
+export async function swapPhoto(brief: string, limiter: AnthropicLimiter = NO_TOKEN_LIMIT): Promise<string | null> {
+  const photo = await findUsablePhoto(brief, limiter)
   return photo?.url ?? null
 }
 
@@ -267,11 +283,14 @@ export async function swapPhoto(brief: string): Promise<string | null> {
  * not precise placement -- precise placement is what dragging is for; chat is the rough-direction
  * path, matching how a designer would eyeball a nudge amount rather than typing exact coordinates.
  */
-export async function generateMoveDelta(input: {
-  message: string
-  currentPosX: number
-  currentPosY: number
-}): Promise<{ deltaX: number; deltaY: number }> {
+export async function generateMoveDelta(
+  input: {
+    message: string
+    currentPosX: number
+    currentPosY: number
+  },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<{ deltaX: number; deltaY: number }> {
   const MoveDelta = z.object({ deltaX: z.number(), deltaY: z.number() })
   const systemPrompt = `A user wants to reposition one element on a real social media carousel slide via chat, relative to where it already is (currently offset ${input.currentPosX}px horizontally, ${input.currentPosY}px vertically from its default spot). The canvas is 1080px wide. Positive deltaX moves right, negative moves left; positive deltaY moves down, negative moves up.
 
@@ -284,13 +303,15 @@ Pick a REASONABLE pixel nudge for the instruction -- a small nudge ("a bit", "sl
 Return only the pixel delta to ADD to the current position.`
 
   const format = zodOutputFormat(MoveDelta)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 128,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Compute the move now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 300, outputTokens: 20 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 128,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Compute the move now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   return format.parse(text)
 }
@@ -304,12 +325,15 @@ Return only the pixel delta to ADD to the current position.`
  * below) mirrors the click-in-place color picker's own wrap mechanism -- just AI-identified
  * instead of user-dragged.
  */
-export async function generateColorEdit(input: {
-  message: string
-  currentHtml: string
-  primary: string
-  secondary: string
-}): Promise<{ matchText: string; hex: string } | null> {
+export async function generateColorEdit(
+  input: {
+    message: string
+    currentHtml: string
+    primary: string
+    secondary: string
+  },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<{ matchText: string; hex: string } | null> {
   const ColorEdit = z.object({ matchText: z.string(), hex: z.string() })
   const plainText = input.currentHtml.replace(/<[^>]+>/g, '')
   const systemPrompt = `A user wants to change the color of part of a text field on a real social media carousel slide, via chat. Identify the EXACT, VERBATIM plain-text substring (a word or short phrase, copied character-for-character from "Current text" below -- no punctuation added/removed, no case changes) the instruction refers to, and the target color as a hex code.
@@ -329,13 +353,15 @@ PRIMARY: ${input.primary}, SECONDARY: ${input.secondary} -- use one of these if 
 If the instruction doesn't clearly name which words to recolor, or no target color, set matchText to an empty string instead of guessing.`
 
   const format = zodOutputFormat(ColorEdit)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 256,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Identify the edit now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 500, outputTokens: 30 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 256,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Identify the edit now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   const parsed = format.parse(text)
   if (!parsed.matchText || !plainText.includes(parsed.matchText)) return null
@@ -345,10 +371,13 @@ If the instruction doesn't clearly name which words to recolor, or no target col
 /** Same shape as generateColorEdit, for font instead of color -- constrained to the exact same
  * 5-font whitelist the click-in-place font picker and Brand Kit already use (FONT_LINKS), not an
  * open-ended font name the AI could invent that was never actually loaded/tested. */
-export async function generateFontEdit(input: {
-  message: string
-  currentHtml: string
-}): Promise<{ matchText: string; fontFamily: string } | null> {
+export async function generateFontEdit(
+  input: {
+    message: string
+    currentHtml: string
+  },
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<{ matchText: string; fontFamily: string } | null> {
   const FontEdit = z.object({ matchText: z.string(), fontName: z.string() })
   const plainText = input.currentHtml.replace(/<[^>]+>/g, '')
   const fontNames = Object.keys(FONT_LINKS)
@@ -369,13 +398,15 @@ ${fontNames.join(', ')}
 If the instruction doesn't clearly name which words, or asks for a font not in this list, set matchText to an empty string instead of guessing.`
 
   const format = zodOutputFormat(FontEdit)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 256,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Identify the edit now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 500, outputTokens: 30 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 256,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Identify the edit now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   const parsed = format.parse(text)
   if (!parsed.matchText || !plainText.includes(parsed.matchText) || !fontNames.includes(parsed.fontName)) return null

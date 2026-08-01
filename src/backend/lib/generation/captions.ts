@@ -8,6 +8,7 @@ import { tavilySearch } from './research'
 import { photosNeeded } from './images'
 import { EDITABLE_FIELDS } from './editableFields'
 import { REFERENCE_DOCS } from './referenceDocs.generated'
+import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
 
 const anthropic = new Anthropic()
 
@@ -190,7 +191,7 @@ const ANGLE_DESCRIPTIONS: Record<Angle, string> = {
  * instead of a cold, uninformed guess, the same way this pipeline already decides photos, copy,
  * and layout details on the user's behalf.
  */
-export async function classifyAngle(brief: string): Promise<Angle> {
+export async function classifyAngle(brief: string, limiter: AnthropicLimiter = NO_TOKEN_LIMIT): Promise<Angle> {
   const systemPrompt = `Pick the single best content angle for a 5-slide social media carousel, based on the brief below. Choose exactly one of:
 
 ${(Object.entries(ANGLE_DESCRIPTIONS) as [Angle, string][]).map(([a, d]) => `- ${a}: ${d}`).join('\n')}
@@ -200,13 +201,15 @@ ${(Object.entries(ANGLE_DESCRIPTIONS) as [Angle, string][]).map(([a, d]) => `- $
 ${brief || '(no brief given -- pick whichever angle best fits a generic, broadly appealing post)'}`
 
   const format = zodOutputFormat(AngleClassification)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 128,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Pick the angle now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 400, outputTokens: 50 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 128,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Pick the angle now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   const parsed = format.parse(text)
   // No real schema-level enum constraint survives this SDK's zod conversion (same bug class
@@ -245,7 +248,10 @@ const CURATED_PALETTES: Record<string, { primary: string; secondary: string; des
  * caroslide colors"). Skips the AI call entirely on an empty brief -- there's nothing to infer
  * from, and the "caroslide" palette IS the defined default for exactly that case.
  */
-export async function classifyColors(brief: string): Promise<{ primary: string; secondary: string }> {
+export async function classifyColors(
+  brief: string,
+  limiter: AnthropicLimiter = NO_TOKEN_LIMIT
+): Promise<{ primary: string; secondary: string }> {
   if (!brief.trim()) return { primary: CAROSLIDE_PRIMARY, secondary: CAROSLIDE_SECONDARY }
 
   const systemPrompt = `Pick the single best color palette for a social media carousel, based on the brief below. Choose exactly one palette ID:
@@ -259,13 +265,15 @@ If the brief gives no real signal about mood, industry, or vibe, choose "carosli
 ${brief}`
 
   const format = zodOutputFormat(ColorClassification)
-  const message = await anthropic.messages.create({
-    model: CLASSIFY_MODEL,
-    max_tokens: 128,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: 'Pick the palette now.' }],
-    output_config: { format },
-  })
+  const message = await limiter({ inputTokens: 500, outputTokens: 50 }, () =>
+    anthropic.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 128,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Pick the palette now.' }],
+      output_config: { format },
+    })
+  )
   const text = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text ?? '{}'
   const parsed = format.parse(text)
   // Same defensive-validation discipline as classifyAngle above -- fall back to the real default
@@ -282,7 +290,9 @@ export async function generateCaptions(input: {
   brief: string
   voiceDescription: string | null
   hasReferenceImages: boolean
+  anthropicLimiter?: AnthropicLimiter
 }): Promise<GeneratedCarousel> {
+  const anthropicLimit = input.anthropicLimiter ?? NO_TOKEN_LIMIT
   const templateFile = templateFileFor(input.look, input.templateVariant)
   const photoCount = photosNeeded(input.templateVariant, input.look)
 
@@ -462,15 +472,22 @@ CRITICAL, checked automatically after you respond: "values" MUST contain real ke
   async function generateOneSlide<T extends z.ZodTypeAny>(systemPrompt: string, schema: T): Promise<z.infer<T>> {
     const format = zodOutputFormat(schema)
 
+    // Estimate: system prompt here runs a few thousand tokens (trimmed reference docs + one
+    // template's full HTML + content-strategy section, per buildSlideSystemPrompt above); real
+    // output is usually well under the 4096 max_tokens ceiling. Trued up against real `.usage`
+    // after each call (see anthropicLimiter.ts's own comment), so this only needs to be roughly
+    // right, not exact.
     async function attempt(messages: Anthropic.MessageParam[]): Promise<string> {
-      const message = await anthropic.messages.create({
-        model: 'claude-opus-4-8',
-        max_tokens: 4096,
-        tools: [],
-        system: systemPrompt,
-        messages,
-        output_config: { format },
-      })
+      const message = await anthropicLimit({ inputTokens: 4000, outputTokens: 800 }, () =>
+        anthropic.messages.create({
+          model: 'claude-opus-4-8',
+          max_tokens: 4096,
+          tools: [],
+          system: systemPrompt,
+          messages,
+          output_config: { format },
+        })
+      )
       const textBlocks = message.content.filter((block) => block.type === 'text')
       console.log(
         `[generation] slide call: stop_reason=${message.stop_reason}, text block lengths=[${textBlocks.map((b) => b.text.length).join(', ')}], usage=${JSON.stringify(message.usage)}`

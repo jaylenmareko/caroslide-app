@@ -21,6 +21,7 @@ import {
 } from '@/backend/lib/generation/edit'
 import { loadTemplate, fillTemplate, renderSlide } from '@/backend/lib/generation/render'
 import { EDITABLE_FIELDS, type EditableField } from '@/backend/lib/generation/editableFields'
+import { createDurableObjectTokenLimiter } from '@/backend/lib/generation/anthropicLimiter'
 import {
   stripe,
   PLAN_PRICE_IDS,
@@ -241,14 +242,22 @@ export async function createCarousel(input: {
     .eq('user_id', user!.id)
     .maybeSingle()
 
+  // Real, cross-instance Anthropic rate limiter (2026-08-01) -- these two calls spend from the
+  // same account-wide per-minute budget the Queue consumer's initial-generation calls do (see
+  // generateCarousel's own anthropicLimiter comment), so they need to coordinate through the same
+  // real Durable Object, not run unthrottled just because they happen to run here instead of in
+  // the consumer. Fetched once, reused below for CAROUSEL_QUEUE too.
+  const { env } = await getCloudflareContext({ async: true })
+  const anthropicLimiter = createDurableObjectTokenLimiter(env.ANTHROPIC_LIMITER)
+
   // Angle (Value/Growth/Education) is no longer a wizard question (2026-08-01) -- a real
   // usability test found a first-time user with zero context got stuck on that exact choice
   // before she understood what the product even was. An AI call decides it instead, same as
   // every other judgment call this pipeline already makes on the user's behalf.
-  const angle = await classifyAngle(input.brief)
+  const angle = await classifyAngle(input.brief, anthropicLimiter)
   // Same reasoning for colors (Brand Kit removed for v1 entirely, see classifyColors' own
   // comment) -- picked from the brief instead of a Settings/wizard color picker.
-  const { primary, secondary } = await classifyColors(input.brief)
+  const { primary, secondary } = await classifyColors(input.brief, anthropicLimiter)
   const brandColors = [primary, secondary]
   // Logo: free accounts show the Caroslide wordmark (buildBrandValues' existing fallback,
   // unchanged), paid accounts get a genuinely blank logo slot -- Jaylen's direction. No custom
@@ -304,7 +313,6 @@ export async function createCarousel(input: {
     font,
     suppressLogoFallback: isActivePaid,
   }
-  const { env } = await getCloudflareContext({ async: true })
   await env.CAROUSEL_QUEUE.send(job)
 
   redirect(`/carousel/${carouselId}`)
@@ -447,7 +455,13 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     .eq('user_id', user!.id)
     .maybeSingle()
 
-  const classification = await classifyEdit({ message, currentSlideIndex, slides })
+  // Same real cross-instance Anthropic budget as createCarousel's -- every AI call in this
+  // function spends from the same account-wide per-minute pool the Queue consumer's own
+  // generation calls do (see anthropicLimiter.ts's own comment).
+  const { env } = await getCloudflareContext({ async: true })
+  const anthropicLimiter = createDurableObjectTokenLimiter(env.ANTHROPIC_LIMITER)
+
+  const classification = await classifyEdit({ message, currentSlideIndex, slides }, anthropicLimiter)
   console.log(`[chat-edit] classification: ${JSON.stringify(classification)}`)
 
   if (classification.editType === 'ambiguous') {
@@ -494,11 +508,14 @@ export async function editSlide(carouselId: string, message: string, currentSlid
     const newValues = { ...slide.values }
 
     if (classification.editType === 'copy_rewrite') {
-      const changed = await rewriteCopy({
-        message,
-        currentValues: slide.values,
-        voiceDescription: brandKit?.voice_description ?? null,
-      })
+      const changed = await rewriteCopy(
+        {
+          message,
+          currentValues: slide.values,
+          voiceDescription: brandKit?.voice_description ?? null,
+        },
+        anthropicLimiter
+      )
       console.log(`[chat-edit] rewriteCopy changed fields: ${JSON.stringify(changed)}`)
       Object.assign(newValues, changed)
     } else if (classification.editType === 'photo_swap') {
@@ -506,8 +523,8 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       if (!field || !(field in slide.values)) {
         return { type: 'clarify', message: 'Which photo on this slide do you mean?' }
       }
-      const brief = await generateSwapBrief({ message, currentValues: slide.values })
-      const newUrl = await swapPhoto(brief)
+      const brief = await generateSwapBrief({ message, currentValues: slide.values }, anthropicLimiter)
+      const newUrl = await swapPhoto(brief, anthropicLimiter)
       if (!newUrl) {
         return {
           type: 'error',
@@ -537,7 +554,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       }
       const currentPosX = parseInt(slide.values[`${field}_POS_X`] ?? '0', 10) || 0
       const currentPosY = parseInt(slide.values[`${field}_POS_Y`] ?? '0', 10) || 0
-      const delta = await generateMoveDelta({ message, currentPosX, currentPosY })
+      const delta = await generateMoveDelta({ message, currentPosX, currentPosY }, anthropicLimiter)
       newValues[`${field}_POS_X`] = `${Math.round(currentPosX + delta.deltaX)}px`
       newValues[`${field}_POS_Y`] = `${Math.round(currentPosY + delta.deltaY)}px`
     } else if (classification.editType === 'color_change' || classification.editType === 'font_change') {
@@ -550,8 +567,11 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       const currentHtml = slide.values[field]
       const edit =
         classification.editType === 'color_change'
-          ? await generateColorEdit({ message, currentHtml, primary: slide.values.PRIMARY, secondary: slide.values.SECONDARY })
-          : await generateFontEdit({ message, currentHtml })
+          ? await generateColorEdit(
+              { message, currentHtml, primary: slide.values.PRIMARY, secondary: slide.values.SECONDARY },
+              anthropicLimiter
+            )
+          : await generateFontEdit({ message, currentHtml }, anthropicLimiter)
       if (!edit) {
         return { type: 'clarify', message: 'Which exact word(s) do you want to change, and to what?' }
       }
@@ -567,7 +587,7 @@ export async function editSlide(carouselId: string, message: string, currentSlid
       newValues[field] = wrapped
     }
 
-    const result = await renderAndGuard(slide.template, newValues, idx + 1, brandKit?.voice_description ?? null)
+    const result = await renderAndGuard(slide.template, newValues, idx + 1, brandKit?.voice_description ?? null, undefined, anthropicLimiter)
 
     // Fresh filename per edit, not an overwrite at the same path -- a same-path overwrite keeps
     // the exact same public URL, which risks the browser/any CDN serving a stale cached copy of

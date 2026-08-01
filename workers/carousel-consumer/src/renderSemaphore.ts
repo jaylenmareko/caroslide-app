@@ -25,7 +25,15 @@ export type DurableObjectNamespaceLike = {
   get(id: unknown): { fetch(url: string, init?: RequestInit): Promise<Response> }
 }
 
-const MAX_CONCURRENT = 2
+// Real measured ceiling for this account (pulled live from Cloudflare's own docs, 2026-08-01,
+// Workers Paid plan): 120 concurrent Browser Rendering sessions, 600 REST API requests/min (10/s).
+// The original value of 2 here was a guess ("Cloudflare's docs describe browser concurrency limits
+// in that range") made before that real number was confirmed -- it left ~98% of the account's real
+// capacity unused, which is the actual reason 1000 concurrent users would have queued for hours
+// instead of minutes. 20 leaves 6x headroom under the real 120-concurrent ceiling (room for
+// Jaylen's own manual testing/other traffic on the same account) and keeps sustained throughput
+// well under the 10 req/s REST cap even with retries factored in.
+const MAX_CONCURRENT = 20
 // Generous on purpose -- covers a render's own retry/backoff cascade (render.ts retries up to 4
 // times, a single 429 backoff alone can wait up to 90s) plus the render itself, with real headroom.
 const LEASE_DURATION_MS = 8 * 60 * 1000

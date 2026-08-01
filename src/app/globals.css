@@ -692,7 +692,6 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .new-section { padding: 28px 0 40px; max-width: 100%; min-height: auto; justify-content: flex-start; }
   .new-section h1 { font-size: 21px; }
   .pick-card { flex: 1 1 100%; }
-  .pick-row-2col { grid-template-columns: 1fr; }
   /* Angle cards' 4:5 desktop aspect-ratio stacks 3 tall cards vertically on mobile -- a lot of
      scrolling for a card that's just two lines of text. Shrink to a fixed shorter height instead
      of scaling the same ratio down; text stays the same size set above, just less empty space

@@ -38,6 +38,19 @@ const MARQUEE_IMAGES = [
 // no "not instantly seeable" complaint to fix for them.
 const MARQUEE_EAGER_COUNT = 6
 
+// SEO/accessibility fix (2026-08-01): all 30 marquee <img>s (15 images, doubled for the seamless
+// scroll loop) had alt="" -- confirmed live via a rendered-DOM query, not assumed. Derived from the
+// src itself (the /mock/caroslide-<topic>.jpg naming convention already carries the real topic)
+// rather than a second hand-written array of alt strings that could drift out of sync if images are
+// ever added/removed here. The two real Supabase-hosted examples don't have a topic slug in their
+// URL, so they get a distinct, still-accurate fallback.
+function marqueeAlt(src: string): string {
+  const match = src.match(/\/mock\/caroslide-(.+)\.jpg$/)
+  if (!match) return 'Real AI-generated carousel example from Caroslide'
+  const topic = match[1].split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')
+  return `AI-generated carousel example: ${topic}`
+}
+
 function MarqueeRow({ images }: { images: string[] }) {
   const doubled = [...images, ...images]
   return (
@@ -57,10 +70,10 @@ function MarqueeRow({ images }: { images: string[] }) {
         {doubled.map((src, i) =>
           i < MARQUEE_EAGER_COUNT ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" fetchPriority="high" loading="eager" />
+            <img key={i} src={src} alt={marqueeAlt(src)} fetchPriority="high" loading="eager" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" loading="lazy" />
+            <img key={i} src={src} alt={marqueeAlt(src)} loading="lazy" />
           )
         )}
       </div>
@@ -148,6 +161,37 @@ const FAQS = [
   },
 ]
 
+// SEO audit fix (2026-08-01): the site had zero structured data anywhere (confirmed live via a
+// rendered-DOM check, not just curl -- curl can miss client-injected schema, but this is genuinely
+// absent either way). Built from FAQS itself, not a second hand-written copy, so the schema can
+// never drift from what's actually visible on the page below. Pricing matches plans.ts exactly
+// (Starter $15/mo, Pro $25/mo) -- no aggregateRating included since there's no real review data to
+// back one; fabricating one would violate Google's structured-data guidelines.
+const FAQ_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+}
+
+const SOFTWARE_APP_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Caroslide',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: 'https://caroslide.com',
+  description: 'AI carousel generator for Instagram and social media -- writes the copy, designs the slides, and picks the photos from a topic or brief.',
+  offers: [
+    { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Starter', price: '15', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Pro', price: '25', priceCurrency: 'USD' },
+  ],
+}
+
 export default function MarketingPage() {
   const [topic, setTopic] = useState('')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -164,6 +208,8 @@ export default function MarketingPage() {
 
   return (
     <div className="lp">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APP_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_SCHEMA) }} />
       <div className={`lp-nav-wrap${scrolled ? ' scrolled' : ''}`}>
         <nav className="lp-nav">
           <Link href="/" className="brand">

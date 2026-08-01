@@ -4,6 +4,16 @@ import { useState } from 'react'
 import { createClient } from '@/backend/lib/supabase/client'
 import { createCheckoutSession, createPortalSession, createPackCheckoutSession } from '@/backend/lib/actions'
 import { PLAN_CAROUSEL_LIMITS, PLAN_PRICES, type Subscription, type Plan, type PackSize } from '@/backend/lib/plans'
+// Internal Next.js import, not the public next/navigation surface -- isRedirectError isn't
+// re-exported there in this Next version (checked directly against node_modules). These three
+// billing actions succeed via redirect() (actions.ts), which works by THROWING a special
+// digest-tagged error Next's own redirect boundary must catch to actually navigate -- a naive
+// catch-all here would swallow that signal and silently break real Stripe checkout redirects,
+// a far worse regression than the missing error message this fixes. Importing Next's own
+// isRedirectError (rather than hand-rolling the digest-parsing) guarantees this stays in exact
+// sync with whatever Next's real redirect boundary itself checks -- worth re-verifying this
+// import path still resolves on any future Next.js major-version upgrade.
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 
 const PLAN_LABELS: Record<Plan, string> = { starter: 'Starter', pro: 'Pro' }
 const PACK_OPTIONS: { size: PackSize; price: string }[] = [
@@ -23,11 +33,21 @@ export default function SettingsForm({
   creditBalance: number
 }) {
   const [billingLoading, setBillingLoading] = useState<Plan | PackSize | 'portal' | null>(null)
+  const [billingError, setBillingError] = useState<string | null>(null)
 
+  // Real bug found in review (2026-08-01): none of these three had a catch -- a genuine failure
+  // (Stripe API error, no billing account yet) threw an unhandled rejection with zero user-facing
+  // feedback. A plain catch-all would be wrong here, though -- success is a THROWN redirect
+  // signal (see isRedirectError's own import comment above), which must be rethrown unchanged so
+  // Next's redirect boundary still performs the real navigation.
   async function handleUpgrade(plan: Plan) {
     setBillingLoading(plan)
+    setBillingError(null)
     try {
       await createCheckoutSession(plan)
+    } catch (err) {
+      if (isRedirectError(err)) throw err
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong starting checkout.')
     } finally {
       setBillingLoading(null)
     }
@@ -35,8 +55,12 @@ export default function SettingsForm({
 
   async function handleBuyPack(size: PackSize) {
     setBillingLoading(size)
+    setBillingError(null)
     try {
       await createPackCheckoutSession(size)
+    } catch (err) {
+      if (isRedirectError(err)) throw err
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong starting checkout.')
     } finally {
       setBillingLoading(null)
     }
@@ -44,8 +68,12 @@ export default function SettingsForm({
 
   async function handleManageBilling() {
     setBillingLoading('portal')
+    setBillingError(null)
     try {
       await createPortalSession()
+    } catch (err) {
+      if (isRedirectError(err)) throw err
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong opening billing.')
     } finally {
       setBillingLoading(null)
     }
@@ -144,6 +172,8 @@ export default function SettingsForm({
             <p className="sub">Your current subscription.</p>
           </div>
         </div>
+
+        {billingError && <div className="auth-error">{billingError}</div>}
 
         {subscription?.status === 'active' ? (
           <>

@@ -220,14 +220,32 @@ function LoginForm() {
             {mode === 'signin' ? (
               <>
                 New here?{' '}
-                <button type="button" onClick={() => setMode('signup')}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signup')
+                    // Real bug found in review (2026-08-01): the Turnstile widget remounts on a
+                    // mode switch (key={mode}), but the OLD widget's token stayed in state until
+                    // the new widget's own callback happened to overwrite it -- a narrow window
+                    // where Submit looked enabled (disabled={loading || !captchaToken}) with a
+                    // token tied to a challenge instance that no longer exists, failing server-side
+                    // even though nothing told the user why.
+                    setCaptchaToken(null)
+                  }}
+                >
                   Create an account
                 </button>
               </>
             ) : (
               <>
                 Already have an account?{' '}
-                <button type="button" onClick={() => setMode('signin')}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signin')
+                    setCaptchaToken(null)
+                  }}
+                >
                   Sign in
                 </button>
               </>

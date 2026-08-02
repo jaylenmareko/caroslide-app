@@ -251,6 +251,7 @@ export default function MarketingPage() {
               </svg>
             </button>
           </form>
+          <p className="lp-hero-microcopy">1 free carousel on signup — no credit card required.</p>
         </div>
 
         <MarqueeRow images={MARQUEE_IMAGES} />

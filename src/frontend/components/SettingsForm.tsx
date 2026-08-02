@@ -158,6 +158,12 @@ export default function SettingsForm({
             </button>
           )}
         </div>
+        <div className="settings-row">
+          <div>
+            <div className="label">Support</div>
+          </div>
+          <a className="settings-link-btn" href="mailto:support@caroslide.com">support@caroslide.com</a>
+        </div>
       </div>
 
       <div className="settings-block">

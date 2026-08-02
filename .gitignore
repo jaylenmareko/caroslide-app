@@ -59,3 +59,6 @@ next-env.d.ts
 src/backend/lib/generation/templates/index.generated.ts
 # generated from reference/*.md by scripts/generate-reference.mjs (runs before dev/build)
 src/backend/lib/generation/referenceDocs.generated.ts
+
+# git worktrees for isolated feature work
+.worktrees/

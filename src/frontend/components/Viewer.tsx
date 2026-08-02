@@ -724,7 +724,7 @@ export default function Viewer({ carousel }: { carousel: Carousel }) {
             <p className="chat-reply">{chatReply}</p>
           ) : (
             <p className="chat-hint">
-              Be specific about which slide(s) you mean (e.g. &quot;slide 2&quot;) — otherwise only the slide you&apos;re viewing gets updated.
+              Be specific about which slide(s)
             </p>
           )}
         </div>

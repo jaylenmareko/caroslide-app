@@ -688,7 +688,15 @@ export async function generateCarousel(input: {
         // headline pair when both are present -- shorter, and matches this template's own top
         // comment framing kicker+headline as the cover/resolution (bookend) convention, the more
         // common real case for this to fire on.
-        if (HEADLINE_STORY_ALTERNATIVE_TEMPLATES.has(templateForSlide) && definedSlideValues.HEADLINE_HTML && definedSlideValues.STORY_HTML) {
+        // Widened 2026-08-02 (real render, WagyuWellnessCo carousel: KICKER ("SKIN & MUSCLE FATS")
+        // rendered directly on top of a 3-line STORY_HTML paragraph on slides 2-3) -- the original
+        // check only fired when HEADLINE_HTML was ALSO set, so a KICKER-without-HEADLINE_HTML slide
+        // (a short label alone, no bookend headline) slipped through with STORY_HTML left intact.
+        // .cover-block collapses to just the kicker's height when HEADLINE_HTML is empty, but it's
+        // still bottom-anchored at the same ~110-130px band as .story, so the collision is identical
+        // either way -- what matters is whether ANY cover-block field is present, not specifically
+        // HEADLINE_HTML.
+        if (HEADLINE_STORY_ALTERNATIVE_TEMPLATES.has(templateForSlide) && (definedSlideValues.HEADLINE_HTML || definedSlideValues.KICKER) && definedSlideValues.STORY_HTML) {
           definedSlideValues.STORY_HTML = ''
         }
       }

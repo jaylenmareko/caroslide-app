@@ -4,13 +4,13 @@ export type Angle = 'Value' | 'Growth' | 'Education'
 // ever a stopgap qualitative guess, never separately measured. 'Post' kept as a named type
 // (not inlined everywhere) since Carousel.format still exists as a real column.
 export type Format = 'Post'
-export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus' | 'Bold Hook'
+export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus' | 'Bold Hook' | 'Photo Continuous'
 
 // Circles + Photo, Bold Stat, and Photo Focus each map to more than one real
 // /carousel skill template (see NewCarouselWizard.tsx's variantsFor()) -- Plain
 // Text maps to exactly one (the pure-text keynote layout), so it's the only
 // Look that skips this sub-choice.
-export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Spotlight' | 'Spotlight Left' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay'
+export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Spotlight' | 'Spotlight Left' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay' | 'Split Two' | 'Split Three' | 'Split Four'
 
 // template/values are only set on AI-generated slides (what actually filled the template to
 // produce `url`) -- absent on user-uploaded reference photos, which reuse this same type in

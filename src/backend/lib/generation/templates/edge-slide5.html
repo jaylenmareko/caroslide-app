@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; }
+  .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:cover; background-position:center; }
+  /* Edge Peek, slide 5: no frame -- plain closing photo slide. */
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="photo"></div>
+  </div>
+</body>
+</html>

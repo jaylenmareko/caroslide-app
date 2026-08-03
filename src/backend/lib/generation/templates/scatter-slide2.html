@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; }
+  .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:cover; background-position:center; }
+  .frame-card {
+    position:absolute; background:#faf6ee; border-radius:10px;
+    box-shadow:0 40px 80px -25px rgba(0,0,0,0.55);
+    -webkit-mask-image:
+      radial-gradient(circle at 20px 20px, transparent 18px, black 19px),
+      radial-gradient(circle at calc(100% - 20px) 20px, transparent 18px, black 19px),
+      radial-gradient(circle at 20px calc(100% - 20px), transparent 18px, black 19px),
+      radial-gradient(circle at calc(100% - 20px) calc(100% - 20px), transparent 18px, black 19px),
+      linear-gradient(black, black);
+    -webkit-mask-repeat: repeat-x, repeat-x, repeat-x, repeat-x, no-repeat;
+    -webkit-mask-size: 40px 40px, 40px 40px, 40px 40px, 40px 40px, 100% 100%;
+    -webkit-mask-position: top left, top right, bottom left, bottom right, center;
+    mask-image:
+      radial-gradient(circle at 20px 20px, transparent 18px, black 19px),
+      radial-gradient(circle at calc(100% - 20px) 20px, transparent 18px, black 19px),
+      radial-gradient(circle at 20px calc(100% - 20px), transparent 18px, black 19px),
+      radial-gradient(circle at calc(100% - 20px) calc(100% - 20px), transparent 18px, black 19px),
+      linear-gradient(black, black);
+    mask-repeat: repeat-x, repeat-x, repeat-x, repeat-x, no-repeat;
+    mask-size: 40px 40px, 40px 40px, 40px 40px, 40px 40px, 100% 100%;
+    mask-position: top left, top right, bottom left, bottom right, center;
+  }
+  .frame-photo { position:absolute; inset:24px 24px 64px; }
+  /* Scatter, slide 2: a real multi-frame collage moment (per the design doc's Scatter
+     description). Frame A completes slide1's right-edge frame at the left edge (same
+     FRAME_1_IMG, background-position:100% here). Frame B and Frame C are standalone, this
+     slide's own photo at two different crops -- a genuine collage, not a straddle. */
+  .frame-1 { top:35%; left:-174px; width:310px; height:390px; transform:rotate(-5deg); }
+  .frame-1 .frame-photo { background-image:url('{{FRAME_1_IMG}}'); background-size:200% 100%; background-position:100% center; }
+  .frame-2 { top:6%; left:750px; width:260px; height:340px; transform:rotate(7deg); }
+  .frame-2 .frame-photo { background-image:url('{{FRAME_2_IMG}}'); background-size:130% 100%; background-position:20% center; }
+  .frame-3 { top:76.3%; left:70px; width:300px; height:250px; transform:rotate(-6deg); }
+  .frame-3 .frame-photo { background-image:url('{{FRAME_3_IMG}}'); background-size:130% 100%; background-position:80% center; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="photo"></div>
+    <div class="frame-card frame-1"><div class="frame-photo"></div></div>
+    <div class="frame-card frame-2"><div class="frame-photo"></div></div>
+    <div class="frame-card frame-3"><div class="frame-photo"></div></div>
+  </div>
+</body>
+</html>

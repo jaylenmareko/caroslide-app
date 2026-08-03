@@ -10,7 +10,7 @@ export type Look = 'Circles + Photo' | 'Plain Text' | 'Bold Stat' | 'Photo Focus
 // /carousel skill template (see NewCarouselWizard.tsx's variantsFor()) -- Plain
 // Text maps to exactly one (the pure-text keynote layout), so it's the only
 // Look that skips this sub-choice.
-export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Spotlight' | 'Spotlight Left' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay' | 'Split Two' | 'Split Three' | 'Split Four'
+export type TemplateVariant = 'Classic' | 'Side by Side' | 'Flipped' | 'Spotlight' | 'Spotlight Left' | 'Photo Column' | 'Editorial' | 'Photo Grid' | 'Split Flip' | 'Overlay' | 'Edge Peek' | 'Corner Peek' | 'Big Overlap' | 'Scatter'
 
 // template/values are only set on AI-generated slides (what actually filled the template to
 // produce `url`) -- absent on user-uploaded reference photos, which reuse this same type in

@@ -43,8 +43,9 @@ export async function runCarouselGeneration(
     // Photo Continuous (2026-08-02) routes to a deliberately separate, much simpler generation
     // path -- no captions.ts call, no photo-sourcing, no guardrail/repair loop, and (2026-08-03)
     // no CTA/branding slide at all (see generateSplitPhotoCarousel's own comment in
-    // pipeline.ts). `referenceImageUrls[0]` is safe to read directly: this Look's wizard step
-    // guarantees exactly 1 URL lands here. `templateVariant!` is non-null for this Look
+    // pipeline.ts). The `as [string, string, string, string, string]` cast is safe only because
+    // this Look's wizard step guarantees exactly 5 URLs land here -- one distinct photo per
+    // slide, per the frame-collage rebuild. `templateVariant!` is non-null for this Look
     // specifically -- unlike Plain Text/Bold Hook, which pass `null` -- Photo Continuous always
     // has a variant.
     const generated =
@@ -52,7 +53,7 @@ export async function runCarouselGeneration(
         ? await generateSplitPhotoCarousel({
             format: input.format,
             templateVariant: input.templateVariant!,
-            photoUrl: input.referenceImageUrls[0],
+            photoUrls: input.referenceImageUrls as [string, string, string, string, string],
             renderLimiter,
           })
         : await generateCarousel({

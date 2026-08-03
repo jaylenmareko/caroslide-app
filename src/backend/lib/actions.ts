@@ -266,6 +266,21 @@ export async function createCarousel(input: {
 
   if (!user) redirect('/login')
 
+  // Real gap found in code review (2026-08-03): the wizard blocks submission client-side unless
+  // exactly 5 photos are attached, and runGeneration.ts/pipeline.ts both lean on "exactly 5 URLs
+  // guaranteed" (runGeneration.ts even casts referenceImageUrls to a 5-tuple on that assumption) --
+  // but this is a Next.js Server Action, directly network-reachable, not actually gated by the
+  // wizard's UI. Fewer than 5 URLs wouldn't crash: generateSplitPhotoCarousel's .map over a short
+  // photoUrls array would just silently produce fewer than 5 slides (wrong output, not a caught
+  // error). More than 5 would eventually throw (caught by runGeneration.ts's try/catch, surfaces as
+  // status: 'failed'), but that's not a clean validation rejection either. Same posture as
+  // uploadReferenceImage's own ALLOWED_IMAGE_TYPES/MAX_ATTACHMENT_MB comment above: client checks
+  // are hints only, the server re-validates. Checked before the limit-consuming RPC below so a bad
+  // request doesn't burn a real carousel credit.
+  if (input.look === 'Photo Continuous' && input.referenceImageUrls.length !== 5) {
+    throw new Error('Photo Continuous needs exactly 5 photos.')
+  }
+
   const { isActivePaid, limit, periodStart } = await resolvePlanLimit(supabase, user!.id)
 
   // Real bug found in code review (2026-07-30): counting existing carousels, checking the credit

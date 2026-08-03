@@ -434,9 +434,10 @@ export type EditSlideResult =
 /** Pulls the real Storage path back out of a Supabase public URL (everything after the bucket
  * name) so a re-uploaded slide's old file can be cleaned up -- same no-orphaned-storage
  * discipline as createCarousel/deleteCarousel, just for a single edited slide instead of a whole
- * deleted carousel. */
-function storagePathFromPublicUrl(url: string): string | null {
-  const marker = '/carousel-slides/'
+ * deleted carousel. Bucket defaults to 'carousel-slides' (every existing caller's own bucket);
+ * deleteCarousel's own carousel-uploads cleanup passes the other bucket explicitly. */
+function storagePathFromPublicUrl(url: string, bucket: string = 'carousel-slides'): string | null {
+  const marker = `/${bucket}/`
   const idx = url.indexOf(marker)
   return idx === -1 ? null : url.slice(idx + marker.length)
 }
@@ -503,11 +504,27 @@ export async function editSlide(carouselId: string, message: string, currentSlid
 
   const { data: carousel, error: fetchError } = await supabase
     .from('carousels')
-    .select('slides, user_id')
+    .select('slides, user_id, look')
     .eq('id', carouselId)
     .single()
   if (fetchError || !carousel) return { type: 'error', message: 'Could not find this carousel.' }
   if (carousel.user_id !== user!.id) return { type: 'error', message: 'Not authorized to edit this carousel.' }
+
+  // Real gap found in code review (2026-08-02): nothing gated this Look out of chat-editing at
+  // all -- a message like "change this photo" matched the existing photo_swap classification and
+  // would silently fire real Anthropic/photo-search calls this Look is specifically built to skip
+  // (see createCarousel's own angle/brandColors comment), AND would only replace ONE of the N
+  // slides' shared source photo, breaking the "one photo split continuously across slides"
+  // illusion the whole Look exists for. Properly supporting an edit here means re-splitting the
+  // photo across all N slides, not patching one -- new scope, not a bug fix, so out of v1. Reject
+  // early and honestly instead, checked immediately after the carousel/ownership fetch and before
+  // classifyEdit or any other Anthropic call in this function can ever run.
+  if (carousel.look === 'Photo Continuous') {
+    return {
+      type: 'unsupported',
+      message: "Chat editing isn't available for Photo Continuous carousels yet -- this Look doesn't support edits in v1.",
+    }
+  }
 
   const slides = carousel.slides as Slide[]
   if (currentSlideIndex < 0 || currentSlideIndex >= slides.length) {
@@ -844,7 +861,17 @@ export async function deleteCarousel(id: string) {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { error } = await supabase.from('carousels').delete().eq('id', id).eq('user_id', user.id)
+  // `.select('reference_images')` on the delete itself (not a separate SELECT beforehand) --
+  // captures the row's reference_images in the same round trip, right as it's deleted, so there's
+  // no window where a second request could race in between a read and the delete. Returns an
+  // empty array (not an error) if the id/user_id pair matched no row, same silent-no-op behavior
+  // this action already had before this cleanup existed.
+  const { data: deletedRows, error } = await supabase
+    .from('carousels')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select('reference_images')
   if (error) throw new Error(error.message)
 
   // Real cleanup, not just the DB row -- previously left every deleted carousel's slide PNGs
@@ -858,6 +885,23 @@ export async function deleteCarousel(id: string) {
     await supabase.storage
       .from('carousel-slides')
       .remove(files.map((f) => `${folder}/${f.name}`))
+  }
+
+  // Photo Continuous's single source photo (uploadReferenceImage) lives in `carousel-uploads`,
+  // not `carousel-slides` -- and unlike rendered slides, its path isn't scoped under this
+  // carousel's own id/folder (it's `${userId}/${randomId}-${filename}`, uploaded before the
+  // carousel even existed -- see uploadReferenceImage's own comment). The only way to find it is
+  // off `reference_images` on the row itself, captured above before the row was gone. A real
+  // DELETE policy for this bucket already exists (012_storage_delete_policy.sql), it just had no
+  // caller for this bucket until now -- previously the source photo stayed in this
+  // publicly-readable bucket forever, even after the carousel that referenced it was deleted.
+  // Same best-effort discipline as the carousel-slides cleanup above.
+  const referenceImages = (deletedRows?.[0]?.reference_images as Slide[] | undefined) ?? []
+  const uploadPaths = referenceImages
+    .map((img) => storagePathFromPublicUrl(img.url, 'carousel-uploads'))
+    .filter((p): p is string => p !== null)
+  if (uploadPaths.length > 0) {
+    await supabase.storage.from('carousel-uploads').remove(uploadPaths)
   }
 }
 

@@ -377,6 +377,18 @@ a { color: inherit; }
 }
 .wizard-hero-form input::placeholder { color: var(--ink-faint); font-weight: 500; }
 
+/* Photo Continuous's 5-photo upload (2026-08-03 rebuild, replaces the old single-file input) --
+   sits inside .wizard-hero-form's pill in place of the text input, so it needs to behave like one
+   flex child: grow to fill the row, shrink each of the 5 native file inputs down small enough
+   that all 5 fit without breaking the pill's shape on a normal desktop width, and wrap to fewer
+   per row on narrow screens rather than overflow it (see the max-width: 680px block below). */
+.photo-continuous-uploads {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 6px 0;
+}
+.photo-continuous-uploads input[type="file"] {
+  width: 100%; min-width: 0; font-family: var(--font); font-size: 10.5px; color: var(--ink-soft);
+}
+
 .new-composer-box {
   background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 20px;
   padding: 16px 18px 14px; box-shadow: var(--shadow-md); margin-bottom: 14px;
@@ -692,6 +704,7 @@ textarea.composer-context-input::placeholder { color: var(--ink-faint); }
   .new-section { padding: 28px 0 40px; max-width: 100%; min-height: auto; justify-content: flex-start; }
   .new-section h1 { font-size: 21px; }
   .pick-card { flex: 1 1 100%; }
+  .photo-continuous-uploads { grid-template-columns: repeat(3, 1fr); }
   /* Angle cards' 4:5 desktop aspect-ratio stacks 3 tall cards vertically on mobile -- a lot of
      scrolling for a card that's just two lines of text. Shrink to a fixed shorter height instead
      of scaling the same ratio down; text stays the same size set above, just less empty space

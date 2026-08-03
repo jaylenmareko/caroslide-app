@@ -10,20 +10,12 @@ export function templateFileFor(look: Look, variant: TemplateVariant | null): st
   // Bold Hook (added 2026-07-22) is a single-file Look, same as Plain Text -- no sub-variant to
   // pick, see NewCarouselWizard.tsx's hasVariantStep.
   if (look === 'Bold Hook') return '12-hook-block.html'
-  // Photo Continuous (2026-08-02): variant IS the file selector directly (Split Two/Three/Four map
-  // 1:1 to their own template), unlike every other Look where variant maps into a shared
-  // family. No `map` lookup needed -- the variant name and file name already agree.
-  // STALE/DEAD as of the 2026-08-03 rebuild (see photoContinuousTemplateFor below) -- kept only
-  // because pipeline.ts's generateSplitPhotoCarousel still calls this branch and that function is
-  // itself currently broken/slated for a rewrite in a later task of this same plan. The 3 tsc
-  // errors this branch throws now (variant no longer includes 'Split Two'/'Three'/'Four') are
-  // known and deferred, not a regression. Delete this whole branch once that rewrite lands.
-  if (look === 'Photo Continuous') {
-    if (variant === 'Split Two') return 'split-2.html'
-    if (variant === 'Split Three') return 'split-3.html'
-    if (variant === 'Split Four') return 'split-4.html'
-    throw new Error(`Photo Continuous requires a Split Two/Three/Four variant, got: ${variant}`)
-  }
+  // Photo Continuous deliberately has no branch here (2026-08-03 rebuild) -- it never reaches this
+  // function at all. It routes through generateSplitPhotoCarousel (pipeline.ts), which resolves
+  // its own per-slide file via photoContinuousTemplateFor below, not this Look-wide lookup. The old
+  // single-file "Split Two/Three/Four" branch that used to live here was deleted once both
+  // pipeline.ts (Task 4) and NewCarouselWizard.tsx (Task 6) stopped routing through it -- see that
+  // plan's Task 6 for the deletion trigger.
 
   const map: Record<string, string> = {
     Classic: '1-cover-circles.html',

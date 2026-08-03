@@ -74,19 +74,21 @@ const STAT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[]
   { title: 'Split Flip', desc: 'A giant stat number on top, two photos split below.', preview: '/template-previews/9-split-flip-stat.png' },
 ]
 
-// One photo, split seamlessly across N slides -- Photo Continuous's only sub-choice, and (per
-// hasVariantStep below) not skippable, since Split Two/Three/Four is exactly the value
-// runGeneration.ts's `input.templateVariant!` non-null assertion depends on for this Look.
-const SPLIT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
-  { title: 'Split Two', desc: 'One photo, 2 slides.', preview: '/template-previews/split-2.png' },
-  { title: 'Split Three', desc: 'One photo, 3 slides.', preview: '/template-previews/split-3.png' },
-  { title: 'Split Four', desc: 'One photo, 4 slides.', preview: '/template-previews/split-4.png' },
+// 5 distinct photos, one per slide, each with small torn-paper-edge frame cut-outs -- Photo
+// Continuous's only sub-choice (2026-08-03 rebuild, replaces the old "split one photo across N
+// slides" mechanic), and (per hasVariantStep below) not skippable, since this is exactly the
+// value runGeneration.ts's `input.templateVariant!` non-null assertion depends on for this Look.
+const LAYOUT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+  { title: 'Edge Peek', desc: 'A framed detail at the edge, continuing to the next slide.', preview: '/template-previews/edge-peek.png' },
+  { title: 'Corner Peek', desc: 'Smaller frames tucked into the corners.', preview: '/template-previews/corner-peek.png' },
+  { title: 'Big Overlap', desc: 'One large frame taking over most of a slide.', preview: '/template-previews/big-overlap.png' },
+  { title: 'Scatter', desc: 'A little collage of frames on one slide.', preview: '/template-previews/scatter.png' },
 ]
 
 function variantsFor(look: Look) {
   if (look === 'Bold Stat') return STAT_VARIANTS
   if (look === 'Photo Focus') return PHOTO_VARIANTS
-  if (look === 'Photo Continuous') return SPLIT_VARIANTS
+  if (look === 'Photo Continuous') return LAYOUT_VARIANTS
   return CIRCLES_VARIANTS
 }
 
@@ -113,10 +115,10 @@ export default function NewCarouselWizard({
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
-  // Photo Continuous only -- this Look has no brief/chat composer (no AI text at all), just a
-  // single required photo upload. See handleGenerate's Photo Continuous branch and the file-input
-  // render below.
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  // Photo Continuous only -- this Look has no brief/chat composer (no AI text at all), just 5
+  // required photo uploads, one per slide (2026-08-03 rebuild, was a single photoFile before). See
+  // handleGenerate's Photo Continuous branch and the 5-file-input render below.
+  const [photoFiles, setPhotoFiles] = useState<(File | null)[]>([null, null, null, null, null])
   const [photoError, setPhotoError] = useState<string | null>(null)
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
@@ -146,26 +148,32 @@ export default function NewCarouselWizard({
   function handleGenerate() {
     setGenerateError(null)
     // Checked, and bailed out of, BEFORE startTransition -- this Look's carousel must never reach
-    // createCarousel with an empty referenceImageUrls[0] (runGeneration.ts reads it unguarded for
-    // Photo Continuous, see its own comment), so a missing photo has to block submission entirely
-    // rather than surface as a generic post-hoc error.
-    if (effectiveLook === 'Photo Continuous' && !photoFile) {
-      setPhotoError('Attach a photo first.')
+    // createCarousel with fewer than 5 referenceImageUrls (runGeneration.ts / generateSplitPhotoCarousel
+    // read all 5 unguarded for Photo Continuous, see their own comments), so missing photos have to
+    // block submission entirely rather than surface as a generic post-hoc error.
+    if (effectiveLook === 'Photo Continuous' && photoFiles.some((f) => f === null)) {
+      setPhotoError('Attach all 5 photos first.')
       return
     }
     setPhotoError(null)
     startTransition(async () => {
       try {
         if (effectiveLook === 'Photo Continuous') {
-          const formData = new FormData()
-          formData.append('file', photoFile!)
-          const { url } = await uploadReferenceImage(formData)
+          // 5 independent uploads -- no reason to serialize them.
+          const urls = await Promise.all(
+            photoFiles.map(async (file) => {
+              const formData = new FormData()
+              formData.append('file', file!)
+              const { url } = await uploadReferenceImage(formData)
+              return url
+            })
+          )
           await createCarousel({
             format: 'Post',
             look: 'Photo Continuous',
             templateVariant,
             brief: '',
-            referenceImageUrls: [url],
+            referenceImageUrls: urls,
           })
         } else {
           await createCarousel({
@@ -246,22 +254,29 @@ export default function NewCarouselWizard({
           }}
         >
           {effectiveLook === 'Photo Continuous' ? (
-            <input
-              key="photo-continuous-file-input"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null
-                if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-                  setPhotoError(`That photo is over ${MAX_ATTACHMENT_MB}MB -- try a smaller one.`)
-                  setPhotoFile(null)
-                  e.target.value = ''
-                  return
-                }
-                setPhotoError(null)
-                setPhotoFile(file)
-              }}
-            />
+            <div className="photo-continuous-uploads" key="photo-continuous-uploads">
+              {[0, 1, 2, 3, 4].map((slot) => (
+                <input
+                  key={`photo-slot-${slot}`}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null
+                    if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+                      setPhotoError(`That photo is over ${MAX_ATTACHMENT_MB}MB -- try a smaller one.`)
+                      e.target.value = ''
+                      return
+                    }
+                    setPhotoError(null)
+                    setPhotoFiles((prev) => {
+                      const next = [...prev]
+                      next[slot] = file
+                      return next
+                    })
+                  }}
+                />
+              ))}
+            </div>
           ) : (
             <input
               key="composer-text-input"

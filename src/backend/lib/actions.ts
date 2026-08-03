@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createClient } from '@/backend/lib/supabase/server'
-import type { Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
+import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
 import { DEFAULT_BRAND_FONT } from '@/backend/lib/types'
 import { renderAndGuard } from '@/backend/lib/generation/pipeline'
 import type { CarouselGenerationJob } from '@/backend/lib/generation/runGeneration'
@@ -254,11 +254,27 @@ export async function createCarousel(input: {
   // usability test found a first-time user with zero context got stuck on that exact choice
   // before she understood what the product even was. An AI call decides it instead, same as
   // every other judgment call this pipeline already makes on the user's behalf.
-  const angle = await classifyAngle(input.brief, anthropicLimiter)
-  // Same reasoning for colors (Brand Kit removed for v1 entirely, see classifyColors' own
-  // comment) -- picked from the brief instead of a Settings/wizard color picker.
-  const { primary, secondary } = await classifyColors(input.brief, anthropicLimiter)
-  const brandColors = [primary, secondary]
+  //
+  // Photo Continuous (2026-08-02) skips both classifyAngle and classifyColors entirely -- this
+  // Look has no brief (always ''), so there's nothing for either call to infer from, and neither
+  // output is ever read for it: there's no caption-writing step to use `angle` as framing, and
+  // its CTA slide falls back to Caroslide's own default brand colors via buildBrandValues'
+  // existing `?? '#512888'` fallback, same as any carousel with an empty brandColors array.
+  // Calling them anyway would be a wasted real Anthropic call and would silently break this
+  // Look's "zero Anthropic calls" design promise. `angle: 'Value'` is an arbitrary but harmless
+  // placeholder -- the `angle` column is NOT NULL and nothing ever reads it for this Look.
+  let angle: Angle
+  let brandColors: string[]
+  if (input.look === 'Photo Continuous') {
+    angle = 'Value'
+    brandColors = []
+  } else {
+    angle = await classifyAngle(input.brief, anthropicLimiter)
+    // Same reasoning for colors (Brand Kit removed for v1 entirely, see classifyColors' own
+    // comment) -- picked from the brief instead of a Settings/wizard color picker.
+    const { primary, secondary } = await classifyColors(input.brief, anthropicLimiter)
+    brandColors = [primary, secondary]
+  }
   // Logo: free accounts show the Caroslide wordmark (buildBrandValues' existing fallback,
   // unchanged), paid accounts get a genuinely blank logo slot -- Jaylen's direction. No custom
   // logo upload exists anymore in v1, so logoUrl itself is always null; suppressLogoFallback is

@@ -10,6 +10,15 @@ export function templateFileFor(look: Look, variant: TemplateVariant | null): st
   // Bold Hook (added 2026-07-22) is a single-file Look, same as Plain Text -- no sub-variant to
   // pick, see NewCarouselWizard.tsx's hasVariantStep.
   if (look === 'Bold Hook') return '12-hook-block.html'
+  // Photo Continuous (2026-08-02): variant IS the file selector directly (Split Two/Three/Four map
+  // 1:1 to their own template), unlike every other Look where variant maps into a shared
+  // family. No `map` lookup needed -- the variant name and file name already agree.
+  if (look === 'Photo Continuous') {
+    if (variant === 'Split Two') return 'split-2.html'
+    if (variant === 'Split Three') return 'split-3.html'
+    if (variant === 'Split Four') return 'split-4.html'
+    throw new Error(`Photo Continuous requires a Split Two/Three/Four variant, got: ${variant}`)
+  }
 
   const map: Record<string, string> = {
     Classic: '1-cover-circles.html',

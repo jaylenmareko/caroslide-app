@@ -83,6 +83,9 @@ export const PHOTO_COUNT: Record<TemplateVariant, number> = {
   'Photo Grid': 3,
   'Photo Column': 1,
   Editorial: 1,
+  'Split Two': 0,
+  'Split Three': 0,
+  'Split Four': 0,
 }
 
 export function photosNeeded(variant: TemplateVariant | null, look: string): number {

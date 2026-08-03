@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:{{CANVAS_H}}px; overflow:hidden; background:#0a0a0a; }
+  .slide { width:1080px; height:{{CANVAS_H}}px; position:relative; }
+  /* background-size:200% spans the source photo across exactly 2 canvas-widths; BG_POSITION
+     (computed per-slide by splitPositionsFor, pipeline-side) selects which half shows. Matches
+     the standard CSS sprite-strip technique -- see splitPhoto.ts's own comment for the math. */
+  .photo { position:absolute; inset:0; background-image:url('{{BG_IMG}}'); background-size:200% 100%; background-position:{{BG_POSITION}} center; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="photo"></div>
+  </div>
+</body>
+</html>

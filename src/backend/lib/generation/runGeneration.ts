@@ -41,21 +41,18 @@ export async function runCarouselGeneration(
   const supabase = createServiceClient()
   try {
     // Photo Continuous (2026-08-02) routes to a deliberately separate, much simpler generation
-    // path -- no captions.ts call, no photo-sourcing, no guardrail/repair loop (see
-    // generateSplitPhotoCarousel's own comment in pipeline.ts). `referenceImageUrls[0]` is safe
-    // to read directly: this Look's wizard step (built in a later task) guarantees exactly 1 URL
-    // lands here. `templateVariant!` is non-null for this Look specifically -- unlike Plain
-    // Text/Bold Hook, which pass `null` -- Photo Continuous always has a variant.
+    // path -- no captions.ts call, no photo-sourcing, no guardrail/repair loop, and (2026-08-03)
+    // no CTA/branding slide at all (see generateSplitPhotoCarousel's own comment in
+    // pipeline.ts). `referenceImageUrls[0]` is safe to read directly: this Look's wizard step
+    // guarantees exactly 1 URL lands here. `templateVariant!` is non-null for this Look
+    // specifically -- unlike Plain Text/Bold Hook, which pass `null` -- Photo Continuous always
+    // has a variant.
     const generated =
       input.look === 'Photo Continuous'
         ? await generateSplitPhotoCarousel({
             format: input.format,
             templateVariant: input.templateVariant!,
             photoUrl: input.referenceImageUrls[0],
-            brandColors: input.brandColors,
-            logoUrl: null,
-            font: input.font,
-            suppressLogoFallback: input.suppressLogoFallback,
             renderLimiter,
           })
         : await generateCarousel({

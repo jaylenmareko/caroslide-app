@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
-import { templateFileFor, CTA_TEMPLATE } from './templates'
+import { templateFileFor, CTA_TEMPLATE, photoContinuousTemplateFor } from './templates'
 import { generateCaptions } from './captions'
 import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPlaceholder } from './images'
 import { renderSlide, sanitizeStrayEscapes } from './render'
@@ -9,7 +9,6 @@ import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
 import { EDITABLE_FIELDS } from './editableFields'
 import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
-import { splitPositionsFor } from './splitPhoto'
 
 const anthropic = new Anthropic()
 
@@ -726,37 +725,84 @@ export async function generateCarousel(input: {
 
 // Photo Continuous (2026-08-02): a deliberately separate path from generateCarousel above --
 // no captions.ts call, no images.ts photo-sourcing, no guardrail/repair loop (there's no text
-// to guard, and BG_IMG is the one photo the user themselves supplied, never AI-sourced). Still
-// reuses the CTA slide convention (see actions.ts createCarousel), renderSlide's render
-// plumbing, and the module's render-concurrency limiter (globalRenderLimit/renderLimiter) so
-// this Look behaves consistently with every other one from the account/billing/attribution
-// side, even though its generation internals are much simpler. Storage upload isn't part of
-// this function at all -- it happens uniformly in the caller (runGeneration.ts) over whatever
-// `slides` array any generate* function returns, regardless of which one ran.
+// to guard, and BG_IMG/FRAME_*_IMG are all photos the user themselves supplied, never
+// AI-sourced). Still reuses renderSlide's render plumbing and the module's render-concurrency
+// limiter (globalRenderLimit/renderLimiter) so this Look behaves consistently with every other
+// one from the account/billing/attribution side, even though its generation internals are much
+// simpler. Storage upload isn't part of this function at all -- it happens uniformly in the
+// caller (runGeneration.ts) over whatever `slides` array any generate* function returns,
+// regardless of which one ran.
 // No CTA/attribution slide for this Look (2026-08-03, Jaylen: "remove the logo for this
 // look") -- the whole point is an everyday user making a plain photo collage to post, not a
 // branded artifact. Every other Look keeps the "Made with Caroslide" CTA slide; this is the
 // one deliberate exception. Also means `brandColors`/`logoUrl`/`font`/`suppressLogoFallback`
 // (only ever used to build that slide's branding) are no longer needed on this function's
 // input at all -- removed rather than left as dead parameters.
+//
+// Photo Continuous (2026-08-03 rebuild): 5 distinct photos, one per slide, with small frame
+// cut-outs positioned per the chosen layout pattern (Edge Peek/Corner Peek/Big Overlap/
+// Scatter) -- see photoContinuousTemplateFor and the 20 templates it selects between. A frame's
+// own photo is always a crop of one of the two adjacent slides' own photos (straddling frames)
+// or that same slide's own photo (standalone frames) -- never a 6th image, so this function only
+// ever needs the 5 URLs the wizard collected, nothing else.
+//
+// FRAME_N_IMG assignment, verified by hand against all 20 real template files (not just the 2
+// named in the original plan -- see this task's own report for the full trace): FRAME_1_IMG and
+// FRAME_2_IMG do NOT mean "the Nth frame drawn on this slide." They name a SEAM in the straddle
+// chain -- FRAME_1_IMG is the seam between slide 1 and slide 2 (sourced from photoUrls[0]),
+// FRAME_2_IMG is the seam between slide 2 and slide 3 (sourced from photoUrls[1]). A slide either
+// STARTS a seam (its frame draws this slide's own photo, since the seam's source photo lives
+// here) or COMPLETES a seam that started on the PREVIOUS slide (its frame draws photoUrls[i-1]).
+// Across all 20 files, FRAME_1_IMG completes (uses photoUrls[i-1]) ONLY on slide index 1, and
+// FRAME_2_IMG completes ONLY on slide index 2 -- every other appearance of FRAME_1_IMG/
+// FRAME_2_IMG (every standalone frame: edge/corner/big-slide4, scatter-slide3/slide4; and
+// Scatter's non-straddle collage frames on slide 2) is this slide's own photo. FRAME_3_IMG never
+// completes a seam in any of the 20 files -- it's always this slide's own photo (Scatter's 3rd
+// collage frame on slide 2).
+//
+// This rule (not the naive "if (i > 0), FRAME_1_IMG = previous slide's photo" formula originally
+// proposed for this task) is what's actually implemented below, because that naive formula has
+// two real bugs caught by hand-tracing every file: (1) edge-slide4.html/corner-slide4.html/
+// big-slide4.html (i=3) have a STANDALONE FRAME_1_IMG that must be this slide's OWN photo
+// (photoUrls[3]) -- `if (i > 0)` fires there too and would wrongly hand it photoUrls[2] (the
+// previous slide's photo) instead. (2) edge-slide3.html/corner-slide3.html (i=2) have a single
+// frame whose placeholder is FRAME_2_IMG (completing slide 2's second frame) and needs
+// photoUrls[1] (slide 2's own photo) -- a rule that always treats FRAME_2_IMG as "this slide's
+// own photo" gets this backwards and would wrongly hand it photoUrls[2]. big-slide2.html/
+// big-slide3.html were the other real edge cases checked by hand: big-slide2 (i=1) has only
+// FRAME_1_IMG, correctly completing (photoUrls[0]) under this rule, with no FRAME_2_IMG straddle
+// to start; big-slide3 (i=2) has NO frame markup at all, so the FRAME_2_IMG value this rule still
+// computes for it (photoUrls[1], since i===2) is simply never referenced -- fillTemplate leaves
+// any values entry with no matching {{...}} placeholder in the template untouched (see
+// render.ts's fillTemplate/PLACEHOLDER regex), so setting an unused value is harmless, exactly
+// like every no-frame slide 5.
 export async function generateSplitPhotoCarousel(input: {
   format: Format
   templateVariant: TemplateVariant
-  photoUrl: string
+  photoUrls: [string, string, string, string, string]
   renderLimiter?: Limiter
 }): Promise<{ title: string; slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> }> {
-  const templateFile = templateFileFor('Photo Continuous', input.templateVariant)
   const canvasH = CANVAS_H[input.format]
-  const positions = splitPositionsFor(input.templateVariant)
   const renderLimit = input.renderLimiter ?? globalRenderLimit
 
-  const contentSlides = await Promise.all(
-    positions.map(async (bgPosition) => {
+  const slides = await Promise.all(
+    input.photoUrls.map(async (bgImg, i) => {
+      const templateFile = photoContinuousTemplateFor(input.templateVariant, i)
       const values: Record<string, string> = {
-        BG_IMG: input.photoUrl,
-        BG_POSITION: bgPosition,
+        BG_IMG: bgImg,
         CANVAS_H: String(canvasH),
+        // Completes the slide1->slide2 seam only on slide index 1; this slide's own photo
+        // everywhere else (slide-1's starting frame, every standalone frame).
+        FRAME_1_IMG: i === 1 ? input.photoUrls[i - 1] : bgImg,
+        // Completes the slide2->slide3 seam only on slide index 2; this slide's own photo
+        // everywhere else (Scatter's standalone slide-2 collage frame, standalone slide-4
+        // frames).
+        FRAME_2_IMG: i === 2 ? input.photoUrls[i - 1] : bgImg,
+        // Never completes a seam in any of the 20 files -- always this slide's own photo
+        // (Scatter's 3rd slide-2 collage frame).
+        FRAME_3_IMG: bgImg,
       }
+
       // No renderAndGuard call here -- that function's repair/vision-review machinery exists
       // entirely to fix AI-generated TEXT (missing fields, over-budget captions). This template
       // has zero text fields, so there is nothing for it to check or repair; a plain renderSlide
@@ -768,7 +814,7 @@ export async function generateSplitPhotoCarousel(input: {
 
   return {
     title: 'Photo carousel',
-    slides: contentSlides,
+    slides,
   }
 }
 

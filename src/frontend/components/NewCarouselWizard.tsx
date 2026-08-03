@@ -24,8 +24,12 @@ const LOOK_PREVIEW: Record<Look, string> = {
   'Plain Text': '/template-previews/7-plain-text.png',
   'Bold Stat': '/template-previews/5-bold-stat.png',
   'Bold Hook': '/template-previews/12-hook-block.png',
-  // Real rendered example, not a mockup -- Task 8 generates this asset via a live test run; the
-  // path just needs to exist in code now, the file itself lands separately.
+  // Real rendered example, not a mockup -- but reused from the frame/collage rebuild's own Task 7
+  // live-verification pass rather than a separate Look-specific render. photo-continuous.png is a
+  // copy of edge-peek.png (one of that rebuild's 4 real rendered layout-pattern previews), picked
+  // as a reasonable single image to represent "collage of photos with frames" at a glance. The
+  // original photo-continuous.png here was leftover from the FIRST (rejected) build of this Look --
+  // it was byte-identical to split-3.png, i.e. still showing the old one-photo-split mechanic.
   'Photo Continuous': '/template-previews/photo-continuous.png',
 }
 

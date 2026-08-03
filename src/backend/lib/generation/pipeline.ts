@@ -3,7 +3,7 @@ import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/
 import { templateFileFor, CTA_TEMPLATE } from './templates'
 import { generateCaptions } from './captions'
 import { findUsablePhoto, photosNeeded, PHOTO_FIELDS_FOR_TEMPLATE, solidColorPlaceholder } from './images'
-import { renderSlide, sanitizeStrayEscapes } from './render'
+import { renderSlide, sanitizeStrayEscapes, RenderError } from './render'
 import { checkSlide, budgetsFor, textLength, type GuardrailViolation } from './guardrails'
 import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
@@ -769,8 +769,27 @@ export async function generateSplitPhotoCarousel(input: {
   // Continuous's "zero text" design intent is about not AI-writing caption/headline copy, not
   // about removing Caroslide's own attribution slide, which every other Look keeps. Revisit if
   // Jaylen wants this Look to skip the CTA slide too; not requested during design.
-  const ctaValues = { ...brand, CANVAS_H: String(canvasH) }
-  const { png: ctaPng } = await renderLimit(() => renderSlide(CTA_TEMPLATE, ctaValues))
+  //
+  // Real bug found live during Task 8's own end-to-end verification (2026-08-02): cta.html's
+  // HEADLINE_HTML/SUBHEAD/CTA_TEXT have no `{{FIELD|default}}` fallback (only LOGO_HTML and
+  // MICRO_TEXT do) -- every other Look fills them via generateCarousel's captions.ts call, which
+  // this function deliberately never makes. Without a value, renderSlide ships the literal,
+  // visibly broken text "{{HEADLINE_HTML}}" on the real rendered slide, and this function ignored
+  // renderSlide's own `unresolved` return, so nothing caught it before now. Fixed with fixed,
+  // hardcoded copy -- NOT an AI call, so this doesn't reopen the "zero Anthropic calls for this
+  // Look" design promise -- sized against guardrails.ts's real cta.html budget
+  // (HEADLINE_HTML 70 / SUBHEAD 100 / CTA_TEXT 30).
+  const ctaValues = {
+    ...brand,
+    HEADLINE_HTML: 'Like this?',
+    SUBHEAD: 'Follow for more.',
+    CTA_TEXT: 'Follow',
+    CANVAS_H: String(canvasH),
+  }
+  const { png: ctaPng, unresolved: ctaUnresolved } = await renderLimit(() => renderSlide(CTA_TEMPLATE, ctaValues))
+  if (ctaUnresolved.length > 0) {
+    throw new RenderError(`Photo Continuous CTA slide left placeholders unresolved: ${ctaUnresolved.join(', ')}`)
+  }
 
   return {
     title: 'Photo carousel',

@@ -13,6 +13,11 @@ export function templateFileFor(look: Look, variant: TemplateVariant | null): st
   // Photo Continuous (2026-08-02): variant IS the file selector directly (Split Two/Three/Four map
   // 1:1 to their own template), unlike every other Look where variant maps into a shared
   // family. No `map` lookup needed -- the variant name and file name already agree.
+  // STALE/DEAD as of the 2026-08-03 rebuild (see photoContinuousTemplateFor below) -- kept only
+  // because pipeline.ts's generateSplitPhotoCarousel still calls this branch and that function is
+  // itself currently broken/slated for a rewrite in a later task of this same plan. The 3 tsc
+  // errors this branch throws now (variant no longer includes 'Split Two'/'Three'/'Four') are
+  // known and deferred, not a regression. Delete this whole branch once that rewrite lands.
   if (look === 'Photo Continuous') {
     if (variant === 'Split Two') return 'split-2.html'
     if (variant === 'Split Three') return 'split-3.html'
@@ -38,3 +43,19 @@ export function templateFileFor(look: Look, variant: TemplateVariant | null): st
 }
 
 export const CTA_TEMPLATE = 'cta.html'
+
+// Photo Continuous only (2026-08-03 rebuild): returns the one specific template file for a
+// given (layout pattern, slide index) pair -- unlike every other Look, this one needs a
+// different file per slide, not one file for the whole carousel. slideIndex is 0-based (0..4).
+const LAYOUT_KEY: Record<string, string> = {
+  'Edge Peek': 'edge',
+  'Corner Peek': 'corner',
+  'Big Overlap': 'big',
+  Scatter: 'scatter',
+}
+export function photoContinuousTemplateFor(variant: TemplateVariant, slideIndex: number): string {
+  const key = LAYOUT_KEY[variant]
+  if (!key) throw new Error(`photoContinuousTemplateFor requires an Edge Peek/Corner Peek/Big Overlap/Scatter variant, got: ${variant}`)
+  if (slideIndex < 0 || slideIndex > 4) throw new Error(`photoContinuousTemplateFor: slideIndex must be 0-4, got: ${slideIndex}`)
+  return `${key}-slide${slideIndex + 1}.html`
+}

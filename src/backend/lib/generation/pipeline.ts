@@ -9,6 +9,7 @@ import { fontValues } from './fonts'
 import { rewriteCopy } from './edit'
 import { EDITABLE_FIELDS } from './editableFields'
 import { NO_TOKEN_LIMIT, type AnthropicLimiter } from './anthropicLimiter'
+import { splitPositionsFor } from './splitPhoto'
 
 const anthropic = new Anthropic()
 
@@ -721,6 +722,60 @@ export async function generateCarousel(input: {
   )
 
   return { title: sanitizeStrayEscapes(generated.title), slides }
+}
+
+// Photo Continuous (2026-08-02): a deliberately separate path from generateCarousel above --
+// no captions.ts call, no images.ts photo-sourcing, no guardrail/repair loop (there's no text
+// to guard, and BG_IMG is the one photo the user themselves supplied, never AI-sourced). Still
+// reuses the CTA slide convention (see actions.ts createCarousel), renderSlide's render
+// plumbing, and the module's render-concurrency limiter (globalRenderLimit/renderLimiter) so
+// this Look behaves consistently with every other one from the account/billing/attribution
+// side, even though its generation internals are much simpler. Storage upload isn't part of
+// this function at all -- it happens uniformly in the caller (runGeneration.ts) over whatever
+// `slides` array any generate* function returns, regardless of which one ran.
+export async function generateSplitPhotoCarousel(input: {
+  format: Format
+  templateVariant: TemplateVariant
+  photoUrl: string
+  brandColors: string[]
+  logoUrl: string | null
+  font: string
+  suppressLogoFallback?: boolean
+  renderLimiter?: Limiter
+}): Promise<{ title: string; slides: Array<{ png: Buffer; template: string; values: Record<string, string> }> }> {
+  const templateFile = templateFileFor('Photo Continuous', input.templateVariant)
+  const canvasH = CANVAS_H[input.format]
+  const brand = buildBrandValues(input)
+  const positions = splitPositionsFor(input.templateVariant)
+  const renderLimit = input.renderLimiter ?? globalRenderLimit
+
+  const contentSlides = await Promise.all(
+    positions.map(async (bgPosition) => {
+      const values: Record<string, string> = {
+        BG_IMG: input.photoUrl,
+        BG_POSITION: bgPosition,
+        CANVAS_H: String(canvasH),
+      }
+      // No renderAndGuard call here -- that function's repair/vision-review machinery exists
+      // entirely to fix AI-generated TEXT (missing fields, over-budget captions). This template
+      // has zero text fields, so there is nothing for it to check or repair; a plain renderSlide
+      // call is the correct amount of machinery, not a shortcut.
+      const { png } = await renderLimit(() => renderSlide(templateFile, values))
+      return { png, template: templateFile, values }
+    })
+  )
+
+  // Reuses the exact same CTA template + brand values every other Look ends on -- Photo
+  // Continuous's "zero text" design intent is about not AI-writing caption/headline copy, not
+  // about removing Caroslide's own attribution slide, which every other Look keeps. Revisit if
+  // Jaylen wants this Look to skip the CTA slide too; not requested during design.
+  const ctaValues = { ...brand, CANVAS_H: String(canvasH) }
+  const { png: ctaPng } = await renderLimit(() => renderSlide(CTA_TEMPLATE, ctaValues))
+
+  return {
+    title: 'Photo carousel',
+    slides: [...contentSlides, { png: ctaPng, template: CTA_TEMPLATE, values: ctaValues }],
+  }
 }
 
 export type { Slide }

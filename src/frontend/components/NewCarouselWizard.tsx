@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Look, TemplateVariant } from '@/backend/lib/types'
-import { createCarousel } from '@/backend/lib/actions'
+import { MAX_ATTACHMENT_MB, type Look, type TemplateVariant } from '@/backend/lib/types'
+import { createCarousel, uploadReferenceImage } from '@/backend/lib/actions'
 
 const RECOMMENDED_LOOK: Look = 'Circles + Photo'
 
@@ -12,6 +12,7 @@ const LOOKS: { title: Look; desc: string }[] = [
   { title: 'Plain Text', desc: 'One strong cover, plain slides after.' },
   { title: 'Bold Stat', desc: 'A number takes over the frame.' },
   { title: 'Bold Hook', desc: 'No photo -- a punchy hook headline on a bold color block.' },
+  { title: 'Photo Continuous', desc: 'Your own photo, split seamlessly across slides. No AI text.' },
 ]
 
 // Real rendered screenshots of the actual /carousel skill templates (real fonts,
@@ -23,6 +24,9 @@ const LOOK_PREVIEW: Record<Look, string> = {
   'Plain Text': '/template-previews/7-plain-text.png',
   'Bold Stat': '/template-previews/5-bold-stat.png',
   'Bold Hook': '/template-previews/12-hook-block.png',
+  // Real rendered example, not a mockup -- Task 8 generates this asset via a live test run; the
+  // path just needs to exist in code now, the file itself lands separately.
+  'Photo Continuous': '/template-previews/photo-continuous.png',
 }
 
 // alt carries the title+description that used to render as visible text (removed 2026-08-01, per
@@ -70,9 +74,19 @@ const STAT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[]
   { title: 'Split Flip', desc: 'A giant stat number on top, two photos split below.', preview: '/template-previews/9-split-flip-stat.png' },
 ]
 
+// One photo, split seamlessly across N slides -- Photo Continuous's only sub-choice, and (per
+// hasVariantStep below) not skippable, since Split Two/Three/Four is exactly the value
+// runGeneration.ts's `input.templateVariant!` non-null assertion depends on for this Look.
+const SPLIT_VARIANTS: { title: TemplateVariant; desc: string; preview: string }[] = [
+  { title: 'Split Two', desc: 'One photo, 2 slides.', preview: '/template-previews/split-2.png' },
+  { title: 'Split Three', desc: 'One photo, 3 slides.', preview: '/template-previews/split-3.png' },
+  { title: 'Split Four', desc: 'One photo, 4 slides.', preview: '/template-previews/split-4.png' },
+]
+
 function variantsFor(look: Look) {
   if (look === 'Bold Stat') return STAT_VARIANTS
   if (look === 'Photo Focus') return PHOTO_VARIANTS
+  if (look === 'Photo Continuous') return SPLIT_VARIANTS
   return CIRCLES_VARIANTS
 }
 
@@ -99,6 +113,11 @@ export default function NewCarouselWizard({
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [templateVariant, setTemplateVariant] = useState<TemplateVariant>('Classic')
+  // Photo Continuous only -- this Look has no brief/chat composer (no AI text at all), just a
+  // single required photo upload. See handleGenerate's Photo Continuous branch and the file-input
+  // render below.
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   const effectiveLook = lookTouched ? look : RECOMMENDED_LOOK
   const hasVariantStep = effectiveLook !== 'Plain Text' && effectiveLook !== 'Bold Hook'
@@ -126,17 +145,39 @@ export default function NewCarouselWizard({
 
   function handleGenerate() {
     setGenerateError(null)
+    // Checked, and bailed out of, BEFORE startTransition -- this Look's carousel must never reach
+    // createCarousel with an empty referenceImageUrls[0] (runGeneration.ts reads it unguarded for
+    // Photo Continuous, see its own comment), so a missing photo has to block submission entirely
+    // rather than surface as a generic post-hoc error.
+    if (effectiveLook === 'Photo Continuous' && !photoFile) {
+      setPhotoError('Attach a photo first.')
+      return
+    }
+    setPhotoError(null)
     startTransition(async () => {
       try {
-        await createCarousel({
-          format: 'Post',
-          look: effectiveLook,
-          templateVariant: hasVariantStep ? templateVariant : null,
-          brief,
-          // Attach-photos removed for v1 (2026-08-01) -- always empty now; generateCarousel
-          // already sources its own photos when none are given (see initial-generation-behavior.md).
-          referenceImageUrls: [],
-        })
+        if (effectiveLook === 'Photo Continuous') {
+          const formData = new FormData()
+          formData.append('file', photoFile!)
+          const { url } = await uploadReferenceImage(formData)
+          await createCarousel({
+            format: 'Post',
+            look: 'Photo Continuous',
+            templateVariant,
+            brief: '',
+            referenceImageUrls: [url],
+          })
+        } else {
+          await createCarousel({
+            format: 'Post',
+            look: effectiveLook,
+            templateVariant: hasVariantStep ? templateVariant : null,
+            brief,
+            // Attach-photos removed for v1 (2026-08-01) -- always empty now; generateCarousel
+            // already sources its own photos when none are given (see initial-generation-behavior.md).
+            referenceImageUrls: [],
+          })
+        }
       } catch (err) {
         // createCarousel redirects on success, which Next.js implements by throwing
         // an internal NEXT_REDIRECT error -- let that one propagate, don't swallow it.
@@ -204,12 +245,32 @@ export default function NewCarouselWizard({
             handleGenerate()
           }}
         >
-          <input
-            type="text"
-            placeholder="What do you want?"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          {effectiveLook === 'Photo Continuous' ? (
+            <input
+              key="photo-continuous-file-input"
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+                  setPhotoError(`That photo is over ${MAX_ATTACHMENT_MB}MB -- try a smaller one.`)
+                  setPhotoFile(null)
+                  e.target.value = ''
+                  return
+                }
+                setPhotoError(null)
+                setPhotoFile(file)
+              }}
+            />
+          ) : (
+            <input
+              key="composer-text-input"
+              type="text"
+              placeholder="What do you want?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          )}
           <button
             type="submit"
             className={`composer-send-btn${isPending ? ' pending' : ''}`}
@@ -225,6 +286,7 @@ export default function NewCarouselWizard({
             )}
           </button>
         </form>
+        {photoError && <p className="attach-limit-error">{photoError}</p>}
         {generateError && <p className="attach-limit-error">{generateError}</p>}
         {isPending && (
           <p className="wiz-step-hint" style={{ margin: '10px 0 0' }}>

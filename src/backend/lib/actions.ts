@@ -5,7 +5,7 @@ import { headers } from 'next/headers'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createClient } from '@/backend/lib/supabase/server'
 import type { Angle, Format, Look, TemplateVariant, Slide } from '@/backend/lib/types'
-import { DEFAULT_BRAND_FONT } from '@/backend/lib/types'
+import { DEFAULT_BRAND_FONT, MAX_ATTACHMENT_MB } from '@/backend/lib/types'
 import { renderAndGuard } from '@/backend/lib/generation/pipeline'
 import type { CarouselGenerationJob } from '@/backend/lib/generation/runGeneration'
 import { classifyAngle, classifyColors } from '@/backend/lib/generation/captions'
@@ -199,6 +199,57 @@ export async function getCarouselLimitStatus(): Promise<{ atLimit: boolean; mess
   if (creditBalance > 0) return { atLimit: false, message: null }
 
   return { atLimit: true, message: limitExceededMessage(isActivePaid, limit) }
+}
+
+// Real gap found in security review (2026-08-03): the wizard's own MAX_ATTACHMENT_MB check and
+// the file input's `accept="image/*"` are both client-side hints only -- neither stops a caller
+// that invokes this server action directly (or a modified client) from sending an oversized file
+// or an arbitrary content type. `carousel-uploads` is a fully PUBLIC-read bucket (see
+// 002_reference_images.sql), and the upload below used to pass attacker-controlled `file.type`
+// straight through as the stored object's Content-Type with zero validation -- e.g. `text/html`
+// or `image/svg+xml` with embedded script, served back out from a public URL on this app's own
+// Storage domain, is a real stored-content/XSS-hosting risk, not just hardening. Both checks below
+// are the actual enforcement boundary; the client-side ones are only there to fail fast/politely.
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+// Photo Continuous's single-photo upload (2026-08-02) -- the wizard's old multi-photo attachment
+// composer was removed entirely for v1 (2026-08-01), but the `carousel-uploads` Storage bucket and
+// its owner-scoped RLS policies survived that removal untouched (see 002_reference_images.sql /
+// 012_storage_delete_policy.sql: both require the object's top-level path segment to equal
+// auth.uid()). This reuses that exact same bucket and the same `${userId}/${randomId}-${filename}`
+// path convention the old client-side upload used (see git history, a14e29e) -- just moved
+// server-side so the upload runs under a real authenticated action instead of a raw client call,
+// consistent with every other write in this file.
+export async function uploadReferenceImage(formData: FormData): Promise<{ url: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const file = formData.get('file')
+  if (!(file instanceof File)) {
+    throw new Error('No photo was attached.')
+  }
+  if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+    throw new Error(`That photo is over ${MAX_ATTACHMENT_MB}MB -- try a smaller one.`)
+  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error('Unsupported file type -- attach a JPEG, PNG, or WebP photo.')
+  }
+
+  // Path is scoped to this user's own top-level folder -- the ONLY thing the bucket's insert
+  // policy checks (auth.uid()::text = (storage.foldername(name))[1]); a random id after that
+  // keeps two uploads of a same-named file from colliding, same as the removed composer's own
+  // convention did.
+  const path = `${user!.id}/${crypto.randomUUID()}-${file.name}`
+  const { data, error } = await supabase.storage
+    .from('carousel-uploads')
+    .upload(path, file, { contentType: file.type })
+  if (error) throw new Error(`Failed to upload photo: ${error.message}`)
+
+  const { data: pub } = supabase.storage.from('carousel-uploads').getPublicUrl(data.path)
+  return { url: pub.publicUrl }
 }
 
 export async function createCarousel(input: {
